@@ -1,0 +1,43 @@
+# Configuration schema version. Change only with `provctl config migrate`.
+[meta]
+config_version = 1
+
+[paths]
+vhosts = "/var/www/vhosts"
+backups = "/var/backups/provctl"
+acme_challenge = "/var/lib/provctl/acme-challenge"
+
+[apache]
+service = "apache2"
+sites_available = "/etc/apache2/sites-available"
+sites_enabled = "/etc/apache2/sites-enabled"
+proxy_timeout = 60
+allowed_proxy_hosts = ["127.0.0.1", "localhost", "::1"]
+
+[php]
+default_version = ""
+max_children = 10
+memory_limit = "256M"
+upload_max = "64M"
+max_exec_time = 60
+
+[mariadb]
+enabled = true
+host = "localhost"
+defaults_file = ""
+
+[users]
+uid_min = 5000
+uid_max = 59999
+shell = "/bin/bash"
+
+[ssl]
+email = ""
+staging = false
+
+[logs]
+retention_days = 14
+compress = true
+
+[limits]
+lock_timeout_seconds = 30
