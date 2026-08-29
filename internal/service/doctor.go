@@ -159,7 +159,7 @@ func (doctor Doctor) checkApacheModules(ctx context.Context) Check {
 		return Check{Name: "Apache modules", Status: CheckFail, Detail: fmt.Sprintf("cannot list modules: %v", err), Hint: "enable required Apache modules"}
 	}
 	missing := make([]string, 0)
-	for _, module := range []string{"proxy", "proxy_fcgi", "proxy_http", "ssl", "rewrite", "headers"} {
+	for _, module := range []string{"proxy", "proxy_fcgi", "proxy_http", "socache_shmcb", "ssl", "rewrite", "headers"} {
 		if !strings.Contains(result.Stdout, module+"_module") {
 			missing = append(missing, module)
 		}

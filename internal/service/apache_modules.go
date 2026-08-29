@@ -10,7 +10,7 @@ import (
 	"provctl/internal/system"
 )
 
-var RequiredApacheModules = []string{"proxy", "proxy_fcgi", "proxy_http", "ssl", "rewrite", "headers"}
+var RequiredApacheModules = []string{"proxy", "proxy_fcgi", "proxy_http", "socache_shmcb", "ssl", "rewrite", "headers"}
 
 // ApacheModules enables Debian Apache modules through their managed symlinks.
 // It deliberately avoids a2enmod so the exact filesystem changes are known.
