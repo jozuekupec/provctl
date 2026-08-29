@@ -23,6 +23,24 @@ type Apache struct {
 // exact previous file state and reloads Apache, making it suitable as a plan
 // rollback step.
 func (apache Apache) Apply(ctx context.Context, path string, contents []byte) (func(context.Context) error, error) {
+	return apache.apply(ctx, path, contents, "")
+}
+
+// ApplyVHost installs a new managed vhost and enables it by a direct symlink.
+// It refuses to replace an existing enabled path.
+func (apache Apache) ApplyVHost(ctx context.Context, path string, contents []byte, enabledPath string) (func(context.Context) error, error) {
+	if enabledPath == "" {
+		return nil, errors.New("Apache enabled vhost path is required")
+	}
+	if _, err := apache.FS.Stat(enabledPath); err == nil {
+		return nil, fmt.Errorf("refuse to replace existing enabled Apache vhost %q", enabledPath)
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return nil, fmt.Errorf("inspect enabled Apache vhost %q: %w", enabledPath, err)
+	}
+	return apache.apply(ctx, path, contents, enabledPath)
+}
+
+func (apache Apache) apply(ctx context.Context, path string, contents []byte, enabledPath string) (func(context.Context) error, error) {
 	if apache.FS == nil || apache.Commands == nil || apache.Systemd == nil || apache.Service == "" {
 		return nil, errors.New("Apache service requires filesystem, commander, systemd, and service name")
 	}
@@ -37,10 +55,21 @@ func (apache Apache) Apply(ctx context.Context, path string, contents []byte) (f
 		return nil, fmt.Errorf("write Apache configuration %q: %w", path, err)
 	}
 	restore := func(restoreCtx context.Context) error {
+		if enabledPath != "" {
+			if err := apache.FS.Remove(enabledPath); err != nil && !errors.Is(err, os.ErrNotExist) {
+				return fmt.Errorf("remove enabled Apache vhost %q: %w", enabledPath, err)
+			}
+		}
 		if err := apache.restore(restoreCtx, path, previous, existed); err != nil {
 			return err
 		}
 		return nil
+	}
+	if enabledPath != "" {
+		if err := apache.FS.Symlink(path, enabledPath); err != nil {
+			_ = restore(ctx)
+			return nil, fmt.Errorf("enable Apache vhost %q: %w", enabledPath, err)
+		}
 	}
 	if err := apache.configTest(ctx, "updated configuration"); err != nil {
 		if restoreErr := restore(ctx); restoreErr != nil {
