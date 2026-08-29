@@ -8,6 +8,7 @@ import (
 	"os/user"
 	"path/filepath"
 	"strconv"
+	"strings"
 
 	"provctl/internal/config"
 	"provctl/internal/domain"
@@ -100,6 +101,60 @@ func (service SubscriptionService) Create(ctx context.Context, name string) (int
 	return service.Executor.Run(ctx, operation)
 }
 
+func (service SubscriptionService) Delete(ctx context.Context, name string, force bool) (int64, error) {
+	operation, err := service.PrepareDelete(ctx, name, force)
+	if err != nil {
+		return 0, err
+	}
+	return service.Executor.Run(ctx, operation)
+}
+
+// PrepareDelete verifies all destructive targets without changing the system.
+func (service SubscriptionService) PrepareDelete(ctx context.Context, name string, force bool) (plan.Plan, error) {
+	subscription, err := service.Show(ctx, name)
+	if err != nil {
+		return plan.Plan{}, err
+	}
+	if subscription.Status != "archived" && !force {
+		return plan.Plan{}, fmt.Errorf("subscription %q is %s; archive it first or use --force", name, subscription.Status)
+	}
+	if err := service.validateDeletionTarget(subscription); err != nil {
+		return plan.Plan{}, err
+	}
+	account, err := service.Users.Lookup(subscription.UnixUser)
+	if err != nil {
+		return plan.Plan{}, fmt.Errorf("look up subscription user %q: %w", subscription.UnixUser, err)
+	}
+	if account.Uid != strconv.Itoa(subscription.UnixUID) || filepath.Clean(account.HomeDir) != filepath.Clean(subscription.Home) {
+		return plan.Plan{}, fmt.Errorf("unix user %q does not match stored subscription identity", subscription.UnixUser)
+	}
+	return service.deletePlan(subscription), nil
+}
+
+func (service SubscriptionService) validateDeletionTarget(subscription domain.Subscription) error {
+	root := filepath.Clean(service.Config.Paths.VHosts)
+	expectedHome := filepath.Join(root, subscription.Name)
+	if root == "." || root == string(filepath.Separator) || filepath.Clean(subscription.Home) != expectedHome {
+		return fmt.Errorf("refuse to delete unexpected subscription home %q", subscription.Home)
+	}
+	resolvedRoot, err := service.FS.EvalSymlinks(root)
+	if err != nil {
+		return fmt.Errorf("resolve vhosts root: %w", err)
+	}
+	resolvedHome, err := service.FS.EvalSymlinks(subscription.Home)
+	if err != nil {
+		return fmt.Errorf("resolve subscription home: %w", err)
+	}
+	relative, err := filepath.Rel(resolvedRoot, resolvedHome)
+	if err != nil || relative == "." || relative == ".." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) || filepath.IsAbs(relative) {
+		return fmt.Errorf("refuse to delete home outside vhosts root: %q", subscription.Home)
+	}
+	if _, err := service.FS.Stat(subscription.Home); err != nil {
+		return fmt.Errorf("inspect subscription home %q: %w", subscription.Home, err)
+	}
+	return nil
+}
+
 // PrepareCreate validates the request and reads current state without changing it.
 func (service SubscriptionService) PrepareCreate(ctx context.Context, name string) (plan.Plan, error) {
 	if err := domain.ValidateSubscriptionName(name); err != nil {
@@ -182,6 +237,15 @@ func (service SubscriptionService) createPlan(subscription domain.Subscription) 
 	}
 	steps = append(steps, plan.Step{Name: "record subscription", Preview: "insert subscription into SQLite", Do: func(ctx context.Context) error { return service.Store.CreateSubscription(ctx, subscription) }, Undo: func(ctx context.Context) error { return service.Store.DeleteSubscription(ctx, subscription.Name) }})
 	return plan.Plan{Action: "subscription.create", Target: subscription.Name, Steps: steps}
+}
+
+func (service SubscriptionService) deletePlan(subscription domain.Subscription) plan.Plan {
+	steps := []plan.Step{
+		{Name: "remove subscription home", Preview: fmt.Sprintf("remove recursively %s", subscription.Home), Do: func(context.Context) error { return service.FS.RemoveAll(subscription.Home) }},
+		{Name: "delete Unix user", Preview: fmt.Sprintf("/usr/sbin/userdel %s", subscription.UnixUser), Do: func(ctx context.Context) error { return service.Users.Delete(ctx, subscription.UnixUser, false) }},
+		{Name: "delete subscription record", Preview: "delete subscription from SQLite", Do: func(ctx context.Context) error { return service.Store.DeleteSubscription(ctx, subscription.Name) }},
+	}
+	return plan.Plan{Action: "subscription.delete", Target: subscription.Name, Steps: steps}
 }
 
 func (service SubscriptionService) createDirectory(path string, uid int, mode os.FileMode) func(context.Context) error {

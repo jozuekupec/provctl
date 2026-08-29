@@ -7,6 +7,7 @@ type FS interface {
 	ReadFile(path string) ([]byte, error)
 	WriteFileAtomic(path string, data []byte, mode os.FileMode) error
 	Remove(path string) error
+	RemoveAll(path string) error
 	MkdirAll(path string, mode os.FileMode) error
 	Chown(path string, uid, gid int) error
 	Chmod(path string, mode os.FileMode) error

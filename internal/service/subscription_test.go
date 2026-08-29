@@ -30,6 +30,7 @@ func (fs *subscriptionFS) Stat(path string) (os.FileInfo, error) {
 func (fs *subscriptionFS) ReadFile(string) ([]byte, error)                   { return nil, os.ErrNotExist }
 func (fs *subscriptionFS) WriteFileAtomic(string, []byte, os.FileMode) error { return nil }
 func (fs *subscriptionFS) Remove(path string) error                          { delete(fs.directories, path); return nil }
+func (fs *subscriptionFS) RemoveAll(path string) error                       { delete(fs.directories, path); return nil }
 func (fs *subscriptionFS) MkdirAll(path string, _ os.FileMode) error {
 	if path == fs.failPath {
 		return errors.New("filesystem failure")
@@ -52,9 +53,15 @@ func (subscriptionInfo) ModTime() time.Time { return time.Time{} }
 func (subscriptionInfo) IsDir() bool        { return true }
 func (subscriptionInfo) Sys() any           { return nil }
 
-type subscriptionUsers struct{ created, deleted bool }
+type subscriptionUsers struct {
+	created, deleted bool
+	account          *user.User
+}
 
 func (users *subscriptionUsers) Lookup(name string) (*user.User, error) {
+	if users.account != nil && users.account.Username == name {
+		return users.account, nil
+	}
 	return nil, user.UnknownUserError(name)
 }
 func (users *subscriptionUsers) LookupID(uid string) (*user.User, error) {
@@ -181,6 +188,42 @@ func TestSubscriptionService_ShowReturnsStoredSubscription(t *testing.T) {
 	}
 	if got != stored {
 		t.Errorf("Show() = %#v, want %#v", got, stored)
+	}
+}
+
+func TestSubscriptionService_DeleteRemovesArchivedSubscription(t *testing.T) {
+	fs := &subscriptionFS{directories: map[string]bool{"/vhosts/acme": true}}
+	users := &subscriptionUsers{account: &user.User{Username: "acme", Uid: "5000", HomeDir: "/vhosts/acme"}}
+	journal := &subscriptionJournal{}
+	stored := domain.Subscription{Name: "acme", UnixUser: "acme", UnixUID: 5000, Home: "/vhosts/acme", Status: "archived"}
+	store := &subscriptionStore{values: map[string]domain.Subscription{"acme": stored}}
+	_, err := newSubscriptionService(fs, users, store, journal).Delete(context.Background(), "acme", false)
+	if err != nil {
+		t.Fatalf("Delete() error = %v", err)
+	}
+	if !users.deleted {
+		t.Error("Unix user was not deleted")
+	}
+	if fs.directories["/vhosts/acme"] {
+		t.Error("subscription home was not deleted")
+	}
+	if _, exists := store.values["acme"]; exists {
+		t.Error("subscription database record was not deleted")
+	}
+	if journal.status != plan.OperationDone {
+		t.Errorf("journal status = %s, want done", journal.status)
+	}
+}
+
+func TestSubscriptionService_PrepareDeleteRejectsUnexpectedHome(t *testing.T) {
+	fs := &subscriptionFS{directories: map[string]bool{"/vhosts": true, "/tmp/acme": true}}
+	users := &subscriptionUsers{account: &user.User{Username: "acme", Uid: "5000", HomeDir: "/tmp/acme"}}
+	journal := &subscriptionJournal{}
+	stored := domain.Subscription{Name: "acme", UnixUser: "acme", UnixUID: 5000, Home: "/tmp/acme", Status: "archived"}
+	store := &subscriptionStore{values: map[string]domain.Subscription{"acme": stored}}
+	_, err := newSubscriptionService(fs, users, store, journal).PrepareDelete(context.Background(), "acme", false)
+	if err == nil {
+		t.Fatal("PrepareDelete() error = nil, want rejection")
 	}
 }
 

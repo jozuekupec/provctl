@@ -12,6 +12,7 @@ type FS struct {
 	ReadFileFunc     func(string) ([]byte, error)
 	WriteFileFunc    func(string, []byte, os.FileMode) error
 	RemoveFunc       func(string) error
+	RemoveAllFunc    func(string) error
 	MkdirAllFunc     func(string, os.FileMode) error
 	ChownFunc        func(string, int, int) error
 	ChmodFunc        func(string, os.FileMode) error
@@ -28,6 +29,7 @@ func (f *FS) WriteFileAtomic(path string, data []byte, mode os.FileMode) error {
 	return f.WriteFileFunc(path, data, mode)
 }
 func (f *FS) Remove(path string) error                     { return f.RemoveFunc(path) }
+func (f *FS) RemoveAll(path string) error                  { return f.RemoveAllFunc(path) }
 func (f *FS) MkdirAll(path string, mode os.FileMode) error { return f.MkdirAllFunc(path, mode) }
 func (f *FS) Chown(path string, uid, gid int) error        { return f.ChownFunc(path, uid, gid) }
 func (f *FS) Chmod(path string, mode os.FileMode) error    { return f.ChmodFunc(path, mode) }

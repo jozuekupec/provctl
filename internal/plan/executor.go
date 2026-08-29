@@ -83,10 +83,12 @@ func (executor Executor) fail(ctx context.Context, id int64, operation Plan, sna
 
 func (executor Executor) rollback(ctx context.Context, id int64, operation Plan, snapshot Snapshot, completed []int, cause error) error {
 	var undoErrors []error
+	var irreversible []string
 	for offset := len(completed) - 1; offset >= 0; offset-- {
 		index := completed[offset]
 		undo := operation.Steps[index].Undo
 		if undo == nil {
+			irreversible = append(irreversible, operation.Steps[index].Name)
 			continue
 		}
 		if err := undo(ctx); err != nil {
@@ -97,8 +99,11 @@ func (executor Executor) rollback(ctx context.Context, id int64, operation Plan,
 		_ = executor.Journal.Update(ctx, id, OperationRunning, snapshot, cause.Error())
 	}
 	status := OperationRolledBack
-	if len(undoErrors) > 0 {
+	if len(undoErrors) > 0 || len(irreversible) > 0 {
 		status = OperationInconsistent
+	}
+	if len(irreversible) > 0 {
+		undoErrors = append(undoErrors, fmt.Errorf("irreversible completed steps remain: %v", irreversible))
 	}
 	finalError := errors.Join(append([]error{cause}, undoErrors...)...)
 	if err := executor.Journal.Update(ctx, id, status, snapshot, finalError.Error()); err != nil {

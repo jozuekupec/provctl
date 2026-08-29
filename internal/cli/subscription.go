@@ -19,6 +19,61 @@ func newSubscriptionCommand() *cobra.Command {
 	command.AddCommand(newSubscriptionCreateCommand())
 	command.AddCommand(newSubscriptionListCommand())
 	command.AddCommand(newSubscriptionShowCommand())
+	command.AddCommand(newSubscriptionDeleteCommand())
+	return command
+}
+
+func newSubscriptionDeleteCommand() *cobra.Command {
+	var configPath, confirmName string
+	var dryRun, force, sure bool
+	command := &cobra.Command{
+		Use:   "delete <name>",
+		Short: "permanently delete an archived subscription",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(command *cobra.Command, args []string) error {
+			if confirmName != args[0] {
+				return fmt.Errorf("--confirm-name must exactly match %q", args[0])
+			}
+			if !sure {
+				return fmt.Errorf("refusing destructive operation without --yes-i-am-sure")
+			}
+			cfg, err := config.Load(configPath)
+			if err != nil {
+				return fmt.Errorf("load configuration: %w", err)
+			}
+			ctx := context.Background()
+			if dryRun {
+				runtime, err := service.NewReadOnlySubscriptionRuntime(ctx, cfg)
+				if err != nil {
+					return fmt.Errorf("open subscription state: %w", err)
+				}
+				defer runtime.Close()
+				operation, err := runtime.Service.PrepareDelete(ctx, args[0], force)
+				if err != nil {
+					return err
+				}
+				return writePlan(command, operation)
+			}
+			runtime, err := service.NewProductionSubscriptionRuntime(ctx, cfg)
+			if err != nil {
+				return fmt.Errorf("open subscription state: %w", err)
+			}
+			defer runtime.Close()
+			lockCtx, cancel := context.WithTimeout(ctx, time.Duration(cfg.Limits.LockTimeoutSeconds)*time.Second)
+			defer cancel()
+			operationID, err := runtime.Service.Delete(lockCtx, args[0], force)
+			if err != nil {
+				return err
+			}
+			_, err = fmt.Fprintf(command.OutOrStdout(), "Deleted subscription %q (operation %d).\n", args[0], operationID)
+			return err
+		},
+	}
+	command.Flags().StringVar(&configPath, "config", meta.ConfigFile, "path to config.toml")
+	command.Flags().StringVar(&confirmName, "confirm-name", "", "repeat the subscription name")
+	command.Flags().BoolVar(&sure, "yes-i-am-sure", false, "confirm permanent deletion")
+	command.Flags().BoolVar(&force, "force", false, "delete an active subscription")
+	command.Flags().BoolVar(&dryRun, "dry-run", false, "show the operation plan without changing the system")
 	return command
 }
 

@@ -21,6 +21,7 @@ func (doctorFS) Stat(string) (os.FileInfo, error)                  { return doct
 func (doctorFS) ReadFile(string) ([]byte, error)                   { return nil, os.ErrNotExist }
 func (doctorFS) WriteFileAtomic(string, []byte, os.FileMode) error { return nil }
 func (doctorFS) Remove(string) error                               { return nil }
+func (doctorFS) RemoveAll(string) error                            { return nil }
 func (doctorFS) MkdirAll(string, os.FileMode) error                { return nil }
 func (doctorFS) Chown(string, int, int) error                      { return nil }
 func (doctorFS) Chmod(string, os.FileMode) error                   { return nil }

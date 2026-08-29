@@ -73,3 +73,17 @@ func TestExecutor_MarksInconsistentWhenUndoFails(t *testing.T) {
 		t.Errorf("final status = %s, want inconsistent", journal.records[len(journal.records)-1].status)
 	}
 }
+
+func TestExecutor_MarksInconsistentWhenIrreversibleStepCompleted(t *testing.T) {
+	journal, locker := &testJournal{}, &testLocker{}
+	_, err := (Executor{Journal: journal, Locker: locker}).Run(context.Background(), Plan{Action: "test", Target: "target", Steps: []Step{
+		{Name: "remove data", Do: func(context.Context) error { return nil }},
+		{Name: "second", Do: func(context.Context) error { return errors.New("boom") }},
+	}})
+	if err == nil {
+		t.Fatal("Run() error = nil, want failure")
+	}
+	if journal.records[len(journal.records)-1].status != OperationInconsistent {
+		t.Errorf("final status = %s, want inconsistent", journal.records[len(journal.records)-1].status)
+	}
+}

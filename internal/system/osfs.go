@@ -12,6 +12,7 @@ type OSFS struct{}
 func (OSFS) Stat(path string) (os.FileInfo, error)        { return os.Stat(path) }
 func (OSFS) ReadFile(path string) ([]byte, error)         { return os.ReadFile(path) }
 func (OSFS) Remove(path string) error                     { return os.Remove(path) }
+func (OSFS) RemoveAll(path string) error                  { return os.RemoveAll(path) }
 func (OSFS) MkdirAll(path string, mode os.FileMode) error { return os.MkdirAll(path, mode) }
 func (OSFS) Chown(path string, uid, gid int) error        { return os.Chown(path, uid, gid) }
 func (OSFS) Chmod(path string, mode os.FileMode) error    { return os.Chmod(path, mode) }
