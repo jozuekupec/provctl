@@ -40,6 +40,42 @@ func TestRenderApachePHPFPMHTTP_ForceHTTPSKeepsACME(t *testing.T) {
 	}
 }
 
+func TestRenderApacheStaticHTTP_ContainsIsolatedDocumentRootAndACME(t *testing.T) {
+	contents, err := RenderApacheStaticHTTP(ApacheStaticVHost{PrimaryDomain: "static.example.test", Aliases: []string{"www.static.example.test"}, DocumentRoot: "/vhosts/acme/sites/static.example.test/public", AcmeChallengeRoot: "/state/acme", LogDir: "/logs/acme/static.example.test"})
+	if err != nil {
+		t.Fatalf("RenderApacheStaticHTTP() error = %v", err)
+	}
+	if !containsAll(string(contents), "DocumentRoot /vhosts/acme/sites/static.example.test/public", "AllowOverride None", "Alias /.well-known/acme-challenge/ /state/acme/") {
+		t.Errorf("static vhost is missing required directives:\n%s", contents)
+	}
+}
+
+func TestRenderApacheProxyHTTP_RestrictsTargetAndSetsHeaders(t *testing.T) {
+	contents, err := RenderApacheProxyHTTP(ApacheProxyVHost{PrimaryDomain: "proxy.example.test", Target: "http://127.0.0.1:8080/", AcmeChallengeRoot: "/state/acme", ProxyTimeout: 60, LogDir: "/logs/acme/proxy.example.test"}, nil)
+	if err != nil {
+		t.Fatalf("RenderApacheProxyHTTP() error = %v", err)
+	}
+	if !containsAll(string(contents), "ProxyRequests Off", "ProxyPass / http://127.0.0.1:8080/ timeout=60", "RequestHeader set X-Forwarded-Proto \"http\"") {
+		t.Errorf("proxy vhost is missing required directives:\n%s", contents)
+	}
+	if _, err := RenderApacheProxyHTTP(ApacheProxyVHost{PrimaryDomain: "proxy.example.test", Target: "http://10.0.0.1:8080", AcmeChallengeRoot: "/state/acme", ProxyTimeout: 60, LogDir: "/logs/acme/proxy.example.test"}, nil); err == nil {
+		t.Error("RenderApacheProxyHTTP() accepted a non-allowlisted target")
+	}
+}
+
+func TestRenderApacheRedirectHTTP_ValidatesTargetAndStatus(t *testing.T) {
+	contents, err := RenderApacheRedirectHTTP(ApacheRedirectVHost{PrimaryDomain: "old.example.test", Target: "https://new.example.test/path", RedirectCode: 301, AcmeChallengeRoot: "/state/acme", LogDir: "/logs/acme/old.example.test"})
+	if err != nil {
+		t.Fatalf("RenderApacheRedirectHTTP() error = %v", err)
+	}
+	if !containsAll(string(contents), "Redirect 301 / https://new.example.test/path", "Alias /.well-known/acme-challenge/ /state/acme/") {
+		t.Errorf("redirect vhost is missing required directives:\n%s", contents)
+	}
+	if _, err := RenderApacheRedirectHTTP(ApacheRedirectVHost{PrimaryDomain: "old.example.test", Target: "mailto:test@example.test", RedirectCode: 301, AcmeChallengeRoot: "/state/acme", LogDir: "/logs/acme/old.example.test"}); err == nil {
+		t.Error("RenderApacheRedirectHTTP() accepted a non-HTTP target")
+	}
+}
+
 func containsAll(contents string, values ...string) bool {
 	for _, value := range values {
 		if !strings.Contains(contents, value) {

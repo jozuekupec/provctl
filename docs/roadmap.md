@@ -16,7 +16,9 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   uživatel, skupina a adresáře s izolačními právy.
 - [~] **M3 — websites a Apache:** PHP-FPM website create, ukládání domény,
   render a atomická aplikace HTTP vhostu, povolení modulů a defaultní catch-all
-  vhost jsou hotové. Zbývají static/proxy/redirect vhosty, správa webů a
+  vhost jsou hotové. Renderery pro static/proxy/redirect jsou připravené a
+  proxy cíl je omezen na loopback či allowlist s povinným neprivilegovaným
+  portem. Zbývá jejich napojení na lifecycle příkazů, správa webů a
   `reconcile`.
 - [~] **M4 — PHP-FPM:** automatická detekce a výběr verze, render a atomické
   vytvoření poolu včetně ověření socketu jsou hotové. Zbývá změna verze poolu
@@ -32,7 +34,10 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
 - [~] Unit testy bootstrapu pokrývají prázdný plán, chybějící systémové cesty
   a odmítnutí změny práv existujícího adresáře. Zbývá cílený rollback test.
 - [ ] Projít end-to-end HTTP požadavek přes Apache a PHP-FPM v Incus kontejneru
-  `pv`; po každém integračním testu obnovit snapshot `clean`.
+  `pv`; po každém integračním testu obnovit snapshot `clean`. **Hotovo pro
+  PHP-FPM tok:** bootstrap → subscription → website → lokální HTTP požadavek
+  s `--resolve` vrátil očekávané PHP tělo; Apache configtest a služby Apache i
+  PHP-FPM byly aktivní. Kontejner byl obnoven na `clean`.
 
 ## Následující milníky
 
