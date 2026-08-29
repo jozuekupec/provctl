@@ -89,6 +89,20 @@ func (store *subscriptionStore) SubscriptionUIDExists(_ context.Context, uid int
 	}
 	return false, nil
 }
+func (store *subscriptionStore) ListSubscriptions(_ context.Context) ([]domain.Subscription, error) {
+	var subscriptions []domain.Subscription
+	for _, subscription := range store.values {
+		subscriptions = append(subscriptions, subscription)
+	}
+	return subscriptions, nil
+}
+func (store *subscriptionStore) SubscriptionByName(_ context.Context, name string) (domain.Subscription, error) {
+	subscription, exists := store.values[name]
+	if !exists {
+		return domain.Subscription{}, errors.New("not found")
+	}
+	return subscription, nil
+}
 func (store *subscriptionStore) CreateSubscription(_ context.Context, subscription domain.Subscription) error {
 	store.values[subscription.Name] = subscription
 	return nil
@@ -153,6 +167,20 @@ func TestSubscriptionService_PrepareCreateDoesNotChangeState(t *testing.T) {
 	}
 	if operation.Steps[0].Preview == "" {
 		t.Error("user-creation preview is empty")
+	}
+}
+
+func TestSubscriptionService_ShowReturnsStoredSubscription(t *testing.T) {
+	fs := &subscriptionFS{directories: map[string]bool{}}
+	users, journal := &subscriptionUsers{}, &subscriptionJournal{}
+	stored := domain.Subscription{Name: "acme", UnixUser: "acme", UnixUID: 5000, Home: "/vhosts/acme", Status: "active"}
+	store := &subscriptionStore{values: map[string]domain.Subscription{"acme": stored}}
+	got, err := newSubscriptionService(fs, users, store, journal).Show(context.Background(), "acme")
+	if err != nil {
+		t.Fatalf("Show() error = %v", err)
+	}
+	if got != stored {
+		t.Errorf("Show() = %#v, want %#v", got, stored)
 	}
 }
 

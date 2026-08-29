@@ -34,6 +34,50 @@ func (repository *Repository) SubscriptionUIDExists(ctx context.Context, uid int
 	return true, nil
 }
 
+func (repository *Repository) ListSubscriptions(ctx context.Context) ([]domain.Subscription, error) {
+	rows, err := repository.DB.QueryContext(ctx, `SELECT id, name, unix_user, unix_uid, home, status, COALESCE(php_version, ''), php_max_children, php_memory_limit, php_upload_max, php_max_exec_time, ssh_access FROM subscriptions ORDER BY name`)
+	if err != nil {
+		return nil, fmt.Errorf("list subscriptions: %w", err)
+	}
+	defer rows.Close()
+	var subscriptions []domain.Subscription
+	for rows.Next() {
+		subscription, err := scanSubscription(rows)
+		if err != nil {
+			return nil, err
+		}
+		subscriptions = append(subscriptions, subscription)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate subscriptions: %w", err)
+	}
+	return subscriptions, nil
+}
+
+func (repository *Repository) SubscriptionByName(ctx context.Context, name string) (domain.Subscription, error) {
+	row := repository.DB.QueryRowContext(ctx, `SELECT id, name, unix_user, unix_uid, home, status, COALESCE(php_version, ''), php_max_children, php_memory_limit, php_upload_max, php_max_exec_time, ssh_access FROM subscriptions WHERE name = ?`, name)
+	subscription, err := scanSubscription(row)
+	if errors.Is(err, sql.ErrNoRows) {
+		return domain.Subscription{}, fmt.Errorf("subscription %q not found", name)
+	}
+	if err != nil {
+		return domain.Subscription{}, err
+	}
+	return subscription, nil
+}
+
+type subscriptionScanner interface {
+	Scan(...any) error
+}
+
+func scanSubscription(scanner subscriptionScanner) (domain.Subscription, error) {
+	var subscription domain.Subscription
+	if err := scanner.Scan(&subscription.ID, &subscription.Name, &subscription.UnixUser, &subscription.UnixUID, &subscription.Home, &subscription.Status, &subscription.PHPVersion, &subscription.PHPMaxChildren, &subscription.PHPMemoryLimit, &subscription.PHPUploadMax, &subscription.PHPMaxExecTime, &subscription.SSHAccess); err != nil {
+		return domain.Subscription{}, err
+	}
+	return subscription, nil
+}
+
 func (repository *Repository) CreateSubscription(ctx context.Context, subscription domain.Subscription) error {
 	now := time.Now().UTC().Format(time.RFC3339)
 	_, err := repository.DB.ExecContext(ctx, `INSERT INTO subscriptions (name, unix_user, unix_uid, home, status, php_version, php_max_children, php_memory_limit, php_upload_max, php_max_exec_time, ssh_access, created_at, updated_at) VALUES (?, ?, ?, ?, 'active', ?, ?, ?, ?, ?, ?, ?, ?)`, subscription.Name, subscription.UnixUser, subscription.UnixUID, subscription.Home, nullable(subscription.PHPVersion), subscription.PHPMaxChildren, subscription.PHPMemoryLimit, subscription.PHPUploadMax, subscription.PHPMaxExecTime, subscription.SSHAccess, now, now)

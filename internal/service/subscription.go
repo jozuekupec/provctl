@@ -20,8 +20,29 @@ import (
 type SubscriptionStore interface {
 	SubscriptionExists(context.Context, string) (bool, error)
 	SubscriptionUIDExists(context.Context, int) (bool, error)
+	ListSubscriptions(context.Context) ([]domain.Subscription, error)
+	SubscriptionByName(context.Context, string) (domain.Subscription, error)
 	CreateSubscription(context.Context, domain.Subscription) error
 	DeleteSubscription(context.Context, string) error
+}
+
+func (service SubscriptionService) List(ctx context.Context) ([]domain.Subscription, error) {
+	subscriptions, err := service.Store.ListSubscriptions(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("list subscriptions: %w", err)
+	}
+	return subscriptions, nil
+}
+
+func (service SubscriptionService) Show(ctx context.Context, name string) (domain.Subscription, error) {
+	if err := domain.ValidateSubscriptionName(name); err != nil {
+		return domain.Subscription{}, err
+	}
+	subscription, err := service.Store.SubscriptionByName(ctx, name)
+	if err != nil {
+		return domain.Subscription{}, err
+	}
+	return subscription, nil
 }
 
 type SubscriptionService struct {

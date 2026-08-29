@@ -13,6 +13,7 @@ var reservedSubscriptions = map[string]struct{}{
 }
 
 type Subscription struct {
+	ID             int64
 	Name           string
 	UnixUser       string
 	UnixUID        int
@@ -23,6 +24,7 @@ type Subscription struct {
 	PHPUploadMax   string
 	PHPMaxExecTime int
 	SSHAccess      string
+	Status         string
 }
 
 func ValidateSubscriptionName(name string) error {
