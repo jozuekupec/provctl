@@ -18,20 +18,20 @@ Go 1.22+ is required. These commands do not require root or Debian services:
 
 ```bash
 make test                 # vet, staticcheck, race-enabled unit tests
-make build                # produces build/provctl
-build/provctl --version
+make build                # produces dist/provctl
+dist/provctl --version
 ```
 
 `doctor` is read-only, but checks the host's services and paths, so it may deliberately return a non-zero result on a development machine:
 
 ```bash
-build/provctl doctor --config packaging/config.toml.default --json
+dist/provctl doctor --config packaging/config.toml.default --json
 ```
 
 `subscription create` is a root-facing operation. Its dry run reads the existing database and account state, then prints the exact planned steps without changing the system:
 
 ```bash
-sudo build/provctl subscription create acme --config /etc/provctl/config.toml --dry-run
+sudo dist/provctl subscription create acme --config /etc/provctl/config.toml --dry-run
 ```
 
 The non-dry-run form requires the state directory and database created by the upcoming `bootstrap` command; do not create those system paths manually on a workstation.
