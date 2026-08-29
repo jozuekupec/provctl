@@ -10,6 +10,7 @@ import (
 // Users delegates account operations to callbacks supplied by a test.
 type Users struct {
 	LookupFunc       func(string) (*user.User, error)
+	LookupIDFunc     func(string) (*user.User, error)
 	CreateFunc       func(context.Context, system.CreateUserOptions) error
 	SetShellFunc     func(context.Context, string, string) error
 	LockPasswordFunc func(context.Context, string) error
@@ -17,7 +18,8 @@ type Users struct {
 	DeleteFunc       func(context.Context, string, bool) error
 }
 
-func (f *Users) Lookup(name string) (*user.User, error) { return f.LookupFunc(name) }
+func (f *Users) Lookup(name string) (*user.User, error)  { return f.LookupFunc(name) }
+func (f *Users) LookupID(uid string) (*user.User, error) { return f.LookupIDFunc(uid) }
 func (f *Users) Create(ctx context.Context, opts system.CreateUserOptions) error {
 	return f.CreateFunc(ctx, opts)
 }

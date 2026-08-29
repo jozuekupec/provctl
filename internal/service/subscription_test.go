@@ -1,0 +1,156 @@
+package service
+
+import (
+	"context"
+	"errors"
+	"os"
+	"os/user"
+	"path/filepath"
+	"strconv"
+	"testing"
+	"time"
+
+	"provctl/internal/config"
+	"provctl/internal/domain"
+	"provctl/internal/plan"
+	"provctl/internal/system"
+)
+
+type subscriptionFS struct {
+	directories map[string]bool
+	failPath    string
+}
+
+func (fs *subscriptionFS) Stat(path string) (os.FileInfo, error) {
+	if fs.directories[path] {
+		return subscriptionInfo{}, nil
+	}
+	return nil, os.ErrNotExist
+}
+func (fs *subscriptionFS) ReadFile(string) ([]byte, error)                   { return nil, os.ErrNotExist }
+func (fs *subscriptionFS) WriteFileAtomic(string, []byte, os.FileMode) error { return nil }
+func (fs *subscriptionFS) Remove(path string) error                          { delete(fs.directories, path); return nil }
+func (fs *subscriptionFS) MkdirAll(path string, _ os.FileMode) error {
+	if path == fs.failPath {
+		return errors.New("filesystem failure")
+	}
+	fs.directories[path] = true
+	return nil
+}
+func (fs *subscriptionFS) Chown(string, int, int) error             { return nil }
+func (fs *subscriptionFS) Chmod(string, os.FileMode) error          { return nil }
+func (fs *subscriptionFS) Symlink(string, string) error             { return nil }
+func (fs *subscriptionFS) ReadDir(string) ([]os.DirEntry, error)    { return nil, nil }
+func (fs *subscriptionFS) EvalSymlinks(path string) (string, error) { return path, nil }
+
+type subscriptionInfo struct{}
+
+func (subscriptionInfo) Name() string       { return "directory" }
+func (subscriptionInfo) Size() int64        { return 0 }
+func (subscriptionInfo) Mode() os.FileMode  { return os.ModeDir | 0o751 }
+func (subscriptionInfo) ModTime() time.Time { return time.Time{} }
+func (subscriptionInfo) IsDir() bool        { return true }
+func (subscriptionInfo) Sys() any           { return nil }
+
+type subscriptionUsers struct{ created, deleted bool }
+
+func (users *subscriptionUsers) Lookup(name string) (*user.User, error) {
+	return nil, user.UnknownUserError(name)
+}
+func (users *subscriptionUsers) LookupID(uid string) (*user.User, error) {
+	id, _ := strconv.Atoi(uid)
+	return nil, user.UnknownUserIdError(id)
+}
+func (users *subscriptionUsers) Create(context.Context, system.CreateUserOptions) error {
+	users.created = true
+	return nil
+}
+func (users *subscriptionUsers) SetShell(context.Context, string, string) error    { return nil }
+func (users *subscriptionUsers) LockPassword(context.Context, string) error        { return nil }
+func (users *subscriptionUsers) SetPassword(context.Context, string, string) error { return nil }
+func (users *subscriptionUsers) Delete(context.Context, string, bool) error {
+	users.deleted = true
+	return nil
+}
+
+type subscriptionStore struct {
+	values map[string]domain.Subscription
+}
+
+func (store *subscriptionStore) SubscriptionExists(_ context.Context, name string) (bool, error) {
+	_, exists := store.values[name]
+	return exists, nil
+}
+func (store *subscriptionStore) CreateSubscription(_ context.Context, subscription domain.Subscription) error {
+	store.values[subscription.Name] = subscription
+	return nil
+}
+func (store *subscriptionStore) DeleteSubscription(_ context.Context, name string) error {
+	delete(store.values, name)
+	return nil
+}
+
+type subscriptionJournal struct{ status plan.OperationStatus }
+
+func (*subscriptionJournal) Start(context.Context, plan.Snapshot) (int64, error) { return 1, nil }
+func (journal *subscriptionJournal) Update(_ context.Context, _ int64, status plan.OperationStatus, _ plan.Snapshot, _ string) error {
+	journal.status = status
+	return nil
+}
+
+type subscriptionLocker struct{}
+
+func (subscriptionLocker) Lock(context.Context, string) (system.Unlock, error) {
+	return func() error { return nil }, nil
+}
+
+func newSubscriptionService(fs *subscriptionFS, users *subscriptionUsers, store *subscriptionStore, journal *subscriptionJournal) SubscriptionService {
+	cfg := config.Config{Paths: config.Paths{VHosts: "/vhosts"}, PHP: config.PHP{MaxChildren: 10, MemoryLimit: "256M", UploadMax: "64M", MaxExecTime: 60}, Users: config.Users{UIDMin: 5000, UIDMax: 5001, Shell: "/bin/bash"}}
+	return SubscriptionService{FS: fs, Users: users, Store: store, Executor: plan.Executor{Journal: journal, Locker: subscriptionLocker{}}, Config: cfg}
+}
+
+func TestSubscriptionService_CreateCreatesSystemAndDatabaseState(t *testing.T) {
+	fs := &subscriptionFS{directories: map[string]bool{}}
+	users, store, journal := &subscriptionUsers{}, &subscriptionStore{values: map[string]domain.Subscription{}}, &subscriptionJournal{}
+	_, err := newSubscriptionService(fs, users, store, journal).Create(context.Background(), "acme")
+	if err != nil {
+		t.Fatalf("Create() error = %v", err)
+	}
+	if !users.created || users.deleted {
+		t.Errorf("user state = created %t, deleted %t", users.created, users.deleted)
+	}
+	if _, exists := store.values["acme"]; !exists {
+		t.Error("subscription was not stored")
+	}
+	if !fs.directories[filepath.Join("/vhosts", "acme", "tmp", "sessions")] {
+		t.Error("session directory was not created")
+	}
+	if journal.status != plan.OperationDone {
+		t.Errorf("journal status = %s, want done", journal.status)
+	}
+}
+
+func TestSubscriptionService_CreateRollsBackOnFilesystemFailure(t *testing.T) {
+	failure := filepath.Join("/vhosts", "acme", ".ssh")
+	fs := &subscriptionFS{directories: map[string]bool{}, failPath: failure}
+	users, store, journal := &subscriptionUsers{}, &subscriptionStore{values: map[string]domain.Subscription{}}, &subscriptionJournal{}
+	_, err := newSubscriptionService(fs, users, store, journal).Create(context.Background(), "acme")
+	if err == nil {
+		t.Fatal("Create() error = nil, want failure")
+	}
+	if !users.deleted {
+		t.Error("Unix user was not rolled back")
+	}
+	if len(store.values) != 0 {
+		t.Errorf("stored subscriptions = %#v, want none", store.values)
+	}
+	if len(fs.directories) != 0 {
+		t.Errorf("directories = %#v, want rollback", fs.directories)
+	}
+	if journal.status != plan.OperationRolledBack {
+		t.Errorf("journal status = %s, want rolled_back", journal.status)
+	}
+}
+
+var _ system.FS = (*subscriptionFS)(nil)
+var _ system.Users = (*subscriptionUsers)(nil)

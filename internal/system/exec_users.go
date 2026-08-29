@@ -13,10 +13,16 @@ type CommandUsers struct {
 	Commander Commander
 }
 
-func (users CommandUsers) Lookup(name string) (*user.User, error) { return user.Lookup(name) }
+func (users CommandUsers) Lookup(name string) (*user.User, error)  { return user.Lookup(name) }
+func (users CommandUsers) LookupID(uid string) (*user.User, error) { return user.LookupId(uid) }
 
 func (users CommandUsers) Create(ctx context.Context, options CreateUserOptions) error {
-	args := []string{"--uid", strconv.Itoa(options.UID), "--gid", strconv.Itoa(options.GID), "--home", options.Home, "--shell", options.Shell}
+	args := []string{"--uid", strconv.Itoa(options.UID), "--home", options.Home, "--shell", options.Shell}
+	if options.UserGroup {
+		args = append(args, "--user-group")
+	} else {
+		args = append(args, "--gid", strconv.Itoa(options.GID))
+	}
 	if options.System {
 		args = append(args, "--system")
 	}
