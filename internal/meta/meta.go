@@ -17,6 +17,7 @@ const (
 	DefaultSSLDir         = StateDir + "/default-ssl"
 	DefaultSSLCertificate = DefaultSSLDir + "/certificate.pem"
 	DefaultSSLKey         = DefaultSSLDir + "/private-key.pem"
+	LogrotateConfig       = "/etc/logrotate.d/provctl"
 )
 
 // Version is set during release builds with -ldflags -X provctl/internal/meta.Version=….
