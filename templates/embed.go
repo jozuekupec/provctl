@@ -5,5 +5,5 @@ import "embed"
 
 // Files contains the default templates distributed with provctl.
 //
-//go:embed apache/*.tmpl
+//go:embed apache/*.tmpl fpm/*.tmpl
 var Files embed.FS
