@@ -19,6 +19,25 @@ Doplněk k implementačnímu zadání. Popisuje **jak postavit jednotlivá testo
 
 **Pravidlo:** nic se nepublikuje do APT `testing`, dokud neprojde E0 → E1 → E2 → E3.
 
+## E-1 — vývojové prostředí a izolace
+
+Na hostu ponech pouze nástroje bez systémových služeb: Go, Git, editor, `staticcheck` a `nfpm`. E0 a sestavení balíčku mohou běžet bez rootu. `piuparts`, `debootstrap`, `lintian` a `reprepro` přenech CI nebo Debian VM.
+
+Pro E2/E3 vytvoř Debian 13 VM (4 vCPU, 8 GB RAM, 60–80 GB disk) přes virt-manager/QEMU nebo Vagrant s libvirt. VM snapshotni hned po instalaci nástrojů jako `tooled`; zdrojový kód připoj přes virtiofs nebo do VM doručuj přes Git.
+
+Uvnitř VM nainstaluj a inicializuj pouze Incus; jeho síť, firewall a storage pool tak zůstávají mimo host:
+
+```bash
+sudo apt update
+sudo apt install -y incus
+sudo incus admin init --minimal
+sudo usermod -aG incus-admin "$USER"  # potom se znovu přihlásit
+incus launch images:debian/13 pv
+incus snapshot create pv clean
+```
+
+E2 musí být **systémový kontejner** s běžícím systemd, ne Dockerový aplikační kontejner. V něm je bezpečné spouštět `provctl` jako root: uživatelé, `/etc/apache2`, databáze i služby jsou izolované v kontejneru. Neověřuje však věci závislé na kernelu, firewallu, diskových kvótách ani veřejném DNS/Let's Encrypt; ty patří do E4/E5. Před každým mutujícím testem obnov `clean` snapshot.
+
 ### Mapa: test → prostředí
 
 | Test | E0 | E1 | E2 | E3 | E4 | E5 |
@@ -72,7 +91,7 @@ golden-update:
 	go test ./internal/render/... -update
 
 build:
-	CGO_ENABLED=0 go build -trimpath -o dist/provctl ./cmd/provctl
+	CGO_ENABLED=0 go build -trimpath -o build/provctl ./cmd/provctl
 
 deb:
 	./scripts/build-deb.sh
@@ -766,4 +785,3 @@ scripts/
 - souběh s ruční úpravou Apache konfigurace administrátorem
 - restore zálohy mezi různými servery s odlišnými UID
 - chování za CDN/reverse proxy před Apache
-
