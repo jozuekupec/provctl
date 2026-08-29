@@ -6,6 +6,9 @@ This repository currently contains the implementation specification in `docs/`:
 
 - `docs/project-specification.md` is the binding v0.1 design and architecture.
 - `docs/testing-cookbook.md` defines local, package, container, and integration test scenarios.
+- `docs/roadmap.md` is the live implementation status. Update it whenever a
+  roadmap item is completed or materially advanced, including the relevant
+  validation and any useful limitation.
 
 Implement the planned Go layout: wiring in `cmd/provctl/`; business code in `internal/`; TUI in `tui/`; templates in `templates/`; Debian packaging in `packaging/`; and releases in `.github/workflows/`. Keep domain types I/O-free. CLI and TUI must call services rather than OS or SQLite packages directly.
 
@@ -21,6 +24,10 @@ make deb            # build the Debian package via scripts/build-deb.sh
 ```
 
 Run `go test ./internal/arch/...` when changing package boundaries. Package checks described in the cookbook use `lintian` and `piuparts`; do not run them against production systems.
+
+Keep `docs/roadmap.md` current as part of every implementation change. Use the
+Debian 13 Incus container and its `clean` snapshot for privileged integration
+tests; restore that snapshot after each test run.
 
 ## Coding Style & Naming Conventions
 
