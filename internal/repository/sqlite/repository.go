@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"net/url"
 	"path"
 	"sort"
 	"strconv"
@@ -24,6 +25,37 @@ var ErrSchemaTooNew = errors.New("database schema is newer than this binary supp
 
 type Repository struct {
 	DB *sql.DB
+}
+
+// SchemaInfo describes a database schema without applying migrations.
+type SchemaInfo struct {
+	Current int
+	Latest  int
+}
+
+// InspectSchema opens an existing database read-only and never modifies it.
+func InspectSchema(ctx context.Context, databasePath string) (SchemaInfo, error) {
+	migrations, err := loadMigrations()
+	if err != nil {
+		return SchemaInfo{}, err
+	}
+	if len(migrations) == 0 {
+		return SchemaInfo{}, errors.New("no embedded SQLite migrations")
+	}
+	uri := (&url.URL{Scheme: "file", Path: databasePath, RawQuery: "mode=ro"}).String()
+	database, err := sql.Open("sqlite", uri)
+	if err != nil {
+		return SchemaInfo{}, fmt.Errorf("open SQLite database read-only: %w", err)
+	}
+	defer database.Close()
+	if err := database.PingContext(ctx); err != nil {
+		return SchemaInfo{}, fmt.Errorf("connect to SQLite database read-only: %w", err)
+	}
+	current, err := currentVersion(ctx, database)
+	if err != nil {
+		return SchemaInfo{}, err
+	}
+	return SchemaInfo{Current: current, Latest: migrations[len(migrations)-1].version}, nil
 }
 
 func Open(ctx context.Context, databasePath string) (*Repository, error) {

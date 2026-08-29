@@ -41,3 +41,21 @@ func TestApplyMigrations_RejectsNewerSchema(t *testing.T) {
 		t.Fatalf("ApplyMigrations() error = %v, want ErrSchemaTooNew", err)
 	}
 }
+
+func TestInspectSchema_ReadsCurrentVersion(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "provctl.db")
+	repository, err := Open(context.Background(), path)
+	if err != nil {
+		t.Fatalf("Open() error = %v", err)
+	}
+	if err := repository.Close(); err != nil {
+		t.Fatalf("Close() error = %v", err)
+	}
+	info, err := InspectSchema(context.Background(), path)
+	if err != nil {
+		t.Fatalf("InspectSchema() error = %v", err)
+	}
+	if info.Current != 1 || info.Latest != 1 {
+		t.Errorf("InspectSchema() = %#v, want current and latest 1", info)
+	}
+}

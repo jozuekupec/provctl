@@ -64,9 +64,16 @@ func (state doctorSystemd) IsActive(_ context.Context, unit string) (bool, error
 func (doctorSystemd) Enable(context.Context, string) error  { return nil }
 func (doctorSystemd) Disable(context.Context, string) error { return nil }
 
+type doctorDatabase struct{}
+
+func (doctorDatabase) Inspect(context.Context, string) (DatabaseSchema, error) {
+	return DatabaseSchema{Current: 1, Latest: 1}, nil
+}
+
 func TestDoctor_RenewalConflictIsWarning(t *testing.T) {
 	cfg := config.Config{Meta: config.Meta{ConfigVersion: config.CurrentVersion}, Paths: config.Paths{VHosts: "/vhosts"}, Apache: config.Apache{Service: "apache2"}, MariaDB: config.MariaDB{Enabled: true}}
 	doctor := NewDoctor(doctorFS{}, doctorCommander{cron: "certbot renew"}, doctorSystemd{timer: true}, doctorIdentity(0))
+	doctor.Database = doctorDatabase{}
 	for _, check := range doctor.Run(context.Background(), cfg) {
 		if check.Name == "certificate renewal" && check.Status == CheckWarn {
 			return

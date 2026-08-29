@@ -8,6 +8,7 @@ import (
 
 	"provctl/internal/config"
 	"provctl/internal/meta"
+	"provctl/internal/repository/sqlite"
 	"provctl/internal/system"
 )
 
@@ -32,11 +33,28 @@ type Doctor struct {
 	Commander system.Commander
 	Systemd   system.Systemd
 	Identity  system.Identity
+	Database  DatabaseInspector
 	PHPDir    string
 }
 
+type DatabaseSchema struct {
+	Current int
+	Latest  int
+}
+
+type DatabaseInspector interface {
+	Inspect(context.Context, string) (DatabaseSchema, error)
+}
+
+type sqliteInspector struct{}
+
+func (sqliteInspector) Inspect(ctx context.Context, path string) (DatabaseSchema, error) {
+	info, err := sqlite.InspectSchema(ctx, path)
+	return DatabaseSchema{Current: info.Current, Latest: info.Latest}, err
+}
+
 func NewDoctor(fs system.FS, commander system.Commander, systemd system.Systemd, identity system.Identity) Doctor {
-	return Doctor{FS: fs, Commander: commander, Systemd: systemd, Identity: identity, PHPDir: meta.PHPConfigDir}
+	return Doctor{FS: fs, Commander: commander, Systemd: systemd, Identity: identity, Database: sqliteInspector{}, PHPDir: meta.PHPConfigDir}
 }
 
 func NewProductionDoctor() Doctor {
@@ -52,6 +70,7 @@ func (doctor Doctor) Run(ctx context.Context, cfg config.Config) []Check {
 		doctor.checkDirectory(meta.StateDir, "state directory"),
 		doctor.checkDirectory(meta.LogDir, "log directory"),
 		doctor.checkDirectory(cfg.Paths.VHosts, "vhosts root"),
+		doctor.checkDatabase(ctx),
 		doctor.checkCommand(ctx, "/usr/sbin/apachectl", "Apache"),
 		doctor.checkService(ctx, cfg.Apache.Service, "Apache service"),
 		doctor.checkApacheModules(ctx), doctor.checkCommand(ctx, "/usr/bin/certbot", "Certbot"),
@@ -61,6 +80,24 @@ func (doctor Doctor) Run(ctx context.Context, cfg config.Config) []Check {
 	checks = append(checks, doctor.checkMariaDB(ctx, cfg))
 	checks = append(checks, doctor.checkRenewal(ctx)...)
 	return checks
+}
+
+func (doctor Doctor) checkDatabase(ctx context.Context) Check {
+	info, err := doctor.FS.Stat(meta.DatabaseFile)
+	if err != nil || info.Mode().Perm()&0o200 == 0 {
+		return Check{Name: "SQLite database", Status: CheckFail, Detail: "database is unavailable or not writable", Hint: "run provctl bootstrap and restore database permissions"}
+	}
+	schema, err := doctor.Database.Inspect(ctx, meta.DatabaseFile)
+	if err != nil {
+		return Check{Name: "SQLite database", Status: CheckFail, Detail: fmt.Sprintf("cannot inspect schema: %v", err), Hint: "restore the provctl database"}
+	}
+	if schema.Current > schema.Latest {
+		return Check{Name: "SQLite database", Status: CheckFail, Detail: fmt.Sprintf("schema %d is newer than supported %d", schema.Current, schema.Latest), Hint: "upgrade provctl"}
+	}
+	if schema.Current < schema.Latest {
+		return Check{Name: "SQLite database", Status: CheckWarn, Detail: fmt.Sprintf("schema %d needs migration to %d", schema.Current, schema.Latest), Hint: "run an apply command to migrate the database"}
+	}
+	return Check{Name: "SQLite database", Status: CheckOK, Detail: fmt.Sprintf("schema version %d", schema.Current)}
 }
 
 func HasFailure(checks []Check) bool {
