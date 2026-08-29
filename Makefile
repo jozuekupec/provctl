@@ -13,8 +13,8 @@ golden-update:
 	go test ./internal/render/... -update
 
 build:
-	mkdir -p dist
-	CGO_ENABLED=0 go build -trimpath -o dist/provctl ./cmd/provctl
+	mkdir -p build
+	CGO_ENABLED=0 go build -trimpath -o build/provctl ./cmd/provctl
 
 deb:
 	./scripts/build-deb.sh

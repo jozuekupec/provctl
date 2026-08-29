@@ -15,7 +15,7 @@ Once the Go project is initialized, use the repository Makefile as the standard 
 
 ```bash
 make test           # vet, staticcheck, race-enabled unit tests
-make build          # build a trimpath, CGO-free binary in dist/
+make build          # build a trimpath, CGO-free binary in build/
 make golden-update  # deliberately refresh renderer golden files
 make deb            # build the Debian package via scripts/build-deb.sh
 ```
