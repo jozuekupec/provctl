@@ -15,7 +15,7 @@ func TestCommandUsers_SetPasswordUsesStdin(t *testing.T) {
 		t.Fatalf("SetPassword() error = %v", err)
 	}
 	if len(commander.Calls) != 1 {
-		.Fatalf("calls = %d, want 1", len(commander.Calls))
+		t.Fatalf("calls = %d, want 1", len(commander.Calls))
 	}
 	call := commander.Calls[0]
 	if call.Name != "/usr/sbin/chpasswd" || !call.HasStdin {

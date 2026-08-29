@@ -15,11 +15,11 @@ type Users interface {
 }
 
 type CreateUserOptions struct {
-	Name    string
-	UID     int
-	GID     int
-	Home    string
-	Shell   string
-	System  bool
+	Name         string
+	UID          int
+	GID          int
+	Home         string
+	Shell        string
+	System       bool
 	NoCreateHome bool
 }

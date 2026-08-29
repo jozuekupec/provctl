@@ -23,7 +23,9 @@ type Config struct {
 	Limits  Limits  `toml:"limits"`
 }
 
-type Meta struct{ ConfigVersion int `toml:"config_version"` }
+type Meta struct {
+	ConfigVersion int `toml:"config_version"`
+}
 type Paths struct {
 	VHosts        string `toml:"vhosts"`
 	Backups       string `toml:"backups"`
@@ -61,7 +63,9 @@ type Logs struct {
 	RetentionDays int  `toml:"retention_days"`
 	Compress      bool `toml:"compress"`
 }
-type Limits struct{ LockTimeoutSeconds int `toml:"lock_timeout_seconds"` }
+type Limits struct {
+	LockTimeoutSeconds int `toml:"lock_timeout_seconds"`
+}
 
 func Load(path string) (Config, error) {
 	file, err := os.Open(path)
