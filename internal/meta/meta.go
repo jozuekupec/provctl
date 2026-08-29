@@ -10,6 +10,8 @@ const (
 	LogDir       = "/var/log/provctl"
 	TemplateDir  = "/usr/share/provctl/templates"
 	PHPConfigDir = "/etc/php"
+	CertbotCron  = "/etc/cron.d/certbot"
+	DeployHook   = "/etc/letsencrypt/renewal-hooks/deploy/00-provctl.sh"
 	FilePrefix   = "provctl-"
 )
 
