@@ -11,6 +11,7 @@ import (
 	"provctl/internal/meta"
 	"provctl/internal/plan"
 	"provctl/internal/render"
+	"provctl/internal/repository/sqlite"
 	"provctl/internal/system"
 )
 
@@ -33,6 +34,40 @@ type WebsiteService struct {
 	Apache   ApacheVHostApplier
 	Config   config.Config
 }
+
+// WebsiteRuntime owns the database connection used by a website command.
+type WebsiteRuntime struct {
+	Service    WebsiteService
+	repository *sqlite.Repository
+}
+
+func NewProductionWebsiteRuntime(ctx context.Context, cfg config.Config) (*WebsiteRuntime, error) {
+	repository, err := sqlite.Open(ctx, meta.DatabaseFile)
+	if err != nil {
+		return nil, err
+	}
+	commander := system.ExecCommander{}
+	return &WebsiteRuntime{
+		Service: WebsiteService{
+			FS:       system.OSFS{},
+			Store:    repository,
+			Executor: plan.Executor{Journal: sqlite.OperationJournal{DB: repository.DB}, Locker: system.FileLocker{Path: meta.LockFile}},
+			Apache:   Apache{FS: system.OSFS{}, Commands: commander, Systemd: system.CommandSystemd{Commander: commander}, Service: cfg.Apache.Service},
+			Config:   cfg,
+		},
+		repository: repository,
+	}, nil
+}
+
+func NewReadOnlyWebsiteRuntime(ctx context.Context, cfg config.Config) (*WebsiteRuntime, error) {
+	repository, err := sqlite.OpenReadOnly(ctx, meta.DatabaseFile)
+	if err != nil {
+		return nil, err
+	}
+	return &WebsiteRuntime{Service: WebsiteService{FS: system.OSFS{}, Store: repository, Config: cfg}, repository: repository}, nil
+}
+
+func (runtime *WebsiteRuntime) Close() error { return runtime.repository.Close() }
 
 func (service WebsiteService) CreatePHPFPM(ctx context.Context, subscriptionName, primaryDomain string) (int64, error) {
 	operation, err := service.PrepareCreatePHPFPM(ctx, subscriptionName, primaryDomain)

@@ -29,5 +29,6 @@ func NewRootCommand() *cobra.Command {
 	}
 	root.AddCommand(newDoctorCommand())
 	root.AddCommand(newSubscriptionCommand())
+	root.AddCommand(newWebsiteCommand())
 	return root
 }
