@@ -71,9 +71,9 @@ func (doctor Doctor) Run(ctx context.Context, cfg config.Config) []Check {
 		doctor.checkDirectory(meta.LogDir, "log directory"),
 		doctor.checkDirectory(cfg.Paths.VHosts, "vhosts root"),
 		doctor.checkDatabase(ctx),
-		doctor.checkCommand(ctx, "/usr/sbin/apachectl", "Apache"),
+		doctor.checkCommand(ctx, "/usr/sbin/apachectl", "Apache", "-v"),
 		doctor.checkService(ctx, cfg.Apache.Service, "Apache service"),
-		doctor.checkApacheModules(ctx), doctor.checkCommand(ctx, "/usr/bin/certbot", "Certbot"),
+		doctor.checkApacheModules(ctx), doctor.checkCommand(ctx, "/usr/bin/certbot", "Certbot", "--version"),
 		doctor.checkDeployHook(),
 	}
 	checks = append(checks, doctor.checkPHP(ctx)...)
@@ -134,8 +134,8 @@ func (doctor Doctor) checkDirectory(path, name string) Check {
 	return Check{Name: name, Status: CheckOK, Detail: path}
 }
 
-func (doctor Doctor) checkCommand(ctx context.Context, binary, name string) Check {
-	result, err := doctor.Commander.Run(ctx, binary, "--version")
+func (doctor Doctor) checkCommand(ctx context.Context, binary, name string, args ...string) Check {
+	result, err := doctor.Commander.Run(ctx, binary, args...)
 	if err != nil {
 		return Check{Name: name, Status: CheckFail, Detail: fmt.Sprintf("%s is unavailable: %v", binary, err), Hint: "install the required Debian package"}
 	}
@@ -184,7 +184,7 @@ func (doctor Doctor) checkPHP(ctx context.Context) []Check {
 		if _, err := doctor.FS.Stat(doctor.PHPDir + "/" + version + "/fpm/pool.d"); err != nil {
 			continue
 		}
-		checks = append(checks, doctor.checkCommand(ctx, "/usr/sbin/php-fpm"+version, "PHP-FPM "+version))
+		checks = append(checks, doctor.checkCommand(ctx, "/usr/sbin/php-fpm"+version, "PHP-FPM "+version, "--version"))
 		checks = append(checks, doctor.checkService(ctx, "php"+version+"-fpm", "PHP-FPM "+version+" service"))
 	}
 	if len(checks) == 0 {
@@ -199,7 +199,7 @@ func (doctor Doctor) checkMariaDB(ctx context.Context, cfg config.Config) Check 
 	}
 	args := []string{"--batch", "--skip-column-names"}
 	if cfg.MariaDB.DefaultsFile != "" {
-		args = append(args, "--defaults-extra-file="+cfg.MariaDB.DefaultsFile)
+		args = append([]string{"--defaults-extra-file=" + cfg.MariaDB.DefaultsFile}, args...)
 	}
 	result, err := doctor.Commander.RunWithStdin(ctx, strings.NewReader("SELECT 1;\n"), "/usr/bin/mysql", args...)
 	if err != nil {
