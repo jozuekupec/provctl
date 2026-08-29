@@ -47,11 +47,12 @@ func (service SubscriptionService) Show(ctx context.Context, name string) (domai
 }
 
 type SubscriptionService struct {
-	FS       system.FS
-	Users    system.Users
-	Store    SubscriptionStore
-	Executor plan.Executor
-	Config   config.Config
+	FS         system.FS
+	Users      system.Users
+	Store      SubscriptionStore
+	Executor   plan.Executor
+	PHPVersion string
+	Config     config.Config
 }
 
 // SubscriptionRuntime owns the database connection used by a production command.
@@ -65,16 +66,23 @@ func NewProductionSubscriptionRuntime(ctx context.Context, cfg config.Config) (*
 	if err != nil {
 		return nil, err
 	}
+	commander := system.ExecCommander{}
+	version, err := selectPHPFPM(ctx, cfg, system.OSFS{}, system.CommandSystemd{Commander: commander})
+	if err != nil {
+		_ = repository.Close()
+		return nil, err
+	}
 	return &SubscriptionRuntime{
 		Service: SubscriptionService{
 			FS:    system.OSFS{},
-			Users: system.CommandUsers{Commander: system.ExecCommander{}},
+			Users: system.CommandUsers{Commander: commander},
 			Store: repository,
 			Executor: plan.Executor{
 				Journal: sqlite.OperationJournal{DB: repository.DB},
 				Locker:  system.FileLocker{Path: meta.LockFile},
 			},
-			Config: cfg,
+			PHPVersion: version.Version,
+			Config:     cfg,
 		},
 		repository: repository,
 	}, nil
@@ -85,8 +93,14 @@ func NewReadOnlySubscriptionRuntime(ctx context.Context, cfg config.Config) (*Su
 	if err != nil {
 		return nil, err
 	}
+	commander := system.ExecCommander{}
+	version, err := selectPHPFPM(ctx, cfg, system.OSFS{}, system.CommandSystemd{Commander: commander})
+	if err != nil {
+		_ = repository.Close()
+		return nil, err
+	}
 	return &SubscriptionRuntime{
-		Service:    SubscriptionService{FS: system.OSFS{}, Users: system.CommandUsers{Commander: system.ExecCommander{}}, Store: repository, Config: cfg},
+		Service:    SubscriptionService{FS: system.OSFS{}, Users: system.CommandUsers{Commander: commander}, Store: repository, PHPVersion: version.Version, Config: cfg},
 		repository: repository,
 	}, nil
 }
@@ -177,7 +191,11 @@ func (service SubscriptionService) PrepareCreate(ctx context.Context, name strin
 	if err != nil {
 		return plan.Plan{}, err
 	}
-	subscription := domain.Subscription{Name: name, UnixUser: name, UnixUID: uid, Home: home, PHPVersion: service.Config.PHP.DefaultVersion, PHPMaxChildren: service.Config.PHP.MaxChildren, PHPMemoryLimit: service.Config.PHP.MemoryLimit, PHPUploadMax: service.Config.PHP.UploadMax, PHPMaxExecTime: service.Config.PHP.MaxExecTime, SSHAccess: "none"}
+	phpVersion := service.PHPVersion
+	if phpVersion == "" {
+		phpVersion = service.Config.PHP.DefaultVersion
+	}
+	subscription := domain.Subscription{Name: name, UnixUser: name, UnixUID: uid, Home: home, PHPVersion: phpVersion, PHPMaxChildren: service.Config.PHP.MaxChildren, PHPMemoryLimit: service.Config.PHP.MemoryLimit, PHPUploadMax: service.Config.PHP.UploadMax, PHPMaxExecTime: service.Config.PHP.MaxExecTime, SSHAccess: "none"}
 	return service.createPlan(subscription), nil
 }
 

@@ -159,6 +159,23 @@ func TestSubscriptionService_CreateCreatesSystemAndDatabaseState(t *testing.T) {
 	}
 }
 
+func TestSubscriptionService_PrepareCreateUsesDiscoveredPHPVersion(t *testing.T) {
+	fs := &subscriptionFS{directories: map[string]bool{}}
+	users, store, journal := &subscriptionUsers{}, &subscriptionStore{values: map[string]domain.Subscription{}}, &subscriptionJournal{}
+	service := newSubscriptionService(fs, users, store, journal)
+	service.PHPVersion = "7.9"
+	operation, err := service.PrepareCreate(context.Background(), "acme")
+	if err != nil {
+		t.Fatalf("PrepareCreate() error = %v", err)
+	}
+	if err := operation.Steps[len(operation.Steps)-1].Do(context.Background()); err != nil {
+		t.Fatalf("record subscription: %v", err)
+	}
+	if got, want := store.values["acme"].PHPVersion, "7.9"; got != want {
+		t.Errorf("PHP version = %q, want %q", got, want)
+	}
+}
+
 func TestSubscriptionService_PrepareCreateDoesNotChangeState(t *testing.T) {
 	fs := &subscriptionFS{directories: map[string]bool{}}
 	users, store, journal := &subscriptionUsers{}, &subscriptionStore{values: map[string]domain.Subscription{}}, &subscriptionJournal{}
