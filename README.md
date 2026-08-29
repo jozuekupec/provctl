@@ -50,6 +50,14 @@ incus exec pv -- systemctl is-system-running
 incus exec pv -- systemctl status apache2
 ```
 
+If Docker's `FORWARD DROP` policy blocks the Incus bridge, install the narrowly scoped, persistent forwarding service from this repository:
+
+```bash
+sudo ./scripts/dev/install-incus-docker-forwarding.sh
+```
+
+It determines the current default uplink, enables IPv4 forwarding, and permits only Incus egress plus established replies. To remove it: `sudo systemctl disable --now incus-docker-forward.service` and remove `/etc/systemd/system/incus-docker-forward.service` and `/etc/sysctl.d/90-incus-forwarding.conf`.
+
 The container does not need privileged mode or nested virtualization. Reset it before each mutating scenario:
 
 ```bash

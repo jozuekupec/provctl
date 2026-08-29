@@ -1,0 +1,12 @@
+[Unit]
+Description=Allow Incus bridge forwarding through Docker firewall
+After=network-online.target incus.service docker.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/sbin/iptables -I DOCKER-USER 1 -i incusbr0 -o @UPLINK@ -j ACCEPT
+ExecStart=/usr/sbin/iptables -I DOCKER-USER 2 -i @UPLINK@ -o incusbr0 -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+ExecStop=/usr/sbin/iptables -D DOCKER-USER -i incusbr0 -o @UPLINK@ -j ACCEPT
+ExecStop=/usr/sbin/iptables -D DOCKER-USER -i @UPLINK@ -o incusbr0 -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT

@@ -36,6 +36,14 @@ incus launch images:debian/13 pv
 incus snapshot create pv clean
 ```
 
+Pokud Docker nastaví politiku `FORWARD DROP` a kontejner nemá odchozí síť, z rootu repozitáře nainstaluj úzce omezenou perzistentní službu:
+
+```bash
+sudo ./scripts/dev/install-incus-docker-forwarding.sh
+```
+
+Skript zjistí aktivní uplink, nastaví IPv4 forwarding a povolí pouze odchozí provoz `incusbr0` a související odpovědi. Službu odebereš přes `sudo systemctl disable --now incus-docker-forward.service`; pak smaž její soubor a `/etc/sysctl.d/90-incus-forwarding.conf`.
+
 E2 musí být **systémový kontejner** s běžícím systemd, ne Dockerový aplikační kontejner. V něm je bezpečné spouštět `provctl` jako root: uživatelé, `/etc/apache2`, databáze i služby jsou izolované v kontejneru. Neověřuje však věci závislé na kernelu, firewallu, diskových kvótách ani veřejném DNS/Let's Encrypt; ty patří do E4/E5. Před každým mutujícím testem obnov `clean` snapshot.
 
 ### Mapa: test → prostředí
