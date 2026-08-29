@@ -10,7 +10,7 @@ System configuration is generated from the database; it is not the source of tru
 
 ## Current status
 
-The foundation is in place: configuration loading, SQLite migrations, system abstractions, `provctl doctor`, and architecture checks. The next milestone adds the executor, durable operation journal, exclusive lock, and rollback support. Subscription and website lifecycle commands are not available yet.
+The foundation, operation executor, durable journal, lock, rollback, and the first subscription operation are in place. `subscription create` creates the Unix account, isolated directory layout, and final SQLite record; website and PHP-FPM lifecycle commands are not available yet.
 
 ## Local development
 
@@ -27,6 +27,14 @@ build/provctl --version
 ```bash
 build/provctl doctor --config packaging/config.toml.default --json
 ```
+
+`subscription create` is a root-facing operation. Its dry run reads the existing database and account state, then prints the exact planned steps without changing the system:
+
+```bash
+sudo build/provctl subscription create acme --config /etc/provctl/config.toml --dry-run
+```
+
+The non-dry-run form requires the state directory and database created by the upcoming `bootstrap` command; do not create those system paths manually on a workstation.
 
 ## Isolated server tests with Incus
 

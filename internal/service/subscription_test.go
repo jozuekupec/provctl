@@ -81,6 +81,14 @@ func (store *subscriptionStore) SubscriptionExists(_ context.Context, name strin
 	_, exists := store.values[name]
 	return exists, nil
 }
+func (store *subscriptionStore) SubscriptionUIDExists(_ context.Context, uid int) (bool, error) {
+	for _, subscription := range store.values {
+		if subscription.UnixUID == uid {
+			return true, nil
+		}
+	}
+	return false, nil
+}
 func (store *subscriptionStore) CreateSubscription(_ context.Context, subscription domain.Subscription) error {
 	store.values[subscription.Name] = subscription
 	return nil
@@ -127,6 +135,24 @@ func TestSubscriptionService_CreateCreatesSystemAndDatabaseState(t *testing.T) {
 	}
 	if journal.status != plan.OperationDone {
 		t.Errorf("journal status = %s, want done", journal.status)
+	}
+}
+
+func TestSubscriptionService_PrepareCreateDoesNotChangeState(t *testing.T) {
+	fs := &subscriptionFS{directories: map[string]bool{}}
+	users, store, journal := &subscriptionUsers{}, &subscriptionStore{values: map[string]domain.Subscription{}}, &subscriptionJournal{}
+	operation, err := newSubscriptionService(fs, users, store, journal).PrepareCreate(context.Background(), "acme")
+	if err != nil {
+		t.Fatalf("PrepareCreate() error = %v", err)
+	}
+	if users.created || users.deleted || len(fs.directories) != 0 || len(store.values) != 0 {
+		t.Error("PrepareCreate() changed system or database state")
+	}
+	if got, want := len(operation.Steps), 8; got != want {
+		t.Errorf("plan step count = %d, want %d", got, want)
+	}
+	if operation.Steps[0].Preview == "" {
+		t.Error("user-creation preview is empty")
 	}
 }
 

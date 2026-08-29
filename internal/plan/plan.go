@@ -5,6 +5,7 @@ import "context"
 
 type Step struct {
 	Name       string
+	Preview    string
 	Do         func(context.Context) error
 	Undo       func(context.Context) error
 	Idempotent bool

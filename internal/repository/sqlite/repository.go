@@ -79,6 +79,22 @@ func Open(ctx context.Context, databasePath string) (*Repository, error) {
 	return &Repository{DB: database}, nil
 }
 
+// OpenReadOnly opens an existing database without changing its schema or
+// connection settings. It is intended for dry-run and other inspection paths.
+func OpenReadOnly(ctx context.Context, databasePath string) (*Repository, error) {
+	uri := (&url.URL{Scheme: "file", Path: databasePath, RawQuery: "mode=ro"}).String()
+	database, err := sql.Open("sqlite", uri)
+	if err != nil {
+		return nil, fmt.Errorf("open SQLite database read-only: %w", err)
+	}
+	database.SetMaxOpenConns(1)
+	if err := database.PingContext(ctx); err != nil {
+		_ = database.Close()
+		return nil, fmt.Errorf("connect to SQLite database read-only: %w", err)
+	}
+	return &Repository{DB: database}, nil
+}
+
 func (repository *Repository) Close() error { return repository.DB.Close() }
 
 func configure(ctx context.Context, database *sql.DB) error {

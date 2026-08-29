@@ -7,6 +7,7 @@ const (
 	ConfigFile   = ConfigDir + "/config.toml"
 	StateDir     = "/var/lib/provctl"
 	DatabaseFile = StateDir + "/provctl.db"
+	LockFile     = "/run/provctl.lock"
 	LogDir       = "/var/log/provctl"
 	TemplateDir  = "/usr/share/provctl/templates"
 	PHPConfigDir = "/etc/php"

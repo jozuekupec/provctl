@@ -22,6 +22,18 @@ func (repository *Repository) SubscriptionExists(ctx context.Context, name strin
 	return true, nil
 }
 
+func (repository *Repository) SubscriptionUIDExists(ctx context.Context, uid int) (bool, error) {
+	var value int
+	err := repository.DB.QueryRowContext(ctx, `SELECT 1 FROM subscriptions WHERE unix_uid = ?`, uid).Scan(&value)
+	if errors.Is(err, sql.ErrNoRows) {
+		return false, nil
+	}
+	if err != nil {
+		return false, fmt.Errorf("query subscription UID %d: %w", uid, err)
+	}
+	return true, nil
+}
+
 func (repository *Repository) CreateSubscription(ctx context.Context, subscription domain.Subscription) error {
 	now := time.Now().UTC().Format(time.RFC3339)
 	_, err := repository.DB.ExecContext(ctx, `INSERT INTO subscriptions (name, unix_user, unix_uid, home, status, php_version, php_max_children, php_memory_limit, php_upload_max, php_max_exec_time, ssh_access, created_at, updated_at) VALUES (?, ?, ?, ?, 'active', ?, ?, ?, ?, ?, ?, ?, ?)`, subscription.Name, subscription.UnixUser, subscription.UnixUID, subscription.Home, nullable(subscription.PHPVersion), subscription.PHPMaxChildren, subscription.PHPMemoryLimit, subscription.PHPUploadMax, subscription.PHPMaxExecTime, subscription.SSHAccess, now, now)
