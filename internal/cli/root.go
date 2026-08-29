@@ -11,9 +11,10 @@ import (
 
 func NewRootCommand() *cobra.Command {
 	root := &cobra.Command{
-		Use:          meta.Name,
-		Short:        "Provisioning control for Debian web hosting",
-		SilenceUsage: true,
+		Use:           meta.Name,
+		Short:         "Provisioning control for Debian web hosting",
+		SilenceUsage:  true,
+		SilenceErrors: true,
 	}
 	root.Flags().Bool("version", false, "print version and exit")
 	root.RunE = func(command *cobra.Command, _ []string) error {
