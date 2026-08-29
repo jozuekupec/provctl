@@ -19,7 +19,11 @@ func newBootstrapCommand() *cobra.Command {
 			return fmt.Errorf("load configuration: %w", err)
 		}
 		if dryRun {
-			operation, err := service.NewBootstrapPreview(cfg).Prepare(context.Background())
+			preview, err := service.NewBootstrapPreview(cfg)
+			if err != nil {
+				return err
+			}
+			operation, err := preview.Prepare(context.Background())
 			if err != nil {
 				return err
 			}
@@ -32,8 +36,12 @@ func newBootstrapCommand() *cobra.Command {
 		defer runtime.Close()
 		ctx, cancel := context.WithTimeout(context.Background(), time.Duration(cfg.Limits.LockTimeoutSeconds)*time.Second)
 		defer cancel()
-		id, err := runtime.Service.Run(ctx)
+		id, unchanged, err := runtime.Service.Run(ctx)
 		if err != nil {
+			return err
+		}
+		if unchanged {
+			_, err = fmt.Fprintln(command.OutOrStdout(), "Bootstrap: nothing to do.")
 			return err
 		}
 		_, err = fmt.Fprintf(command.OutOrStdout(), "Bootstrap completed (operation %d).\n", id)

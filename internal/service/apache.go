@@ -18,6 +18,27 @@ type Apache struct {
 	Service  string
 }
 
+// ValidateAndReload validates the complete Apache configuration and reloads it.
+func (apache Apache) ValidateAndReload(ctx context.Context) error {
+	if apache.FS == nil || apache.Commands == nil || apache.Systemd == nil || apache.Service == "" {
+		return errors.New("Apache service requires filesystem, commander, systemd, and service name")
+	}
+	if err := apache.configTest(ctx, "updated configuration"); err != nil {
+		return err
+	}
+	if err := apache.Systemd.Reload(ctx, apache.Service); err != nil {
+		return fmt.Errorf("reload Apache: %w", err)
+	}
+	active, err := apache.Systemd.IsActive(ctx, apache.Service)
+	if err != nil {
+		return fmt.Errorf("check Apache service: %w", err)
+	}
+	if !active {
+		return fmt.Errorf("Apache service %q is not active after reload", apache.Service)
+	}
+	return nil
+}
+
 // Apply writes a configuration file only after the existing Apache
 // configuration passes a baseline test. The returned function restores the
 // exact previous file state and reloads Apache, making it suitable as a plan

@@ -24,11 +24,13 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
 
 ## Bezprostřední práce
 
-- [~] Dokončit `bootstrap`: vytvoření všech adresářů a audit logu s právy ze
-  specifikace, skutečně prázdný druhý běh (`nothing to do`), následný `doctor`.
-  Současné moduly, výchozí certifikát, vhost, deploy-hook a logrotate jsou
-  implementovány a ověřeny v kontejneru.
-- [ ] Doplnit unit testy bootstrapu pro vytvoření, idempotenci a rollback.
+- [~] `bootstrap`: vytvoření systémových adresářů a audit logu s právy ze
+  specifikace, moduly, výchozí certifikát, vhost, deploy-hook, logrotate i
+  skutečně prázdný druhý běh (`nothing to do`) jsou hotové. Chybí přepínače
+  `--yes`, `--skip`, `--install-missing` a automatické vypsání výsledku
+  `doctor`.
+- [~] Unit testy bootstrapu pokrývají prázdný plán, chybějící systémové cesty
+  a odmítnutí změny práv existujícího adresáře. Zbývá cílený rollback test.
 - [ ] Projít end-to-end HTTP požadavek přes Apache a PHP-FPM v Incus kontejneru
   `pv`; po každém integračním testu obnovit snapshot `clean`.
 
@@ -50,3 +52,9 @@ Unit a golden testy běží neprivilegovaně přes `make test`. Integrační ov�
 probíhá jen v Debian 13 kontejneru `pv`, nikdy na hostiteli; návrat do čistého
 stavu provede `incus snapshot restore pv clean`. Před uzavřením každého milníku
 se do tohoto souboru doplní rozsah ověření a případná odchylka od specifikace.
+
+Poslední integrační ověření (2026-08-30): bootstrap vytvořil požadované cesty
+včetně práv, `apachectl configtest` a reload uspěly a druhý běh byl beze změn.
+Následný `doctor` potvrdil provctl, Apache, PHP-FPM a Certbot; testovací obraz
+zatím nemá funkční MariaDB socket autentizaci a obsahuje dva certbot renewal
+mechanismy. Nejde o změnu provctl a kontejner byl následně obnoven na `clean`.
