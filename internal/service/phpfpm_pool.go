@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"provctl/internal/system"
 )
@@ -109,7 +110,22 @@ func (fpm PHPFPM) verify(ctx context.Context, version PHPFPMVersion, socket stri
 	if !active {
 		return fmt.Errorf("PHP-FPM service %q is not active after reload", version.Service)
 	}
-	info, err := fpm.FS.Stat(socket)
+	deadline := time.Now().Add(5 * time.Second)
+	var info os.FileInfo
+	for {
+		info, err = fpm.FS.Stat(socket)
+		if err == nil || time.Now().After(deadline) {
+			break
+		}
+		if !errors.Is(err, os.ErrNotExist) {
+			break
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(100 * time.Millisecond):
+		}
+	}
 	if err != nil {
 		return fmt.Errorf("inspect PHP-FPM socket %q: %w", socket, err)
 	}
