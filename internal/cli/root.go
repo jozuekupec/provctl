@@ -2,11 +2,15 @@
 package cli
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/spf13/cobra"
 
+	"provctl/internal/config"
 	"provctl/internal/meta"
+	"provctl/internal/service"
+	"provctl/internal/ui"
 )
 
 func NewRootCommand() *cobra.Command {
@@ -26,7 +30,17 @@ func NewRootCommand() *cobra.Command {
 			_, err := fmt.Fprintln(command.OutOrStdout(), meta.Version)
 			return err
 		}
-		return command.Help()
+		cfg, err := config.Load(meta.ConfigFile)
+		if err != nil {
+			return fmt.Errorf("load configuration: %w", err)
+		}
+		runtime, err := service.NewReadOnlySubscriptionRuntime(context.Background(), cfg)
+		if err != nil {
+			return fmt.Errorf("open TUI state: %w", err)
+		}
+		defer runtime.Close()
+		_, err = ui.Program(ui.Deps{LoadSubscriptions: runtime.Service.List}).Run()
+		return err
 	}
 	root.AddCommand(newDoctorCommand())
 	root.AddCommand(newBootstrapCommand())
