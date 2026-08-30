@@ -66,6 +66,10 @@ func (websitePHPFPM) ApplyPool(context.Context, PHPFPMVersion, string, []byte, s
 	return func(context.Context) error { return nil }, nil
 }
 
+func (websitePHPFPM) RemovePool(context.Context, PHPFPMVersion, string) (func(context.Context) error, error) {
+	return func(context.Context) error { return nil }, nil
+}
+
 func TestWebsiteService_PrepareCreatePHPFPMBuildsPlanWithoutChanges(t *testing.T) {
 	fs := &subscriptionFS{directories: map[string]bool{}}
 	service := WebsiteService{

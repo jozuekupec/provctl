@@ -14,6 +14,48 @@ import (
 // PHPFPMPoolApplier applies one PHP-FPM pool and returns an undo operation.
 type PHPFPMPoolApplier interface {
 	ApplyPool(context.Context, PHPFPMVersion, string, []byte, string) (func(context.Context) error, error)
+	RemovePool(context.Context, PHPFPMVersion, string) (func(context.Context) error, error)
+}
+
+// RemovePool validates and reloads the old FPM service after removing one
+// managed pool. Its undo operation restores the exact previous pool.
+func (fpm PHPFPM) RemovePool(ctx context.Context, version PHPFPMVersion, path string) (func(context.Context) error, error) {
+	if fpm.FS == nil || fpm.Commands == nil || fpm.Systemd == nil || version.Binary == "" || version.Service == "" || path == "" {
+		return nil, errors.New("PHP-FPM pool removal requires filesystem, commander, systemd, version, and path")
+	}
+	previous, existed, err := fpm.readPrevious(path)
+	if err != nil {
+		return nil, err
+	}
+	if !existed {
+		return nil, fmt.Errorf("PHP-FPM pool %q does not exist", path)
+	}
+	if err := fpm.FS.Remove(path); err != nil {
+		return nil, fmt.Errorf("remove PHP-FPM pool %q: %w", path, err)
+	}
+	restore := func(restoreCtx context.Context) error {
+		return fpm.restore(restoreCtx, version, path, previous, true)
+	}
+	if err := fpm.configTest(ctx, version, "removed configuration"); err != nil {
+		if restoreErr := restore(ctx); restoreErr != nil {
+			return nil, errors.Join(err, restoreErr)
+		}
+		return nil, err
+	}
+	if err := fpm.Systemd.Reload(ctx, version.Service); err != nil {
+		if restoreErr := restore(ctx); restoreErr != nil {
+			return nil, errors.Join(fmt.Errorf("reload PHP-FPM: %w", err), restoreErr)
+		}
+		return nil, fmt.Errorf("reload PHP-FPM: %w", err)
+	}
+	active, err := fpm.Systemd.IsActive(ctx, version.Service)
+	if err != nil {
+		return nil, fmt.Errorf("check PHP-FPM service: %w", err)
+	}
+	if !active {
+		return nil, fmt.Errorf("PHP-FPM service %q is not active after reload", version.Service)
+	}
+	return restore, nil
 }
 
 // PHPFPM applies a pool only after validating the PHP-FPM configuration.

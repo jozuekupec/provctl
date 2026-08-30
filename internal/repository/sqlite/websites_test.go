@@ -100,3 +100,42 @@ func TestRepository_SetWebsiteEnabledUpdatesPersistedState(t *testing.T) {
 		t.Errorf("ListWebsites() = %#v, want one disabled website", websites)
 	}
 }
+
+func TestRepository_UpdatePHPSettingsMirrorsPHPFPMWebsites(t *testing.T) {
+	repository, err := Open(context.Background(), filepath.Join(t.TempDir(), "provctl.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer repository.Close()
+	if err := repository.CreateSubscription(context.Background(), domain.Subscription{Name: "acme", UnixUser: "acme", UnixUID: 5000, Home: "/vhosts/acme", PHPVersion: "8.3", PHPMaxChildren: 10, PHPMemoryLimit: "256M", PHPUploadMax: "64M", PHPMaxExecTime: 60, SSHAccess: "none"}); err != nil {
+		t.Fatal(err)
+	}
+	subscription, err := repository.SubscriptionByName(context.Background(), "acme")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := repository.CreateWebsite(context.Background(), domain.Website{SubscriptionID: subscription.ID, Type: domain.WebsitePHPFPM, PrimaryDomain: "app.example.test", PHPVersion: "8.3", Enabled: true}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := repository.CreateWebsite(context.Background(), domain.Website{SubscriptionID: subscription.ID, Type: domain.WebsiteStatic, PrimaryDomain: "static.example.test", Enabled: true}); err != nil {
+		t.Fatal(err)
+	}
+	subscription.PHPVersion, subscription.PHPMaxChildren, subscription.PHPMemoryLimit = "8.4", 20, "512M"
+	if err := repository.UpdatePHPSettings(context.Background(), subscription); err != nil {
+		t.Fatal(err)
+	}
+	updated, err := repository.SubscriptionByName(context.Background(), "acme")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if updated.PHPVersion != "8.4" || updated.PHPMaxChildren != 20 || updated.PHPMemoryLimit != "512M" {
+		t.Errorf("subscription = %#v", updated)
+	}
+	websites, err := repository.ListWebsites(context.Background(), subscription.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if websites[0].PHPVersion != "8.4" || websites[1].PHPVersion != "" {
+		t.Errorf("website versions = %#v", websites)
+	}
+}

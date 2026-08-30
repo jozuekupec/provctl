@@ -92,3 +92,21 @@ func TestPHPFPM_ApplyPoolVerifiesSocket(t *testing.T) {
 		t.Error("new pool remains after undo")
 	}
 }
+
+func TestPHPFPM_RemovePoolRestoresPreviousPool(t *testing.T) {
+	path := "/etc/php/version/fpm/pool.d/provctl-acme.conf"
+	fs := &poolFS{files: map[string][]byte{path: []byte("old")}}
+	undo, err := (PHPFPM{FS: fs, Commands: &poolCommander{}, Systemd: &apacheSystemd{active: true}}).RemovePool(context.Background(), PHPFPMVersion{Binary: "/usr/sbin/php-fpm7.9", Service: "php7.9-fpm.service"}, path)
+	if err != nil {
+		t.Fatalf("RemovePool() error = %v", err)
+	}
+	if _, exists := fs.files[path]; exists {
+		t.Error("pool remains after RemovePool()")
+	}
+	if err := undo(context.Background()); err != nil {
+		t.Fatalf("undo() error = %v", err)
+	}
+	if got := string(fs.files[path]); got != "old" {
+		t.Errorf("restored contents = %q, want old", got)
+	}
+}

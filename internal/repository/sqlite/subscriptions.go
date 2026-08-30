@@ -102,6 +102,35 @@ func (repository *Repository) DeleteSubscription(ctx context.Context, name strin
 	return nil
 }
 
+// UpdatePHPSettings atomically records a subscription PHP version and mirrors
+// it to every PHP-FPM website owned by that subscription.
+func (repository *Repository) UpdatePHPSettings(ctx context.Context, subscription domain.Subscription) error {
+	transaction, err := repository.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin PHP settings update: %w", err)
+	}
+	defer transaction.Rollback()
+	now := time.Now().UTC().Format(time.RFC3339)
+	result, err := transaction.ExecContext(ctx, `UPDATE subscriptions SET php_version = ?, php_max_children = ?, php_memory_limit = ?, updated_at = ? WHERE id = ?`, nullable(subscription.PHPVersion), subscription.PHPMaxChildren, subscription.PHPMemoryLimit, now, subscription.ID)
+	if err != nil {
+		return fmt.Errorf("update subscription PHP settings: %w", err)
+	}
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("count subscription PHP settings update: %w", err)
+	}
+	if rows != 1 {
+		return fmt.Errorf("subscription %q not found", subscription.Name)
+	}
+	if _, err := transaction.ExecContext(ctx, `UPDATE websites SET php_version = ?, updated_at = ? WHERE subscription_id = ? AND type = 'php-fpm'`, nullable(subscription.PHPVersion), now, subscription.ID); err != nil {
+		return fmt.Errorf("update PHP-FPM website versions: %w", err)
+	}
+	if err := transaction.Commit(); err != nil {
+		return fmt.Errorf("commit PHP settings update: %w", err)
+	}
+	return nil
+}
+
 func nullable(value string) any {
 	if value == "" {
 		return nil

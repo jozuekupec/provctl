@@ -40,8 +40,14 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   vhost i smazaný symlink, následný `apachectl configtest` a druhý dry-run bez
   driftu. Golden testy nyní pokrývají všechny čtyři typy HTTP vhostu.
 - [~] **M4 — PHP-FPM:** automatická detekce a výběr verze, render a atomické
-  vytvoření poolu včetně ověření socketu jsou hotové. Zbývá změna verze poolu
-  (`php set`) s rollbackem.
+  vytvoření poolu včetně ověření socketu jsou hotové. `php list-versions` a
+  žurnálované `php set <sub> --version <ver>` nyní vytvářejí nový pool,
+  přerenderují všechny vhosty subscription, odstraní starý pool a nakonec
+  atomicky zapíší verzi i nastavení poolu do SQLite; každý krok má rollback.
+  Změna limitů ve stejné verzi aktualizuje existující pool, aniž by jej
+  odstranila. V `pv` byl skutečně ověřen dry-run i změna `max_children`,
+  configtest Apache a zapsaná verze; přechod mezi dvěma různými verzemi zůstává
+  neověřený, protože standardní Debian 13 obraz obsahuje jen PHP-FPM 8.4.
 
 ## Bezprostřední práce
 
