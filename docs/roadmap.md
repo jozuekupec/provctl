@@ -23,6 +23,9 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   správa webů a `reconcile`. Proxy a redirect lifecycle včetně CLI jsou
   napojené, perzistují cíl/redirect kód, mají cílené unit testy a byly ověřeny
   v `pv` skutečným HTTP proxy požadavkem i odpovědí `302` s `Location`.
+  Read-only `website list <subscription>` a `website show <subscription> <domain>`
+  jsou dostupné přes service vrstvu a ověřené v `pv`; zbývá enable/disable,
+  delete, aliasy, logy a `reconcile`.
 - [~] **M4 — PHP-FPM:** automatická detekce a výběr verze, render a atomické
   vytvoření poolu včetně ověření socketu jsou hotové. Zbývá změna verze poolu
   (`php set`) s rollbackem.

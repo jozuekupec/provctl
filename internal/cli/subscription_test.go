@@ -38,3 +38,17 @@ func TestWriteSubscriptionList_FormatsRows(t *testing.T) {
 		t.Errorf("writeSubscriptionList() mismatch (-want +got):\n%s", diff)
 	}
 }
+
+func TestWriteWebsite_FormatsProxyFields(t *testing.T) {
+	var output bytes.Buffer
+	command := &cobra.Command{}
+	command.SetOut(&output)
+	website := domain.Website{PrimaryDomain: "proxy.example.test", Type: domain.WebsiteProxy, Enabled: true, Target: "http://127.0.0.1:8080"}
+	if err := writeWebsite(command, website); err != nil {
+		t.Fatalf("writeWebsite() error = %v", err)
+	}
+	want := "Domain: proxy.example.test\nType: proxy\nEnabled: true\nSSL enabled: false\nDocument root: \nTarget: http://127.0.0.1:8080\nRedirect code: 0\nPHP version: \n"
+	if diff := cmp.Diff(want, output.String()); diff != "" {
+		t.Errorf("writeWebsite() mismatch (-want +got):\n%s", diff)
+	}
+}

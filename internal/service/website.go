@@ -32,6 +32,18 @@ func (service WebsiteService) List(ctx context.Context, subscriptionID int64) ([
 	return websites, nil
 }
 
+// ListForSubscription returns websites identified by their subscription name.
+func (service WebsiteService) ListForSubscription(ctx context.Context, subscriptionName string) ([]domain.Website, error) {
+	if err := domain.ValidateSubscriptionName(subscriptionName); err != nil {
+		return nil, err
+	}
+	subscription, err := service.Store.SubscriptionByName(ctx, subscriptionName)
+	if err != nil {
+		return nil, err
+	}
+	return service.List(ctx, subscription.ID)
+}
+
 type ApacheVHostApplier interface {
 	ApplyVHost(context.Context, string, []byte, string) (func(context.Context) error, error)
 }

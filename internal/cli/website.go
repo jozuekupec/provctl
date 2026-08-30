@@ -8,6 +8,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"provctl/internal/config"
+	"provctl/internal/domain"
 	"provctl/internal/meta"
 	"provctl/internal/plan"
 	"provctl/internal/service"
@@ -16,7 +17,72 @@ import (
 func newWebsiteCommand() *cobra.Command {
 	command := &cobra.Command{Use: "website", Short: "manage hosted websites"}
 	command.AddCommand(newWebsiteCreateCommand())
+	command.AddCommand(newWebsiteListCommand())
+	command.AddCommand(newWebsiteShowCommand())
 	return command
+}
+
+func newWebsiteListCommand() *cobra.Command {
+	var configPath string
+	command := &cobra.Command{
+		Use:   "list <subscription>",
+		Short: "list websites in a subscription",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(command *cobra.Command, args []string) error {
+			service, closeRuntime, err := openReadOnlyWebsiteService(configPath)
+			if err != nil {
+				return err
+			}
+			defer closeRuntime()
+			websites, err := service.ListForSubscription(context.Background(), args[0])
+			if err != nil {
+				return err
+			}
+			return writeWebsiteList(command, websites)
+		},
+	}
+	command.Flags().StringVar(&configPath, "config", meta.ConfigFile, "path to config.toml")
+	return command
+}
+
+func newWebsiteShowCommand() *cobra.Command {
+	var configPath string
+	command := &cobra.Command{
+		Use:   "show <subscription> <domain>",
+		Short: "show a website",
+		Args:  cobra.ExactArgs(2),
+		RunE: func(command *cobra.Command, args []string) error {
+			service, closeRuntime, err := openReadOnlyWebsiteService(configPath)
+			if err != nil {
+				return err
+			}
+			defer closeRuntime()
+			websites, err := service.ListForSubscription(context.Background(), args[0])
+			if err != nil {
+				return err
+			}
+			for _, website := range websites {
+				if website.PrimaryDomain == args[1] {
+					return writeWebsite(command, website)
+				}
+			}
+			return fmt.Errorf("website %q not found in subscription %q", args[1], args[0])
+		},
+	}
+	command.Flags().StringVar(&configPath, "config", meta.ConfigFile, "path to config.toml")
+	return command
+}
+
+func openReadOnlyWebsiteService(configPath string) (service.WebsiteService, func() error, error) {
+	cfg, err := config.Load(configPath)
+	if err != nil {
+		return service.WebsiteService{}, nil, fmt.Errorf("load configuration: %w", err)
+	}
+	runtime, err := service.NewReadOnlyWebsiteRuntime(context.Background(), cfg)
+	if err != nil {
+		return service.WebsiteService{}, nil, fmt.Errorf("open website state: %w", err)
+	}
+	return runtime.Service, runtime.Close, nil
 }
 
 func newWebsiteCreateCommand() *cobra.Command {
@@ -97,4 +163,21 @@ func createWebsite(service service.WebsiteService, websiteType string, ctx conte
 		return service.CreateRedirect(ctx, subscription, domain, target, redirectCode)
 	}
 	return service.CreatePHPFPM(ctx, subscription, domain)
+}
+
+func writeWebsiteList(command *cobra.Command, websites []domain.Website) error {
+	if _, err := fmt.Fprintln(command.OutOrStdout(), "DOMAIN\tTYPE\tENABLED\tSSL"); err != nil {
+		return err
+	}
+	for _, website := range websites {
+		if _, err := fmt.Fprintf(command.OutOrStdout(), "%s\t%s\t%t\t%t\n", website.PrimaryDomain, website.Type, website.Enabled, website.SSLEnabled); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func writeWebsite(command *cobra.Command, website domain.Website) error {
+	_, err := fmt.Fprintf(command.OutOrStdout(), "Domain: %s\nType: %s\nEnabled: %t\nSSL enabled: %t\nDocument root: %s\nTarget: %s\nRedirect code: %d\nPHP version: %s\n", website.PrimaryDomain, website.Type, website.Enabled, website.SSLEnabled, website.DocumentRoot, website.Target, website.RedirectCode, website.PHPVersion)
+	return err
 }
