@@ -21,6 +21,8 @@ type Website struct {
 	Type           WebsiteType
 	PrimaryDomain  string
 	DocumentRoot   string
+	Target         string
+	RedirectCode   int
 	PHPVersion     string
 	Enabled        bool
 	SSLEnabled     bool

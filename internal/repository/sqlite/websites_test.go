@@ -33,3 +33,28 @@ func TestRepository_CreateWebsite(t *testing.T) {
 		t.Errorf("DomainExists() = %t, %v; want true, nil", exists, err)
 	}
 }
+
+func TestRepository_CreateProxyWebsitePersistsTarget(t *testing.T) {
+	repository, err := Open(context.Background(), filepath.Join(t.TempDir(), "provctl.db"))
+	if err != nil {
+		t.Fatalf("Open() error = %v", err)
+	}
+	defer repository.Close()
+	if err := repository.CreateSubscription(context.Background(), domain.Subscription{Name: "acme", UnixUser: "acme", UnixUID: 5000, Home: "/vhosts/acme", PHPMaxChildren: 10, PHPMemoryLimit: "256M", PHPUploadMax: "64M", PHPMaxExecTime: 60, SSHAccess: "none"}); err != nil {
+		t.Fatal(err)
+	}
+	subscription, err := repository.SubscriptionByName(context.Background(), "acme")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := repository.CreateWebsite(context.Background(), domain.Website{SubscriptionID: subscription.ID, Type: domain.WebsiteProxy, PrimaryDomain: "proxy.example.test", Target: "http://127.0.0.1:8080", Enabled: true}); err != nil {
+		t.Fatalf("CreateWebsite() error = %v", err)
+	}
+	var target string
+	if err := repository.DB.QueryRowContext(context.Background(), `SELECT target FROM websites`).Scan(&target); err != nil {
+		t.Fatal(err)
+	}
+	if target != "http://127.0.0.1:8080" {
+		t.Errorf("target = %q", target)
+	}
+}

@@ -20,7 +20,9 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   proxy cíl je omezen na loopback či allowlist s povinným neprivilegovaným
   portem. Static lifecycle (`website create --type static`) je napojený a
   unit-testovaný i integračně ověřený v `pv` lokálním HTTP požadavkem; zbývá
-  proxy/redirect lifecycle, správa webů a `reconcile`.
+  proxy/redirect lifecycle, správa webů a `reconcile`. Datový model a SQLite
+  zápis už pro proxy/redirect uchovávají cíl a redirect kód; následuje service
+  a CLI lifecycle.
 - [~] **M4 — PHP-FPM:** automatická detekce a výběr verze, render a atomické
   vytvoření poolu včetně ověření socketu jsou hotové. Zbývá změna verze poolu
   (`php set`) s rollbackem.

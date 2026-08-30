@@ -50,7 +50,7 @@ func (repository *Repository) CreateWebsite(ctx context.Context, website domain.
 	}
 	defer transaction.Rollback()
 	now := time.Now().UTC().Format(time.RFC3339)
-	result, err := transaction.ExecContext(ctx, `INSERT INTO websites (subscription_id, type, document_root, php_version, enabled, ssl_enabled, force_https, hsts, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, website.SubscriptionID, website.Type, nullable(website.DocumentRoot), nullable(website.PHPVersion), website.Enabled, website.SSLEnabled, website.ForceHTTPS, website.HSTS, now, now)
+	result, err := transaction.ExecContext(ctx, `INSERT INTO websites (subscription_id, type, document_root, target, redirect_code, php_version, enabled, ssl_enabled, force_https, hsts, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, website.SubscriptionID, website.Type, nullable(website.DocumentRoot), nullable(website.Target), nullableInt(website.RedirectCode), nullable(website.PHPVersion), website.Enabled, website.SSLEnabled, website.ForceHTTPS, website.HSTS, now, now)
 	if err != nil {
 		return 0, fmt.Errorf("insert website: %w", err)
 	}
@@ -65,6 +65,13 @@ func (repository *Repository) CreateWebsite(ctx context.Context, website domain.
 		return 0, fmt.Errorf("commit website insert: %w", err)
 	}
 	return websiteID, nil
+}
+
+func nullableInt(value int) any {
+	if value == 0 {
+		return nil
+	}
+	return value
 }
 
 func (repository *Repository) DeleteWebsite(ctx context.Context, websiteID int64) error {
