@@ -21,3 +21,18 @@ func TestModel_LoadAndNavigateSubscriptions(t *testing.T) {
 		t.Errorf("cursor = %d, want 1", got)
 	}
 }
+
+func TestModel_LoadWebsitesForSelectedSubscription(t *testing.T) {
+	m := New(Deps{LoadWebsites: func(_ context.Context, id int64) ([]domain.Website, error) {
+		if id != 7 {
+			t.Fatalf("subscription ID = %d, want 7", id)
+		}
+		return []domain.Website{{PrimaryDomain: "example.test", Type: domain.WebsiteStatic, Enabled: true}}, nil
+	}})
+	m.items = []domain.Subscription{{ID: 7, Name: "acme"}}
+	loaded := m.loadWebsites().(websitesLoadedMsg)
+	updated, _ := m.Update(loaded)
+	if got := updated.(appModel).websites[0].PrimaryDomain; got != "example.test" {
+		t.Errorf("domain = %q", got)
+	}
+}

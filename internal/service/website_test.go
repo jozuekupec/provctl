@@ -14,9 +14,10 @@ type websiteStore struct{ subscription domain.Subscription }
 func (store websiteStore) SubscriptionByName(context.Context, string) (domain.Subscription, error) {
 	return store.subscription, nil
 }
-func (websiteStore) DomainExists(context.Context, string) (bool, error)           { return false, nil }
-func (websiteStore) CreateWebsite(context.Context, domain.Website) (int64, error) { return 1, nil }
-func (websiteStore) DeleteWebsite(context.Context, int64) error                   { return nil }
+func (websiteStore) DomainExists(context.Context, string) (bool, error)            { return false, nil }
+func (websiteStore) CreateWebsite(context.Context, domain.Website) (int64, error)  { return 1, nil }
+func (websiteStore) DeleteWebsite(context.Context, int64) error                    { return nil }
+func (websiteStore) ListWebsites(context.Context, int64) ([]domain.Website, error) { return nil, nil }
 
 type websiteApache struct{}
 

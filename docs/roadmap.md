@@ -51,8 +51,9 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   cíleně přebírá konzistentní Bubble Tea vzor z projektu `depo`: hodnotový
   model, `Deps`, samostatné routing/render/keys/theme a I/O jen přes `tea.Cmd`.
   První read-only subscriptions obrazovka je funkční (`provctl` bez argumentů):
-  načítá přes `tea.Cmd`, umí pohyb a refresh a má modelový test. Následují
-  panely websites/detail/output a potvrzované mutace.
+  načítá přes `tea.Cmd`, umí pohyb a refresh a má modelový test. Websites se
+  nyní načtou pro vybranou subscription přes service vrstvu. Následují detail,
+  output a potvrzované mutace.
 - [ ] **M9 — distribuce:** nfpm, maintainer skripty, CI, APT repozitář a
   package testy (`lintian`, `piuparts`, upgrade/purge).
 - [ ] **M10 — migrace:** `subscription adopt` pro existující weby.

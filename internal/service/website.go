@@ -20,6 +20,16 @@ type WebsiteStore interface {
 	DomainExists(context.Context, string) (bool, error)
 	CreateWebsite(context.Context, domain.Website) (int64, error)
 	DeleteWebsite(context.Context, int64) error
+	ListWebsites(context.Context, int64) ([]domain.Website, error)
+}
+
+// List returns websites of a subscription for read-only callers such as the TUI.
+func (service WebsiteService) List(ctx context.Context, subscriptionID int64) ([]domain.Website, error) {
+	websites, err := service.Store.ListWebsites(ctx, subscriptionID)
+	if err != nil {
+		return nil, fmt.Errorf("list websites: %w", err)
+	}
+	return websites, nil
 }
 
 type ApacheVHostApplier interface {

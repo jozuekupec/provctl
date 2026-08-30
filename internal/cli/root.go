@@ -39,7 +39,12 @@ func NewRootCommand() *cobra.Command {
 			return fmt.Errorf("open TUI state: %w", err)
 		}
 		defer runtime.Close()
-		_, err = ui.Program(ui.Deps{LoadSubscriptions: runtime.Service.List}).Run()
+		websiteRuntime, err := service.NewReadOnlyWebsiteRuntime(context.Background(), cfg)
+		if err != nil {
+			return fmt.Errorf("open website TUI state: %w", err)
+		}
+		defer websiteRuntime.Close()
+		_, err = ui.Program(ui.Deps{LoadSubscriptions: runtime.Service.List, LoadWebsites: websiteRuntime.Service.List}).Run()
 		return err
 	}
 	root.AddCommand(newDoctorCommand())
