@@ -51,3 +51,18 @@ func TestWebsiteService_PrepareCreatePHPFPMBuildsPlanWithoutChanges(t *testing.T
 		t.Errorf("plan steps = %d, want %d", got, want)
 	}
 }
+
+func TestWebsiteService_PrepareCreateStaticBuildsPlanWithoutChanges(t *testing.T) {
+	fs := &subscriptionFS{directories: map[string]bool{}}
+	service := WebsiteService{FS: fs, Store: websiteStore{subscription: domain.Subscription{ID: 1, Name: "acme", UnixUID: 5000, Home: "/vhosts/acme", Status: "active"}}, Apache: websiteApache{}, Executor: plan.Executor{Journal: &subscriptionJournal{}, Locker: subscriptionLocker{}}, Config: config.Config{Paths: config.Paths{ACMEChallenge: "/var/lib/provctl/acme-challenge"}, Apache: config.Apache{SitesAvailable: "/etc/apache2/sites-available", SitesEnabled: "/etc/apache2/sites-enabled", ProxyTimeout: 60}}}
+	operation, err := service.PrepareCreateStatic(context.Background(), "acme", "static.example.test")
+	if err != nil {
+		t.Fatalf("PrepareCreateStatic() error = %v", err)
+	}
+	if len(fs.directories) != 0 {
+		t.Error("PrepareCreateStatic() changed filesystem state")
+	}
+	if got, want := len(operation.Steps), 7; got != want {
+		t.Errorf("plan steps = %d, want %d", got, want)
+	}
+}

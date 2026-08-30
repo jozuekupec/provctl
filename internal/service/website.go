@@ -102,6 +102,53 @@ func (service WebsiteService) CreatePHPFPM(ctx context.Context, subscriptionName
 	return service.Executor.Run(ctx, operation)
 }
 
+// CreateStatic provisions an isolated static website and its Apache vhost.
+func (service WebsiteService) CreateStatic(ctx context.Context, subscriptionName, primaryDomain string) (int64, error) {
+	operation, err := service.PrepareCreateStatic(ctx, subscriptionName, primaryDomain)
+	if err != nil {
+		return 0, err
+	}
+	return service.Executor.Run(ctx, operation)
+}
+
+// PrepareCreateStatic validates state and prepares a static website without changes.
+func (service WebsiteService) PrepareCreateStatic(ctx context.Context, subscriptionName, primaryDomain string) (plan.Plan, error) {
+	if service.Apache == nil {
+		return plan.Plan{}, fmt.Errorf("Apache vhost applier is required")
+	}
+	if err := domain.ValidateSubscriptionName(subscriptionName); err != nil {
+		return plan.Plan{}, err
+	}
+	if err := domain.ValidateDomain(primaryDomain); err != nil {
+		return plan.Plan{}, err
+	}
+	subscription, err := service.Store.SubscriptionByName(ctx, subscriptionName)
+	if err != nil {
+		return plan.Plan{}, err
+	}
+	if subscription.Status != "active" {
+		return plan.Plan{}, fmt.Errorf("subscription %q is %s", subscriptionName, subscription.Status)
+	}
+	exists, err := service.Store.DomainExists(ctx, primaryDomain)
+	if err != nil {
+		return plan.Plan{}, fmt.Errorf("check domain: %w", err)
+	}
+	if exists {
+		return plan.Plan{}, fmt.Errorf("domain %q is already assigned", primaryDomain)
+	}
+	siteRoot := filepath.Join(subscription.Home, "sites", primaryDomain)
+	documentRoot := filepath.Join(siteRoot, "public")
+	logDir := filepath.Join(meta.LogDir, subscription.Name, primaryDomain)
+	vhostPath := filepath.Join(service.Config.Apache.SitesAvailable, meta.FilePrefix+subscription.Name+"-"+primaryDomain+".conf")
+	enabledPath := filepath.Join(service.Config.Apache.SitesEnabled, filepath.Base(vhostPath))
+	contents, err := render.RenderApacheStaticHTTP(render.ApacheStaticVHost{PrimaryDomain: primaryDomain, DocumentRoot: documentRoot, AcmeChallengeRoot: service.Config.Paths.ACMEChallenge, LogDir: logDir})
+	if err != nil {
+		return plan.Plan{}, err
+	}
+	website := domain.Website{SubscriptionID: subscription.ID, Type: domain.WebsiteStatic, PrimaryDomain: primaryDomain, DocumentRoot: documentRoot, Enabled: true}
+	return service.createStaticPlan(subscription, website, siteRoot, logDir, vhostPath, enabledPath, contents), nil
+}
+
 func (service WebsiteService) PrepareCreatePHPFPM(ctx context.Context, subscriptionName, primaryDomain string) (plan.Plan, error) {
 	if service.PHPFPM == nil || service.Version.Version == "" || service.Version.Binary == "" || service.Version.Service == "" {
 		return plan.Plan{}, fmt.Errorf("PHP-FPM version and pool applier are required")
@@ -176,6 +223,43 @@ func (service WebsiteService) createPHPFPMPlan(subscription domain.Subscription,
 		}
 		return undoPool(ctx)
 	}})
+	var undoApache func(context.Context) error
+	steps = append(steps, plan.Step{Name: "install and enable Apache vhost", Preview: fmt.Sprintf("write %s and enable %s", vhostPath, enabledPath), Do: func(ctx context.Context) error {
+		var err error
+		undoApache, err = service.Apache.ApplyVHost(ctx, vhostPath, contents, enabledPath)
+		return err
+	}, Undo: func(ctx context.Context) error {
+		if undoApache == nil {
+			return nil
+		}
+		return undoApache(ctx)
+	}})
+	steps = append(steps, plan.Step{Name: "record website", Preview: "insert website and primary domain into SQLite", Do: func(ctx context.Context) error {
+		id, err := service.Store.CreateWebsite(ctx, website)
+		website.ID = id
+		return err
+	}, Undo: func(ctx context.Context) error { return service.Store.DeleteWebsite(ctx, website.ID) }})
+	return plan.Plan{Action: "website.create", Target: subscription.Name + "/" + website.PrimaryDomain, Steps: steps}
+}
+
+func (service WebsiteService) createStaticPlan(subscription domain.Subscription, website domain.Website, siteRoot, logDir, vhostPath, enabledPath string, contents []byte) plan.Plan {
+	directories := []struct {
+		name, path string
+		mode       os.FileMode
+	}{{"create website root", siteRoot, 0o751}, {"create public directory", filepath.Join(siteRoot, "public"), 0o755}, {"create website log directory", logDir, 0o750}}
+	steps := make([]plan.Step, 0, len(directories)+4)
+	for _, directory := range directories {
+		directory := directory
+		uid, gid := subscription.UnixUID, subscription.UnixUID
+		if directory.path == logDir {
+			uid = 0
+		}
+		steps = append(steps, plan.Step{Name: directory.name, Preview: fmt.Sprintf("mkdir -m %04o %s", directory.mode, directory.path), Do: service.createOwnedDirectory(directory.path, uid, gid, directory.mode), Undo: func(context.Context) error { return service.FS.Remove(directory.path) }})
+	}
+	for _, name := range []string{"access.log", "error.log"} {
+		path := filepath.Join(logDir, name)
+		steps = append(steps, plan.Step{Name: "create " + name, Preview: "create " + path, Do: service.createLogFile(path, subscription.UnixUID), Undo: func(context.Context) error { return service.FS.Remove(path) }})
+	}
 	var undoApache func(context.Context) error
 	steps = append(steps, plan.Step{Name: "install and enable Apache vhost", Preview: fmt.Sprintf("write %s and enable %s", vhostPath, enabledPath), Do: func(ctx context.Context) error {
 		var err error
