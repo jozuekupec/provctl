@@ -52,6 +52,7 @@ func NewRootCommand() *cobra.Command {
 	root.AddCommand(newSubscriptionCommand())
 	root.AddCommand(newWebsiteCommand())
 	root.AddCommand(newPHPCommand())
+	root.AddCommand(newDatabaseCommand())
 	root.AddCommand(newReconcileCommand())
 	return root
 }

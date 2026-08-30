@@ -70,11 +70,15 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
 
 ## Následující milníky
 
-- [~] **M5 — MariaDB, SSH a cron:** založen čistý datový model databáze,
-  whitelist validace jmen a SQLite lifecycle úložiště. MariaDB adapter předává
-  SQL výhradně přes stdin, podporuje defaults-file a hesla generuje
-  kryptograficky bez jejich perzistence. Následuje žurnálovaný database lifecycle,
-  SSH klíče a crontab.
+- [~] **M5 — MariaDB, SSH a cron:** databázový lifecycle je žurnálovaný a
+  dostupný přes `database create|list|password|delete`. Jméno se skládá jako
+  `<subscription>_<name>`, před vytvořením se dynamicky ověřuje limit uživatele
+  na cílovém MariaDB serveru a SQL jde výhradně přes stdin. Hesla jsou
+  kryptografická, nezapisují se do SQLite a CLI je vypíše pouze po úspěchu.
+  Create má rollback databáze i metadata; delete nejdříve odstraňuje metadata,
+  aby je při selhání serverového dropu vrátil. Zbývá `--write-credentials`, SSH
+  klíče a crontab; skutečný MariaDB integrační běh čeká na opravu unix-socket
+  autentizace testovacího obrazu `pv`.
 - [ ] **M6 — SSL:** stavový automat Certbotu, deploy-hook command a přijetí
   existujících certifikátů.
 - [ ] **M7 — provoz:** backup/restore, health checks, audit log a kvóty.

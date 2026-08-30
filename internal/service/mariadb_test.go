@@ -43,15 +43,16 @@ func containsDatabasePasswordCharacter(character byte) bool {
 type mariaCommander struct {
 	name, stdin string
 	args        []string
+	result      system.Result
 }
 
-func (*mariaCommander) Run(context.Context, string, ...string) (system.Result, error) {
-	return system.Result{}, nil
+func (commander *mariaCommander) Run(context.Context, string, ...string) (system.Result, error) {
+	return commander.result, nil
 }
 func (commander *mariaCommander) RunWithStdin(_ context.Context, input io.Reader, name string, args ...string) (system.Result, error) {
 	contents, _ := io.ReadAll(input)
 	commander.name, commander.stdin, commander.args = name, string(contents), append([]string(nil), args...)
-	return system.Result{}, nil
+	return commander.result, nil
 }
 
 func TestMariaDB_ExecuteUsesStdinAndDefaultsFile(t *testing.T) {
@@ -67,6 +68,27 @@ func TestMariaDB_ExecuteUsesStdinAndDefaultsFile(t *testing.T) {
 	}
 }
 
+func TestMariaDB_UserNameLimitReadsServerLimit(t *testing.T) {
+	commander := &mariaCommander{result: system.Result{Stdout: "80\n"}}
+	limit, err := (MariaDB{Commands: commander}).UserNameLimit(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if limit != 80 {
+		t.Errorf("limit = %d, want 80", limit)
+	}
+	if !strings.Contains(commander.stdin, "information_schema.COLUMNS") {
+		t.Errorf("query = %q", commander.stdin)
+	}
+}
+
+func TestMariaDB_UserNameLimitRejectsInvalidResult(t *testing.T) {
+	commander := &mariaCommander{result: system.Result{Stdout: "not-a-number\n"}}
+	if _, err := (MariaDB{Commands: commander}).UserNameLimit(context.Background()); err == nil {
+		t.Fatal("UserNameLimit() error = nil")
+	}
+}
+
 func TestCreateSQLEscapesPassword(t *testing.T) {
 	query, err := CreateSQL("main", "acme_main", "a'b")
 	if err != nil {
@@ -74,5 +96,16 @@ func TestCreateSQLEscapesPassword(t *testing.T) {
 	}
 	if !strings.Contains(query, "IDENTIFIED BY 'a''b'") {
 		t.Errorf("query = %q", query)
+	}
+}
+
+func TestDropSQLAndPasswordSQLValidateAndEscape(t *testing.T) {
+	drop, err := DropSQL("acme_main", "acme_main")
+	if err != nil || !strings.Contains(drop, "DROP USER IF EXISTS 'acme_main'@'localhost'") {
+		t.Fatalf("DropSQL() = %q, %v", drop, err)
+	}
+	password, err := PasswordSQL("acme_main", "a'b")
+	if err != nil || !strings.Contains(password, "IDENTIFIED BY 'a''b'") {
+		t.Fatalf("PasswordSQL() = %q, %v", password, err)
 	}
 }
