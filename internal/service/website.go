@@ -274,7 +274,7 @@ func (service WebsiteService) renderHTTPVHost(subscriptionName string, website d
 	case domain.WebsiteRedirect:
 		return render.RenderApacheRedirectHTTP(render.ApacheRedirectVHost{PrimaryDomain: website.PrimaryDomain, Aliases: website.Aliases, Target: website.Target, RedirectCode: website.RedirectCode, AcmeChallengeRoot: service.Config.Paths.ACMEChallenge, LogDir: logDir})
 	case domain.WebsitePHPFPM:
-		return render.RenderApachePHPFPMHTTP(render.ApacheHTTPVHost{Subscription: subscriptionName, PrimaryDomain: website.PrimaryDomain, Aliases: website.Aliases, DocumentRoot: website.DocumentRoot, AcmeChallengeRoot: service.Config.Paths.ACMEChallenge, FPMSocket: filepath.Join("/run/php", meta.FilePrefix+subscriptionName+".sock"), ProxyTimeout: service.Config.Apache.ProxyTimeout, LogDir: logDir})
+		return render.RenderApachePHPFPMHTTP(render.ApacheHTTPVHost{Subscription: subscriptionName, PrimaryDomain: website.PrimaryDomain, Aliases: website.Aliases, DocumentRoot: website.DocumentRoot, AcmeChallengeRoot: service.Config.Paths.ACMEChallenge, FPMSocket: filepath.Join("/run/php", meta.FilePrefix+subscriptionName+".sock"), ProxyTimeout: service.Config.Apache.ProxyTimeout, LogDir: logDir, ForceHTTPS: website.ForceHTTPS})
 	default:
 		return nil, fmt.Errorf("unsupported website type %q", website.Type)
 	}

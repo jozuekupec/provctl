@@ -14,7 +14,7 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
 - [x] **M1 — operační jádro:** plán, journal operací, zámek a rollback.
 - [x] **M2 — subscriptions:** vytvoření, výpis, detail a bezpečné smazání;
   uživatel, skupina a adresáře s izolačními právy.
-- [~] **M3 — websites a Apache:** PHP-FPM website create, ukládání domény,
+- [x] **M3 — websites a Apache:** PHP-FPM website create, ukládání domény,
   render a atomická aplikace HTTP vhostu, povolení modulů a defaultní catch-all
   vhost jsou hotové. Renderery pro static/proxy/redirect jsou připravené a
   proxy cíl je omezen na loopback či allowlist s povinným neprivilegovaným
@@ -33,8 +33,12 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   zatím chybí. Před integračním během po restore je nutné počkat na aktivní
   Apache, jinak může jeho runtime adresář krátce chybět. `website alias
   add|remove` atomicky přerenderuje Apache vhost a upraví SQLite; obě cesty
-  jsou ověřené v `pv`. Zbývá `reconcile`.
-  Golden testy nyní pokrývají všechny čtyři typy HTTP vhostu.
+  jsou ověřené v `pv`. `reconcile` nyní z SQLite obnoví obsah všech
+  spravovaných HTTP vhostů i jejich enabled symlinky; `--dry-run` vypíše
+  line-oriented unified diff a při driftu končí kódem 2. Skutečný běh vytváří
+  žurnálovanou rollbackovatelnou operaci. V `pv` byl ověřen úmyslně změněný
+  vhost i smazaný symlink, následný `apachectl configtest` a druhý dry-run bez
+  driftu. Golden testy nyní pokrývají všechny čtyři typy HTTP vhostu.
 - [~] **M4 — PHP-FPM:** automatická detekce a výběr verze, render a atomické
   vytvoření poolu včetně ověření socketu jsou hotové. Zbývá změna verze poolu
   (`php set`) s rollbackem.
