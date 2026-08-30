@@ -69,16 +69,19 @@ func TestPHPService_SetPlanOrdersTransitionAndRecordsSettings(t *testing.T) {
 	if err != nil {
 		t.Fatalf("setPlan() error = %v", err)
 	}
-	if got, want := len(operation.Steps), 5; got != want {
+	if got, want := len(operation.Steps), 6; got != want {
 		t.Fatalf("steps = %d, want %d", got, want)
 	}
-	if got, want := operation.Steps[1].Name, "regenerate Apache vhost app.example.test"; got != want {
-		t.Errorf("second step = %q, want %q", got, want)
+	if got, want := operation.Steps[0].Name, "remove previous PHP-FPM pool"; got != want {
+		t.Errorf("first step = %q, want %q", got, want)
+	}
+	if got, want := operation.Steps[3].Name, "regenerate Apache vhost app.example.test"; got != want {
+		t.Errorf("fourth step = %q, want %q", got, want)
 	}
 	if _, err := service.Executor.Run(context.Background(), operation); err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}
-	if got, want := strings.Join(pools.events, "\n"), "apply 8.4 /etc/php/8.4/fpm/pool.d/provctl-acme.conf\nremove 8.3 /etc/php/8.3/fpm/pool.d/provctl-acme.conf"; got != want {
+	if got, want := strings.Join(pools.events, "\n"), "remove 8.3 /etc/php/8.3/fpm/pool.d/provctl-acme.conf\napply 8.4 /etc/php/8.4/fpm/pool.d/provctl-acme.conf"; got != want {
 		t.Errorf("pool events (-want +got):\n%s", got)
 	}
 	if got, want := strings.Join(apache.events, "\n"), "apply /available/provctl-acme-app.example.test.conf\napply /available/provctl-acme-static.example.test.conf"; got != want {

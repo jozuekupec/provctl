@@ -45,9 +45,11 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   přerenderují všechny vhosty subscription, odstraní starý pool a nakonec
   atomicky zapíší verzi i nastavení poolu do SQLite; každý krok má rollback.
   Změna limitů ve stejné verzi aktualizuje existující pool, aniž by jej
-  odstranila. V `pv` byl skutečně ověřen dry-run i změna `max_children`,
-  configtest Apache a zapsaná verze; přechod mezi dvěma různými verzemi zůstává
-  neověřený, protože standardní Debian 13 obraz obsahuje jen PHP-FPM 8.4.
+  odstranila. Sdílený socket vyžaduje bezpečné předání: starý pool se odstraní,
+  systém čeká nejvýše 10 sekund na uvolnění socketu a teprve poté aktivuje nový
+  pool; timeout vrátí starý pool žurnálovaným rollbackem. V `pv` byl ověřen
+  dry-run i změna `max_children`, configtest Apache, zapsaná verze a obousměrné
+  HTTP přepnutí 8.4 → 8.3 → 8.4 s dodatečně instalovaným PHP 8.3 ze Sury.
 
 ## Bezprostřední práce
 

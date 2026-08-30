@@ -495,7 +495,11 @@ Trik, jak vynutit selhání bez zásahu do kódu: podstrč vadnou šablonu do ov
 
 ### T13 — změna PHP verze
 
-Vyžaduje dvě nainstalované verze. Pokud jsou v Debianu 13 dostupné pouze jedna, tento test se přesouvá na E5 (server se Sury) — **a musí to být v reportu uvedeno jako neověřeno**.
+Vyžaduje dvě nainstalované verze. Pokud standardní Debian 13 obsahuje jen jednu,
+dočasně přidej v testovacím kontejneru repozitář Sury a druhou FPM verzi; po
+testu vždy obnov `clean`. Pro ověření M4 byl použit PHP 8.3 ze Sury vedle
+distribučního PHP 8.4. Produkční rozhodnutí o Sury je samostatné a tato
+testovací závislost se nesmí promítnout do balíčku `provctl`.
 
 ```bash
 ./scripts/e2.sh sh 'provctl php list-versions'

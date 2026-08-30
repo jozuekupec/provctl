@@ -2,8 +2,11 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
+	"time"
 
 	"provctl/internal/config"
 	"provctl/internal/domain"
@@ -172,6 +175,22 @@ func (service PHPService) setPlan(previous, desired domain.Subscription, website
 	newPoolPath, oldPoolPath := phpPoolPath(newVersion, desired.Name), phpPoolPath(oldVersion, desired.Name)
 	socket := phpSocket(desired.Name)
 	steps := make([]plan.Step, 0, len(websites)+3)
+	if oldVersion.Version != newVersion.Version {
+		var undoOldPool func(context.Context) error
+		steps = append(steps, plan.Step{Name: "remove previous PHP-FPM pool", Preview: fmt.Sprintf("remove %s; validate %s -t; reload %s", oldPoolPath, oldVersion.Binary, oldVersion.Service), Do: func(ctx context.Context) error {
+			var err error
+			undoOldPool, err = service.PHPFPM.RemovePool(ctx, oldVersion, oldPoolPath)
+			return err
+		}, Undo: func(ctx context.Context) error {
+			if undoOldPool == nil {
+				return nil
+			}
+			return undoOldPool(ctx)
+		}})
+		steps = append(steps, plan.Step{Name: "wait for PHP-FPM socket release", Preview: "wait for " + socket + " to be released by " + oldVersion.Service, Do: func(ctx context.Context) error {
+			return waitForSocketRelease(ctx, service.FS, socket)
+		}, Undo: func(context.Context) error { return nil }})
+	}
 	var undoNewPool func(context.Context) error
 	steps = append(steps, plan.Step{Name: "install new PHP-FPM pool", Preview: fmt.Sprintf("write %s; validate %s -t; reload %s", newPoolPath, newVersion.Binary, newVersion.Service), Do: func(ctx context.Context) error {
 		var err error
@@ -202,23 +221,34 @@ func (service PHPService) setPlan(previous, desired domain.Subscription, website
 			return undoApache(ctx)
 		}})
 	}
-	if oldVersion.Version != newVersion.Version {
-		var undoOldPool func(context.Context) error
-		steps = append(steps, plan.Step{Name: "remove previous PHP-FPM pool", Preview: fmt.Sprintf("remove %s; validate %s -t; reload %s", oldPoolPath, oldVersion.Binary, oldVersion.Service), Do: func(ctx context.Context) error {
-			var err error
-			undoOldPool, err = service.PHPFPM.RemovePool(ctx, oldVersion, oldPoolPath)
-			return err
-		}, Undo: func(ctx context.Context) error {
-			if undoOldPool == nil {
-				return nil
-			}
-			return undoOldPool(ctx)
-		}})
-	}
 	steps = append(steps, plan.Step{Name: "record PHP-FPM settings in SQLite", Preview: "update subscription and PHP-FPM website versions in SQLite", Do: func(ctx context.Context) error {
 		return service.Store.UpdatePHPSettings(ctx, desired)
 	}, Undo: func(ctx context.Context) error {
 		return service.Store.UpdatePHPSettings(ctx, previous)
 	}})
 	return plan.Plan{Action: "php.set", Target: desired.Name, Steps: steps}, nil
+}
+
+func waitForSocketRelease(ctx context.Context, fs system.FS, socket string) error {
+	if fs == nil {
+		return nil
+	}
+	deadline := time.Now().Add(10 * time.Second)
+	for {
+		_, err := fs.Stat(socket)
+		if errors.Is(err, os.ErrNotExist) {
+			return nil
+		}
+		if err != nil {
+			return fmt.Errorf("inspect PHP-FPM socket %q: %w", socket, err)
+		}
+		if time.Now().After(deadline) {
+			return fmt.Errorf("PHP-FPM socket %q was not released within 10 seconds", socket)
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(100 * time.Millisecond):
+		}
+	}
 }
