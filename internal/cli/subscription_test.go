@@ -47,7 +47,7 @@ func TestWriteWebsite_FormatsProxyFields(t *testing.T) {
 	if err := writeWebsite(command, website); err != nil {
 		t.Fatalf("writeWebsite() error = %v", err)
 	}
-	want := "Domain: proxy.example.test\nType: proxy\nEnabled: true\nSSL enabled: false\nDocument root: \nTarget: http://127.0.0.1:8080\nRedirect code: 0\nPHP version: \n"
+	want := "Domain: proxy.example.test\nAliases: \nType: proxy\nEnabled: true\nSSL enabled: false\nDocument root: \nTarget: http://127.0.0.1:8080\nRedirect code: 0\nPHP version: \n"
 	if diff := cmp.Diff(want, output.String()); diff != "" {
 		t.Errorf("writeWebsite() mismatch (-want +got):\n%s", diff)
 	}

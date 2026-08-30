@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -23,6 +24,45 @@ func newWebsiteCommand() *cobra.Command {
 	command.AddCommand(newWebsiteSetEnabledCommand("disable", false))
 	command.AddCommand(newWebsiteDeleteCommand())
 	command.AddCommand(newWebsiteLogsCommand())
+	command.AddCommand(newWebsiteAliasCommand())
+	return command
+}
+
+func newWebsiteAliasCommand() *cobra.Command {
+	command := &cobra.Command{Use: "alias", Short: "manage website aliases"}
+	for _, operation := range []struct {
+		name string
+		add  bool
+	}{{"add", true}, {"remove", false}} {
+		operation := operation
+		var configPath string
+		child := &cobra.Command{Use: operation.name + " <subscription> <domain> <alias>", Short: operation.name + " a website alias", Args: cobra.ExactArgs(3), RunE: func(command *cobra.Command, args []string) error {
+			cfg, err := config.Load(configPath)
+			if err != nil {
+				return fmt.Errorf("load configuration: %w", err)
+			}
+			runtime, err := service.NewProductionWebsiteRuntime(context.Background(), cfg)
+			if err != nil {
+				return fmt.Errorf("open website state: %w", err)
+			}
+			defer runtime.Close()
+			ctx, cancel := context.WithTimeout(context.Background(), time.Duration(cfg.Limits.LockTimeoutSeconds)*time.Second)
+			defer cancel()
+			var operationID int64
+			if operation.add {
+				operationID, err = runtime.Service.AddAlias(ctx, args[0], args[1], args[2])
+			} else {
+				operationID, err = runtime.Service.RemoveAlias(ctx, args[0], args[1], args[2])
+			}
+			if err != nil {
+				return err
+			}
+			_, err = fmt.Fprintf(command.OutOrStdout(), "%s alias %q for website %q (operation %d).\n", map[bool]string{true: "Added", false: "Removed"}[operation.add], args[2], args[1], operationID)
+			return err
+		}}
+		child.Flags().StringVar(&configPath, "config", meta.ConfigFile, "path to config.toml")
+		command.AddCommand(child)
+	}
 	return command
 }
 
@@ -298,6 +338,6 @@ func writeWebsiteList(command *cobra.Command, websites []domain.Website) error {
 }
 
 func writeWebsite(command *cobra.Command, website domain.Website) error {
-	_, err := fmt.Fprintf(command.OutOrStdout(), "Domain: %s\nType: %s\nEnabled: %t\nSSL enabled: %t\nDocument root: %s\nTarget: %s\nRedirect code: %d\nPHP version: %s\n", website.PrimaryDomain, website.Type, website.Enabled, website.SSLEnabled, website.DocumentRoot, website.Target, website.RedirectCode, website.PHPVersion)
+	_, err := fmt.Fprintf(command.OutOrStdout(), "Domain: %s\nAliases: %s\nType: %s\nEnabled: %t\nSSL enabled: %t\nDocument root: %s\nTarget: %s\nRedirect code: %d\nPHP version: %s\n", website.PrimaryDomain, strings.Join(website.Aliases, ", "), website.Type, website.Enabled, website.SSLEnabled, website.DocumentRoot, website.Target, website.RedirectCode, website.PHPVersion)
 	return err
 }

@@ -95,6 +95,10 @@ func (bootstrapInfo) Sys() any           { return nil }
 
 type bootstrapApache struct{}
 
+func (bootstrapApache) Apply(context.Context, string, []byte) (func(context.Context) error, error) {
+	return func(context.Context) error { return nil }, nil
+}
+
 func (bootstrapApache) ApplyVHost(context.Context, string, []byte, string) (func(context.Context) error, error) {
 	return func(context.Context) error { return nil }, nil
 }

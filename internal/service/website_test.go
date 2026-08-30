@@ -38,11 +38,17 @@ func (websiteStore) DomainExists(context.Context, string) (bool, error)         
 func (websiteStore) CreateWebsite(context.Context, domain.Website) (int64, error) { return 1, nil }
 func (websiteStore) DeleteWebsite(context.Context, int64) error                   { return nil }
 func (websiteStore) SetWebsiteEnabled(context.Context, int64, bool) error         { return nil }
+func (websiteStore) AddWebsiteAlias(context.Context, int64, string) error         { return nil }
+func (websiteStore) RemoveWebsiteAlias(context.Context, int64, string) error      { return nil }
 func (store websiteStore) ListWebsites(context.Context, int64) ([]domain.Website, error) {
 	return store.websites, nil
 }
 
 type websiteApache struct{}
+
+func (websiteApache) Apply(context.Context, string, []byte) (func(context.Context) error, error) {
+	return func(context.Context) error { return nil }, nil
+}
 
 func (websiteApache) ApplyVHost(context.Context, string, []byte, string) (func(context.Context) error, error) {
 	return func(context.Context) error { return nil }, nil
@@ -146,6 +152,17 @@ func TestWebsiteService_PrepareSetEnabledBuildsReversiblePlan(t *testing.T) {
 	}
 	if got, want := operation.Action, "website.set-enabled"; got != want {
 		t.Errorf("action = %q, want %q", got, want)
+	}
+}
+
+func TestWebsiteService_PrepareAliasBuildsReversiblePlan(t *testing.T) {
+	service := WebsiteService{Store: websiteStore{subscription: domain.Subscription{ID: 1, Name: "acme"}, websites: []domain.Website{{ID: 4, SubscriptionID: 1, Type: domain.WebsiteStatic, PrimaryDomain: "example.test", DocumentRoot: "/vhosts/acme/sites/example.test/public"}}}, Apache: websiteApache{}, Executor: plan.Executor{Journal: &subscriptionJournal{}, Locker: subscriptionLocker{}}, Config: config.Config{Paths: config.Paths{ACMEChallenge: "/var/lib/provctl/acme-challenge"}, Apache: config.Apache{SitesAvailable: "/etc/apache2/sites-available", ProxyTimeout: 60}}}
+	operation, err := service.PrepareAlias(context.Background(), "acme", "example.test", "www.example.test", true)
+	if err != nil {
+		t.Fatalf("PrepareAlias() error = %v", err)
+	}
+	if got, want := len(operation.Steps), 2; got != want {
+		t.Errorf("plan steps = %d, want %d", got, want)
 	}
 }
 

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"provctl/internal/config"
@@ -22,6 +23,8 @@ type WebsiteStore interface {
 	CreateWebsite(context.Context, domain.Website) (int64, error)
 	DeleteWebsite(context.Context, int64) error
 	SetWebsiteEnabled(context.Context, int64, bool) error
+	AddWebsiteAlias(context.Context, int64, string) error
+	RemoveWebsiteAlias(context.Context, int64, string) error
 	ListWebsites(context.Context, int64) ([]domain.Website, error)
 }
 
@@ -84,6 +87,7 @@ func (service WebsiteService) ReadLogs(ctx context.Context, subscriptionName, pr
 }
 
 type ApacheVHostApplier interface {
+	Apply(context.Context, string, []byte) (func(context.Context) error, error)
 	ApplyVHost(context.Context, string, []byte, string) (func(context.Context) error, error)
 	SetVHostEnabled(context.Context, string, string, bool) (func(context.Context) error, error)
 	RemoveVHost(context.Context, string, string) (func(context.Context) error, error)
@@ -172,6 +176,108 @@ func (service WebsiteService) CreateStatic(ctx context.Context, subscriptionName
 		return 0, err
 	}
 	return service.Executor.Run(ctx, operation)
+}
+
+func (service WebsiteService) AddAlias(ctx context.Context, subscriptionName, primaryDomain, alias string) (int64, error) {
+	operation, err := service.PrepareAlias(ctx, subscriptionName, primaryDomain, alias, true)
+	if err != nil {
+		return 0, err
+	}
+	return service.Executor.Run(ctx, operation)
+}
+
+func (service WebsiteService) RemoveAlias(ctx context.Context, subscriptionName, primaryDomain, alias string) (int64, error) {
+	operation, err := service.PrepareAlias(ctx, subscriptionName, primaryDomain, alias, false)
+	if err != nil {
+		return 0, err
+	}
+	return service.Executor.Run(ctx, operation)
+}
+
+func (service WebsiteService) PrepareAlias(ctx context.Context, subscriptionName, primaryDomain, alias string, add bool) (plan.Plan, error) {
+	if service.Apache == nil {
+		return plan.Plan{}, fmt.Errorf("Apache vhost applier is required")
+	}
+	if err := domain.ValidateDomain(alias); err != nil {
+		return plan.Plan{}, err
+	}
+	websites, err := service.ListForSubscription(ctx, subscriptionName)
+	if err != nil {
+		return plan.Plan{}, err
+	}
+	var website domain.Website
+	for _, candidate := range websites {
+		if candidate.PrimaryDomain == primaryDomain {
+			website = candidate
+			break
+		}
+	}
+	if website.ID == 0 {
+		return plan.Plan{}, fmt.Errorf("website %q not found in subscription %q", primaryDomain, subscriptionName)
+	}
+	aliases := append([]string(nil), website.Aliases...)
+	if add {
+		exists, err := service.Store.DomainExists(ctx, alias)
+		if err != nil {
+			return plan.Plan{}, err
+		}
+		if exists {
+			return plan.Plan{}, fmt.Errorf("domain %q is already assigned", alias)
+		}
+		aliases = append(aliases, alias)
+		sort.Strings(aliases)
+	} else {
+		filtered := aliases[:0]
+		for _, value := range aliases {
+			if value != alias {
+				filtered = append(filtered, value)
+			}
+		}
+		if len(filtered) == len(aliases) {
+			return plan.Plan{}, fmt.Errorf("website alias %q not found", alias)
+		}
+		aliases = filtered
+	}
+	website.Aliases = aliases
+	contents, err := service.renderHTTPVHost(subscriptionName, website)
+	if err != nil {
+		return plan.Plan{}, err
+	}
+	vhostPath := filepath.Join(service.Config.Apache.SitesAvailable, meta.FilePrefix+subscriptionName+"-"+primaryDomain+".conf")
+	var undoApache func(context.Context) error
+	verb := map[bool]string{true: "add", false: "remove"}[add]
+	steps := []plan.Step{{Name: "update Apache vhost aliases", Preview: "write " + vhostPath, Do: func(ctx context.Context) error {
+		var err error
+		undoApache, err = service.Apache.Apply(ctx, vhostPath, contents)
+		return err
+	}, Undo: func(ctx context.Context) error { return undoApache(ctx) }}, {Name: verb + " website alias in SQLite", Preview: verb + " " + alias, Do: func(ctx context.Context) error {
+		if add {
+			return service.Store.AddWebsiteAlias(ctx, website.ID, alias)
+		}
+		return service.Store.RemoveWebsiteAlias(ctx, website.ID, alias)
+	}, Undo: func(ctx context.Context) error {
+		if add {
+			return service.Store.RemoveWebsiteAlias(ctx, website.ID, alias)
+		}
+		return service.Store.AddWebsiteAlias(ctx, website.ID, alias)
+	}}}
+	return plan.Plan{Action: "website.alias." + verb, Target: subscriptionName + "/" + primaryDomain + "/" + alias, Steps: steps}, nil
+}
+
+func (service WebsiteService) renderHTTPVHost(subscriptionName string, website domain.Website) ([]byte, error) {
+	logDir := filepath.Join(meta.LogDir, subscriptionName, website.PrimaryDomain)
+	switch website.Type {
+	case domain.WebsiteStatic:
+		return render.RenderApacheStaticHTTP(render.ApacheStaticVHost{PrimaryDomain: website.PrimaryDomain, Aliases: website.Aliases, DocumentRoot: website.DocumentRoot, AcmeChallengeRoot: service.Config.Paths.ACMEChallenge, LogDir: logDir})
+	case domain.WebsiteProxy:
+		return render.RenderApacheProxyHTTP(render.ApacheProxyVHost{PrimaryDomain: website.PrimaryDomain, Aliases: website.Aliases, Target: website.Target, AcmeChallengeRoot: service.Config.Paths.ACMEChallenge, ProxyTimeout: service.Config.Apache.ProxyTimeout, LogDir: logDir}, service.Config.Apache.AllowedProxyHosts)
+	case domain.WebsiteRedirect:
+		return render.RenderApacheRedirectHTTP(render.ApacheRedirectVHost{PrimaryDomain: website.PrimaryDomain, Aliases: website.Aliases, Target: website.Target, RedirectCode: website.RedirectCode, AcmeChallengeRoot: service.Config.Paths.ACMEChallenge, LogDir: logDir})
+	case domain.WebsitePHPFPM:
+		return render.RenderApachePHPFPMHTTP(render.ApacheHTTPVHost{Subscription: subscriptionName, PrimaryDomain: website.PrimaryDomain, Aliases: website.Aliases, DocumentRoot: website.DocumentRoot, AcmeChallengeRoot: service.Config.Paths.ACMEChallenge, FPMSocket: filepath.Join("/run/php", meta.FilePrefix+subscriptionName+".sock"), ProxyTimeout: service.Config.Apache.ProxyTimeout, LogDir: logDir})
+	default:
+		return nil, fmt.Errorf("unsupported website type %q", website.Type)
+	}
 }
 
 // SetEnabled changes one website's Apache vhost and persisted enabled state.

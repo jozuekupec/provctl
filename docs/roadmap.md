@@ -31,9 +31,9 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   obsah webu a logy; je ověřený v `pv`. `website logs` bezpečně čte omezený
   konec access/error logu (1–1000 řádků) a je ověřený v `pv`; `--follow`
   zatím chybí. Před integračním během po restore je nutné počkat na aktivní
-  Apache, jinak může jeho runtime adresář krátce chybět. Read model nyní nese
-  aliasy a SQLite bezpečně vynucuje jejich globální unikátnost; zbývá atomická
-  změna vhostu, CLI aliasů a `reconcile`.
+  Apache, jinak může jeho runtime adresář krátce chybět. `website alias
+  add|remove` atomicky přerenderuje Apache vhost a upraví SQLite; obě cesty
+  jsou ověřené v `pv`. Zbývá `reconcile`.
   Golden testy nyní pokrývají všechny čtyři typy HTTP vhostu.
 - [~] **M4 — PHP-FPM:** automatická detekce a výběr verze, render a atomické
   vytvoření poolu včetně ověření socketu jsou hotové. Zbývá změna verze poolu
