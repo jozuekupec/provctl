@@ -34,6 +34,9 @@ func (websiteApache) ApplyVHost(context.Context, string, []byte, string) (func(c
 func (websiteApache) SetVHostEnabled(context.Context, string, string, bool) (func(context.Context) error, error) {
 	return func(context.Context) error { return nil }, nil
 }
+func (websiteApache) RemoveVHost(context.Context, string, string) (func(context.Context) error, error) {
+	return func(context.Context) error { return nil }, nil
+}
 
 type websitePHPFPM struct{}
 

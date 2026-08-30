@@ -48,6 +48,7 @@ func (service WebsiteService) ListForSubscription(ctx context.Context, subscript
 type ApacheVHostApplier interface {
 	ApplyVHost(context.Context, string, []byte, string) (func(context.Context) error, error)
 	SetVHostEnabled(context.Context, string, string, bool) (func(context.Context) error, error)
+	RemoveVHost(context.Context, string, string) (func(context.Context) error, error)
 }
 
 // WebsiteService creates an isolated PHP-FPM website and its Apache vhost.
@@ -142,6 +143,50 @@ func (service WebsiteService) SetEnabled(ctx context.Context, subscriptionName, 
 		return 0, err
 	}
 	return service.Executor.Run(ctx, operation)
+}
+
+// Delete removes generated Apache artifacts and the website record. Site data
+// and logs are intentionally retained for administrator-managed recovery.
+func (service WebsiteService) Delete(ctx context.Context, subscriptionName, primaryDomain string) (int64, error) {
+	operation, err := service.PrepareDelete(ctx, subscriptionName, primaryDomain)
+	if err != nil {
+		return 0, err
+	}
+	return service.Executor.Run(ctx, operation)
+}
+
+func (service WebsiteService) PrepareDelete(ctx context.Context, subscriptionName, primaryDomain string) (plan.Plan, error) {
+	if service.Apache == nil {
+		return plan.Plan{}, fmt.Errorf("Apache vhost applier is required")
+	}
+	websites, err := service.ListForSubscription(ctx, subscriptionName)
+	if err != nil {
+		return plan.Plan{}, err
+	}
+	var website domain.Website
+	for _, candidate := range websites {
+		if candidate.PrimaryDomain == primaryDomain {
+			website = candidate
+			break
+		}
+	}
+	if website.ID == 0 {
+		return plan.Plan{}, fmt.Errorf("website %q not found in subscription %q", primaryDomain, subscriptionName)
+	}
+	vhostPath := filepath.Join(service.Config.Apache.SitesAvailable, meta.FilePrefix+subscriptionName+"-"+primaryDomain+".conf")
+	enabledPath := filepath.Join(service.Config.Apache.SitesEnabled, filepath.Base(vhostPath))
+	var undoApache func(context.Context) error
+	steps := []plan.Step{{Name: "remove Apache vhost", Preview: "remove " + vhostPath, Do: func(ctx context.Context) error {
+		var err error
+		undoApache, err = service.Apache.RemoveVHost(ctx, vhostPath, enabledPath)
+		return err
+	}, Undo: func(ctx context.Context) error { return undoApache(ctx) }}, {Name: "remove website from SQLite", Preview: "delete website and domains from SQLite; retain site data and logs", Do: func(ctx context.Context) error {
+		return service.Store.DeleteWebsite(ctx, website.ID)
+	}, Undo: func(ctx context.Context) error {
+		_, err := service.Store.CreateWebsite(ctx, website)
+		return err
+	}}}
+	return plan.Plan{Action: "website.delete", Target: subscriptionName + "/" + primaryDomain, Steps: steps}, nil
 }
 
 // PrepareSetEnabled builds a reversible enable or disable operation.

@@ -111,6 +111,54 @@ func (apache Apache) SetVHostEnabled(ctx context.Context, path, enabledPath stri
 	return restore, nil
 }
 
+// RemoveVHost removes a managed vhost and its enabled symlink. Its rollback
+// restores both generated artifacts and reloads Apache.
+func (apache Apache) RemoveVHost(ctx context.Context, path, enabledPath string) (func(context.Context) error, error) {
+	if apache.FS == nil || apache.Commands == nil || apache.Systemd == nil || apache.Service == "" {
+		return nil, errors.New("Apache service requires filesystem, commander, systemd, and service name")
+	}
+	contents, existed, err := apache.readPrevious(path)
+	if err != nil {
+		return nil, err
+	}
+	if !existed {
+		return nil, fmt.Errorf("Apache vhost %q does not exist", path)
+	}
+	_, enabled, err := apache.readPrevious(enabledPath)
+	if err != nil {
+		return nil, err
+	}
+	if err := apache.configTest(ctx, "baseline"); err != nil {
+		return nil, err
+	}
+	if enabled {
+		if err := apache.FS.Remove(enabledPath); err != nil {
+			return nil, fmt.Errorf("disable Apache vhost %q: %w", enabledPath, err)
+		}
+	}
+	if err := apache.FS.Remove(path); err != nil {
+		return nil, fmt.Errorf("remove Apache vhost %q: %w", path, err)
+	}
+	restore := func(restoreCtx context.Context) error {
+		if err := apache.FS.WriteFileAtomic(path, contents, 0o640); err != nil {
+			return fmt.Errorf("restore Apache vhost %q: %w", path, err)
+		}
+		if enabled {
+			if err := apache.FS.Symlink(path, enabledPath); err != nil {
+				return fmt.Errorf("restore enabled Apache vhost %q: %w", enabledPath, err)
+			}
+		}
+		return apache.ValidateAndReload(restoreCtx)
+	}
+	if err := apache.ValidateAndReload(ctx); err != nil {
+		if restoreErr := restore(ctx); restoreErr != nil {
+			return nil, errors.Join(err, restoreErr)
+		}
+		return nil, err
+	}
+	return restore, nil
+}
+
 func (apache Apache) apply(ctx context.Context, path string, contents []byte, enabledPath string) (func(context.Context) error, error) {
 	if apache.FS == nil || apache.Commands == nil || apache.Systemd == nil || apache.Service == "" {
 		return nil, errors.New("Apache service requires filesystem, commander, systemd, and service name")
