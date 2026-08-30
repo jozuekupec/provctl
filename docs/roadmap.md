@@ -39,7 +39,7 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   žurnálovanou rollbackovatelnou operaci. V `pv` byl ověřen úmyslně změněný
   vhost i smazaný symlink, následný `apachectl configtest` a druhý dry-run bez
   driftu. Golden testy nyní pokrývají všechny čtyři typy HTTP vhostu.
-- [~] **M4 — PHP-FPM:** automatická detekce a výběr verze, render a atomické
+- [x] **M4 — PHP-FPM:** automatická detekce a výběr verze, render a atomické
   vytvoření poolu včetně ověření socketu jsou hotové. `php list-versions` a
   žurnálované `php set <sub> --version <ver>` nyní vytvářejí nový pool,
   přerenderují všechny vhosty subscription, odstraní starý pool a nakonec
@@ -58,8 +58,9 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   skutečně prázdný druhý běh (`nothing to do`) jsou hotové. Chybí přepínače
   `--yes`, `--skip`, `--install-missing` a automatické vypsání výsledku
   `doctor`.
-- [~] Unit testy bootstrapu pokrývají prázdný plán, chybějící systémové cesty
-  a odmítnutí změny práv existujícího adresáře. Zbývá cílený rollback test.
+- [x] Unit testy bootstrapu pokrývají prázdný plán, chybějící systémové cesty,
+  odmítnutí změny práv existujícího adresáře i rollback nově vytvořené cesty po
+  neúspěšném Apache configtestu.
 - [x] Projít end-to-end HTTP požadavek přes Apache v Incus kontejneru `pv`; po
   každém integračním testu obnovit snapshot `clean`. PHP-FPM, static, proxy i
   redirect tok jsou ověřeny přes lokální HTTP požadavky s `--resolve`.

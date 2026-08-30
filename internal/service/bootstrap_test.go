@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"io"
 	"os"
 	"path/filepath"
@@ -10,6 +11,7 @@ import (
 
 	"provctl/internal/config"
 	"provctl/internal/meta"
+	"provctl/internal/plan"
 	"provctl/internal/render"
 	"provctl/internal/system"
 )
@@ -110,6 +112,12 @@ func (bootstrapApache) RemoveVHost(context.Context, string, string) (func(contex
 }
 func (bootstrapApache) ValidateAndReload(context.Context) error { return nil }
 
+type failingBootstrapApache struct{ bootstrapApache }
+
+func (failingBootstrapApache) ValidateAndReload(context.Context) error {
+	return errors.New("Apache configtest failed")
+}
+
 type bootstrapCommander struct{}
 
 func (bootstrapCommander) Run(context.Context, string, ...string) (system.Result, error) {
@@ -157,6 +165,21 @@ func TestBootstrap_PrepareRefusesExistingDirectoryWithWrongPermissions(t *testin
 	_, err := bootstrapService(fs, cfg).Prepare(context.Background())
 	if err == nil {
 		t.Fatal("Prepare() error = nil, want permission refusal")
+	}
+}
+
+func TestBootstrap_RunRollsBackCreatedDirectoryWhenApacheValidationFails(t *testing.T) {
+	fs, cfg := readyBootstrapFS(t)
+	delete(fs.entries, meta.ConfigDir)
+	service := bootstrapService(fs, cfg)
+	service.Apache = failingBootstrapApache{}
+	service.Executor = plan.Executor{Journal: &subscriptionJournal{}, Locker: subscriptionLocker{}}
+	_, _, err := service.Run(context.Background())
+	if err == nil {
+		t.Fatal("Run() error = nil, want Apache validation failure")
+	}
+	if _, exists := fs.entries[meta.ConfigDir]; exists {
+		t.Error("created configuration directory remains after rollback")
 	}
 }
 
