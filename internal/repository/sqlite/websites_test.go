@@ -34,7 +34,7 @@ func TestRepository_CreateWebsite(t *testing.T) {
 	}
 }
 
-func TestRepository_CreateProxyWebsitePersistsTarget(t *testing.T) {
+func TestRepository_ListWebsitesIncludesProxyTarget(t *testing.T) {
 	repository, err := Open(context.Background(), filepath.Join(t.TempDir(), "provctl.db"))
 	if err != nil {
 		t.Fatalf("Open() error = %v", err)
@@ -50,11 +50,14 @@ func TestRepository_CreateProxyWebsitePersistsTarget(t *testing.T) {
 	if _, err := repository.CreateWebsite(context.Background(), domain.Website{SubscriptionID: subscription.ID, Type: domain.WebsiteProxy, PrimaryDomain: "proxy.example.test", Target: "http://127.0.0.1:8080", Enabled: true}); err != nil {
 		t.Fatalf("CreateWebsite() error = %v", err)
 	}
-	var target string
-	if err := repository.DB.QueryRowContext(context.Background(), `SELECT target FROM websites`).Scan(&target); err != nil {
-		t.Fatal(err)
+	websites, err := repository.ListWebsites(context.Background(), subscription.ID)
+	if err != nil {
+		t.Fatalf("ListWebsites() error = %v", err)
 	}
-	if target != "http://127.0.0.1:8080" {
-		t.Errorf("target = %q", target)
+	if len(websites) != 1 {
+		t.Fatalf("ListWebsites() returned %d websites, want 1", len(websites))
+	}
+	if target := websites[0].Target; target != "http://127.0.0.1:8080" {
+		t.Errorf("Target = %q", target)
 	}
 }

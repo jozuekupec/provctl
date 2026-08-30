@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"provctl/internal/config"
@@ -64,6 +65,44 @@ func TestWebsiteService_PrepareCreateStaticBuildsPlanWithoutChanges(t *testing.T
 		t.Error("PrepareCreateStatic() changed filesystem state")
 	}
 	if got, want := len(operation.Steps), 7; got != want {
+		t.Errorf("plan steps = %d, want %d", got, want)
+	}
+}
+
+func TestWebsiteService_PrepareCreateProxyBuildsPlanWithoutChanges(t *testing.T) {
+	fs := &subscriptionFS{directories: map[string]bool{}}
+	service := WebsiteService{FS: fs, Store: websiteStore{subscription: domain.Subscription{ID: 1, Name: "acme", UnixUID: 5000, Home: "/vhosts/acme", Status: "active"}}, Apache: websiteApache{}, Executor: plan.Executor{Journal: &subscriptionJournal{}, Locker: subscriptionLocker{}}, Config: config.Config{Paths: config.Paths{ACMEChallenge: "/var/lib/provctl/acme-challenge"}, Apache: config.Apache{SitesAvailable: "/etc/apache2/sites-available", SitesEnabled: "/etc/apache2/sites-enabled", ProxyTimeout: 60}}}
+	operation, err := service.PrepareCreateProxy(context.Background(), "acme", "proxy.example.test", "http://127.0.0.1:8080")
+	if err != nil {
+		t.Fatalf("PrepareCreateProxy() error = %v", err)
+	}
+	if len(fs.directories) != 0 {
+		t.Error("PrepareCreateProxy() changed filesystem state")
+	}
+	if got, want := len(operation.Steps), 5; got != want {
+		t.Errorf("plan steps = %d, want %d", got, want)
+	}
+}
+
+func TestWebsiteService_PrepareCreateProxyRejectsExternalTarget(t *testing.T) {
+	service := WebsiteService{Store: websiteStore{subscription: domain.Subscription{ID: 1, Name: "acme", UnixUID: 5000, Status: "active"}}, Apache: websiteApache{}, Config: config.Config{Paths: config.Paths{ACMEChallenge: "/var/lib/provctl/acme-challenge"}, Apache: config.Apache{SitesAvailable: "/etc/apache2/sites-available", SitesEnabled: "/etc/apache2/sites-enabled", ProxyTimeout: 60}}}
+	_, err := service.PrepareCreateProxy(context.Background(), "acme", "proxy.example.test", "http://example.com:8080")
+	if err == nil || !strings.Contains(err.Error(), "not allowed") {
+		t.Fatalf("PrepareCreateProxy() error = %v, want allowlist validation error", err)
+	}
+}
+
+func TestWebsiteService_PrepareCreateRedirectBuildsPlanWithoutChanges(t *testing.T) {
+	fs := &subscriptionFS{directories: map[string]bool{}}
+	service := WebsiteService{FS: fs, Store: websiteStore{subscription: domain.Subscription{ID: 1, Name: "acme", UnixUID: 5000, Status: "active"}}, Apache: websiteApache{}, Executor: plan.Executor{Journal: &subscriptionJournal{}, Locker: subscriptionLocker{}}, Config: config.Config{Paths: config.Paths{ACMEChallenge: "/var/lib/provctl/acme-challenge"}, Apache: config.Apache{SitesAvailable: "/etc/apache2/sites-available", SitesEnabled: "/etc/apache2/sites-enabled"}}}
+	operation, err := service.PrepareCreateRedirect(context.Background(), "acme", "redirect.example.test", "https://target.example.test", 302)
+	if err != nil {
+		t.Fatalf("PrepareCreateRedirect() error = %v", err)
+	}
+	if len(fs.directories) != 0 {
+		t.Error("PrepareCreateRedirect() changed filesystem state")
+	}
+	if got, want := len(operation.Steps), 5; got != want {
 		t.Errorf("plan steps = %d, want %d", got, want)
 	}
 }

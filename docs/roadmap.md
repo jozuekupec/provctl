@@ -20,9 +20,9 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   proxy cíl je omezen na loopback či allowlist s povinným neprivilegovaným
   portem. Static lifecycle (`website create --type static`) je napojený a
   unit-testovaný i integračně ověřený v `pv` lokálním HTTP požadavkem; zbývá
-  správa webů a `reconcile`. Proxy a redirect lifecycle včetně CLI jsou nyní
-  napojené a perzistují cíl/redirect kód; následují cílené testy, ověření v
-  `pv` a správa webů.
+  správa webů a `reconcile`. Proxy a redirect lifecycle včetně CLI jsou
+  napojené, perzistují cíl/redirect kód, mají cílené unit testy a byly ověřeny
+  v `pv` skutečným HTTP proxy požadavkem i odpovědí `302` s `Location`.
 - [~] **M4 — PHP-FPM:** automatická detekce a výběr verze, render a atomické
   vytvoření poolu včetně ověření socketu jsou hotové. Zbývá změna verze poolu
   (`php set`) s rollbackem.
@@ -36,11 +36,12 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   `doctor`.
 - [~] Unit testy bootstrapu pokrývají prázdný plán, chybějící systémové cesty
   a odmítnutí změny práv existujícího adresáře. Zbývá cílený rollback test.
-- [ ] Projít end-to-end HTTP požadavek přes Apache a PHP-FPM v Incus kontejneru
-  `pv`; po každém integračním testu obnovit snapshot `clean`. **Hotovo pro
-  PHP-FPM tok:** bootstrap → subscription → website → lokální HTTP požadavek
-  s `--resolve` vrátil očekávané PHP tělo; Apache configtest a služby Apache i
-  PHP-FPM byly aktivní. Kontejner byl obnoven na `clean`.
+- [x] Projít end-to-end HTTP požadavek přes Apache v Incus kontejneru `pv`; po
+  každém integračním testu obnovit snapshot `clean`. PHP-FPM, static, proxy i
+  redirect tok jsou ověřeny přes lokální HTTP požadavky s `--resolve`.
+  Poslední běh proxy přenesl tělo z `127.0.0.1:8080`; redirect vrátil `302` a
+  očekávaný `Location`. Apache configtest uspěl a kontejner byl obnoven na
+  `clean`.
 
 ## Následující milníky
 
@@ -73,3 +74,6 @@ včetně práv, `apachectl configtest` a reload uspěly a druhý běh byl beze z
 Následný `doctor` potvrdil provctl, Apache, PHP-FPM a Certbot; testovací obraz
 zatím nemá funkční MariaDB socket autentizaci a obsahuje dva certbot renewal
 mechanismy. Nejde o změnu provctl a kontejner byl následně obnoven na `clean`.
+Ve stejný den proxy website úspěšně předala odpověď z lokálního upstreamu a
+redirect website vrátila očekávané `302` a `Location`; i po tomto testu byl
+kontejner obnoven na `clean`.

@@ -67,7 +67,7 @@ func newWebsiteCreateCommand() *cobra.Command {
 	}
 	command.Flags().StringVar(&configPath, "config", meta.ConfigFile, "path to config.toml")
 	command.Flags().BoolVar(&dryRun, "dry-run", false, "show the operation plan without changing the system")
-	command.Flags().StringVar(&websiteType, "type", "php-fpm", "website type: php-fpm or static")
+	command.Flags().StringVar(&websiteType, "type", "php-fpm", "website type: php-fpm, static, proxy, or redirect")
 	command.Flags().StringVar(&target, "target", "", "proxy or redirect target URL")
 	command.Flags().IntVar(&redirectCode, "redirect-code", 301, "redirect status code: 301 or 302")
 	return command
