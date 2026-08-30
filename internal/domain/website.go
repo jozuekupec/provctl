@@ -20,6 +20,7 @@ type Website struct {
 	SubscriptionID int64
 	Type           WebsiteType
 	PrimaryDomain  string
+	Aliases        []string
 	DocumentRoot   string
 	Target         string
 	RedirectCode   int

@@ -60,6 +60,16 @@ func TestRepository_ListWebsitesIncludesProxyTarget(t *testing.T) {
 	if target := websites[0].Target; target != "http://127.0.0.1:8080" {
 		t.Errorf("Target = %q", target)
 	}
+	if err := repository.AddWebsiteAlias(context.Background(), websites[0].ID, "www.proxy.example.test"); err != nil {
+		t.Fatalf("AddWebsiteAlias() error = %v", err)
+	}
+	websites, err = repository.ListWebsites(context.Background(), subscription.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := len(websites[0].Aliases), 1; got != want || websites[0].Aliases[0] != "www.proxy.example.test" {
+		t.Errorf("Aliases = %#v", websites[0].Aliases)
+	}
 }
 
 func TestRepository_SetWebsiteEnabledUpdatesPersistedState(t *testing.T) {

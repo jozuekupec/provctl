@@ -40,7 +40,37 @@ func (repository *Repository) ListWebsites(ctx context.Context, subscriptionID i
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("iterate websites: %w", err)
 	}
+	if err := rows.Close(); err != nil {
+		return nil, fmt.Errorf("close website rows: %w", err)
+	}
+	for index := range websites {
+		aliases, err := repository.websiteAliases(ctx, websites[index].ID)
+		if err != nil {
+			return nil, err
+		}
+		websites[index].Aliases = aliases
+	}
 	return websites, nil
+}
+
+func (repository *Repository) websiteAliases(ctx context.Context, websiteID int64) ([]string, error) {
+	rows, err := repository.DB.QueryContext(ctx, `SELECT name FROM domains WHERE website_id = ? AND is_primary = 0 ORDER BY name`, websiteID)
+	if err != nil {
+		return nil, fmt.Errorf("list website aliases: %w", err)
+	}
+	defer rows.Close()
+	var aliases []string
+	for rows.Next() {
+		var alias string
+		if err := rows.Scan(&alias); err != nil {
+			return nil, fmt.Errorf("scan website alias: %w", err)
+		}
+		aliases = append(aliases, alias)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate website aliases: %w", err)
+	}
+	return aliases, nil
 }
 
 func (repository *Repository) CreateWebsite(ctx context.Context, website domain.Website) (int64, error) {
@@ -72,6 +102,31 @@ func nullableInt(value int) any {
 		return nil
 	}
 	return value
+}
+
+// AddWebsiteAlias associates a globally unique alias with a website.
+func (repository *Repository) AddWebsiteAlias(ctx context.Context, websiteID int64, alias string) error {
+	_, err := repository.DB.ExecContext(ctx, `INSERT INTO domains (website_id, name, is_primary, created_at) VALUES (?, ?, 0, ?)`, websiteID, alias, time.Now().UTC().Format(time.RFC3339))
+	if err != nil {
+		return fmt.Errorf("add website alias %q: %w", alias, err)
+	}
+	return nil
+}
+
+// RemoveWebsiteAlias removes an alias only when it belongs to the website.
+func (repository *Repository) RemoveWebsiteAlias(ctx context.Context, websiteID int64, alias string) error {
+	result, err := repository.DB.ExecContext(ctx, `DELETE FROM domains WHERE website_id = ? AND name = ? AND is_primary = 0`, websiteID, alias)
+	if err != nil {
+		return fmt.Errorf("remove website alias %q: %w", alias, err)
+	}
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("count website alias delete: %w", err)
+	}
+	if rows != 1 {
+		return fmt.Errorf("website alias %q not found", alias)
+	}
+	return nil
 }
 
 func (repository *Repository) DeleteWebsite(ctx context.Context, websiteID int64) error {
