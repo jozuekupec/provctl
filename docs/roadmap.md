@@ -70,8 +70,9 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
 
 ## Následující milníky
 
-- [ ] **M5 — MariaDB, SSH a cron:** bezpečné předávání hesel přes stdin,
-  databázové lifecycle operace, SSH klíče a crontab.
+- [~] **M5 — MariaDB, SSH a cron:** založen čistý datový model databáze,
+  whitelist validace jmen a SQLite lifecycle úložiště. Následuje MariaDB service
+  s SQL výhradně přes stdin, generováním hesel, SSH klíče a crontab.
 - [ ] **M6 — SSL:** stavový automat Certbotu, deploy-hook command a přijetí
   existujících certifikátů.
 - [ ] **M7 — provoz:** backup/restore, health checks, audit log a kvóty.
