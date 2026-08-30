@@ -9,6 +9,10 @@ This repository currently contains the implementation specification in `docs/`:
 - `docs/roadmap.md` is the live implementation status. Update it whenever a
   roadmap item is completed or materially advanced, including the relevant
   validation and any useful limitation.
+- The reference TUI is `/home/jozue/development/apps/depo/internal/ui`; consult
+  its `docs/go-tui.md` and the personal cookbook
+  `/home/jozue/development/ai-recipes/terminal/go-tui-blueprint.md` before TUI
+  work. Keep the selected conventions consistent across both projects.
 
 Implement the planned Go layout: wiring in `cmd/provctl/`; business code in `internal/`; TUI in `tui/`; templates in `templates/`; Debian packaging in `packaging/`; and releases in `.github/workflows/`. Keep domain types I/O-free. CLI and TUI must call services rather than OS or SQLite packages directly.
 
@@ -34,6 +38,16 @@ tests; restore that snapshot after each test run.
 Use Go 1.22+; use tabs and run `gofmt` on every changed Go file. Keep code, identifiers, comments, commits, and technical messages in English. Use lower-case package names; exported identifiers use `PascalCase`; unexported identifiers use `camelCase`. Define product paths and the `provctl` name centrally in `internal/meta`—do not scatter literals.
 
 Use explicit command arguments through the `system.Commander` abstraction. Never invoke a shell (`sh -c` or `bash -c`) or interpolate user input into commands.
+
+## Terminal UI Conventions
+
+Implement the planned TUI in a focused `internal/ui` package with Bubble Tea.
+Use a value model, thematic sub-state structs, a `Deps` dependency seam, and
+`tea.Cmd` for every filesystem, database, or service operation. Keep message
+routing in `ui.go`, rendering in `render.go`, key handling in `keys.go`, and
+styles in `theme.go`; create additional feature files only when they have a
+concrete responsibility. The TUI is read-mostly and must call services rather
+than system or SQLite packages directly.
 
 ## Testing Guidelines
 

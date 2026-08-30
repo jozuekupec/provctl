@@ -47,7 +47,10 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
 - [ ] **M6 — SSL:** stavový automat Certbotu, deploy-hook command a přijetí
   existujících certifikátů.
 - [ ] **M7 — provoz:** backup/restore, health checks, audit log a kvóty.
-- [ ] **M8 — TUI:** read-mostly rozhraní nad service vrstvou.
+- [~] **M8 — TUI:** návrh je zaznamenán v [tui-design.md](tui-design.md) a
+  cíleně přebírá konzistentní Bubble Tea vzor z projektu `depo`: hodnotový
+  model, `Deps`, samostatné routing/render/keys/theme a I/O jen přes `tea.Cmd`.
+  Následuje první funkční read-only fáze s panely subscriptions/websites/detail/output.
 - [ ] **M9 — distribuce:** nfpm, maintainer skripty, CI, APT repozitář a
   package testy (`lintian`, `piuparts`, upgrade/purge).
 - [ ] **M10 — migrace:** `subscription adopt` pro existující weby.
