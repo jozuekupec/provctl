@@ -12,7 +12,7 @@ func (m appModel) View() string {
 	lines := []string{"provctl — Subscriptions", ""}
 	for i, item := range m.items {
 		marker := " "
-		if i == m.cursor {
+		if i == m.cursor && m.focus == focusSubscriptions {
 			marker = ">"
 		}
 		lines = append(lines, fmt.Sprintf("%s %-20s %-10s %s", marker, item.Name, item.Status, item.PHPVersion))
@@ -22,12 +22,23 @@ func (m appModel) View() string {
 	}
 	if m.showWebsites {
 		lines = append(lines, "", "Websites")
-		for _, website := range m.websites {
-			lines = append(lines, fmt.Sprintf("  %-28s %-10s %t", website.PrimaryDomain, website.Type, website.Enabled))
+		for i, website := range m.websites {
+			marker := " "
+			if i == m.websiteCursor && m.focus == focusWebsites {
+				marker = ">"
+			}
+			lines = append(lines, fmt.Sprintf("%s %-28s %-10s %t", marker, website.PrimaryDomain, website.Type, website.Enabled))
 		}
 		if len(m.websites) == 0 {
 			lines = append(lines, "  no websites")
 		}
+	}
+	if m.focus == focusDetail {
+		lines = append(lines, "", "Detail", m.detail())
+	}
+	if m.focus == focusOutput {
+		lines = append(lines, "", "Output")
+		lines = append(lines, m.output.lines...)
 	}
 	lines = append(lines, "", m.status)
 	return strings.Join(lines, "\n")

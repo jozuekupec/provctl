@@ -2,6 +2,7 @@ package ui
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -34,5 +35,14 @@ func TestModel_LoadWebsitesForSelectedSubscription(t *testing.T) {
 	updated, _ := m.Update(loaded)
 	if got := updated.(appModel).websites[0].PrimaryDomain; got != "example.test" {
 		t.Errorf("domain = %q", got)
+	}
+}
+
+func TestModel_DetailUsesSelectedWebsite(t *testing.T) {
+	m := New(Deps{})
+	m.showWebsites = true
+	m.websites = []domain.Website{{PrimaryDomain: "example.test", Type: domain.WebsiteStatic, DocumentRoot: "/vhosts/acme/sites/example.test/public", Enabled: true}}
+	if got := m.detail(); !strings.Contains(got, "Domain: example.test") {
+		t.Errorf("detail = %q", got)
 	}
 }

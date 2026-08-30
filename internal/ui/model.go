@@ -23,6 +23,26 @@ type subscriptionsLoadedMsg struct {
 	err   error
 }
 
+type focus int
+
+const (
+	focusSubscriptions focus = iota
+	focusWebsites
+	focusDetail
+	focusOutput
+)
+
+type outputState struct{ lines []string }
+
+func (output outputState) append(line string) outputState {
+	next := append([]string(nil), output.lines...)
+	next = append(next, line)
+	if len(next) > 100 {
+		next = next[len(next)-100:]
+	}
+	return outputState{lines: next}
+}
+
 type appModel struct {
 	deps          Deps
 	width, height int
@@ -32,6 +52,8 @@ type appModel struct {
 	websites      []domain.Website
 	websiteCursor int
 	showWebsites  bool
+	focus         focus
+	output        outputState
 	status        string
 }
 
@@ -43,7 +65,9 @@ func (m appModel) loadWebsites() tea.Msg {
 	return websitesLoadedMsg{items: items, err: err}
 }
 
-func New(deps Deps) appModel { return appModel{deps: deps, status: "loading subscriptions…"} }
+func New(deps Deps) appModel {
+	return appModel{deps: deps, focus: focusSubscriptions, status: "loading subscriptions…"}
+}
 
 func (m appModel) Init() tea.Cmd { return m.loadSubscriptions }
 
