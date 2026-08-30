@@ -121,6 +121,101 @@ func (service WebsiteService) CreateStatic(ctx context.Context, subscriptionName
 	return service.Executor.Run(ctx, operation)
 }
 
+func (service WebsiteService) CreateProxy(ctx context.Context, subscriptionName, primaryDomain, target string) (int64, error) {
+	operation, err := service.PrepareCreateProxy(ctx, subscriptionName, primaryDomain, target)
+	if err != nil {
+		return 0, err
+	}
+	return service.Executor.Run(ctx, operation)
+}
+
+func (service WebsiteService) PrepareCreateProxy(ctx context.Context, subscriptionName, primaryDomain, target string) (plan.Plan, error) {
+	subscription, logDir, vhostPath, enabledPath, err := service.prepareHTTPWebsite(ctx, subscriptionName, primaryDomain)
+	if err != nil {
+		return plan.Plan{}, err
+	}
+	contents, err := render.RenderApacheProxyHTTP(render.ApacheProxyVHost{PrimaryDomain: primaryDomain, Target: target, AcmeChallengeRoot: service.Config.Paths.ACMEChallenge, ProxyTimeout: service.Config.Apache.ProxyTimeout, LogDir: logDir}, service.Config.Apache.AllowedProxyHosts)
+	if err != nil {
+		return plan.Plan{}, err
+	}
+	website := domain.Website{SubscriptionID: subscription.ID, Type: domain.WebsiteProxy, PrimaryDomain: primaryDomain, Target: target, Enabled: true}
+	return service.createHTTPOnlyPlan(subscription, website, logDir, vhostPath, enabledPath, contents), nil
+}
+
+func (service WebsiteService) CreateRedirect(ctx context.Context, subscriptionName, primaryDomain, target string, code int) (int64, error) {
+	operation, err := service.PrepareCreateRedirect(ctx, subscriptionName, primaryDomain, target, code)
+	if err != nil {
+		return 0, err
+	}
+	return service.Executor.Run(ctx, operation)
+}
+
+func (service WebsiteService) PrepareCreateRedirect(ctx context.Context, subscriptionName, primaryDomain, target string, code int) (plan.Plan, error) {
+	subscription, logDir, vhostPath, enabledPath, err := service.prepareHTTPWebsite(ctx, subscriptionName, primaryDomain)
+	if err != nil {
+		return plan.Plan{}, err
+	}
+	contents, err := render.RenderApacheRedirectHTTP(render.ApacheRedirectVHost{PrimaryDomain: primaryDomain, Target: target, RedirectCode: code, AcmeChallengeRoot: service.Config.Paths.ACMEChallenge, LogDir: logDir})
+	if err != nil {
+		return plan.Plan{}, err
+	}
+	website := domain.Website{SubscriptionID: subscription.ID, Type: domain.WebsiteRedirect, PrimaryDomain: primaryDomain, Target: target, RedirectCode: code, Enabled: true}
+	return service.createHTTPOnlyPlan(subscription, website, logDir, vhostPath, enabledPath, contents), nil
+}
+
+func (service WebsiteService) prepareHTTPWebsite(ctx context.Context, subscriptionName, primaryDomain string) (domain.Subscription, string, string, string, error) {
+	if service.Apache == nil {
+		return domain.Subscription{}, "", "", "", fmt.Errorf("Apache vhost applier is required")
+	}
+	if err := domain.ValidateSubscriptionName(subscriptionName); err != nil {
+		return domain.Subscription{}, "", "", "", err
+	}
+	if err := domain.ValidateDomain(primaryDomain); err != nil {
+		return domain.Subscription{}, "", "", "", err
+	}
+	subscription, err := service.Store.SubscriptionByName(ctx, subscriptionName)
+	if err != nil {
+		return domain.Subscription{}, "", "", "", err
+	}
+	if subscription.Status != "active" {
+		return domain.Subscription{}, "", "", "", fmt.Errorf("subscription %q is %s", subscriptionName, subscription.Status)
+	}
+	exists, err := service.Store.DomainExists(ctx, primaryDomain)
+	if err != nil {
+		return domain.Subscription{}, "", "", "", fmt.Errorf("check domain: %w", err)
+	}
+	if exists {
+		return domain.Subscription{}, "", "", "", fmt.Errorf("domain %q is already assigned", primaryDomain)
+	}
+	logDir := filepath.Join(meta.LogDir, subscription.Name, primaryDomain)
+	vhostPath := filepath.Join(service.Config.Apache.SitesAvailable, meta.FilePrefix+subscription.Name+"-"+primaryDomain+".conf")
+	return subscription, logDir, vhostPath, filepath.Join(service.Config.Apache.SitesEnabled, filepath.Base(vhostPath)), nil
+}
+
+func (service WebsiteService) createHTTPOnlyPlan(subscription domain.Subscription, website domain.Website, logDir, vhostPath, enabledPath string, contents []byte) plan.Plan {
+	steps := []plan.Step{{Name: "create website log directory", Preview: "create " + logDir, Do: service.createOwnedDirectory(logDir, 0, subscription.UnixUID, 0o750), Undo: func(context.Context) error { return service.FS.Remove(logDir) }}}
+	for _, name := range []string{"access.log", "error.log"} {
+		path := filepath.Join(logDir, name)
+		steps = append(steps, plan.Step{Name: "create " + name, Preview: "create " + path, Do: service.createLogFile(path, subscription.UnixUID), Undo: func(context.Context) error { return service.FS.Remove(path) }})
+	}
+	var undoApache func(context.Context) error
+	steps = append(steps, plan.Step{Name: "install and enable Apache vhost", Preview: "write " + vhostPath, Do: func(ctx context.Context) error {
+		var err error
+		undoApache, err = service.Apache.ApplyVHost(ctx, vhostPath, contents, enabledPath)
+		return err
+	}, Undo: func(ctx context.Context) error {
+		if undoApache == nil {
+			return nil
+		}
+		return undoApache(ctx)
+	}}, plan.Step{Name: "record website", Preview: "insert website and primary domain into SQLite", Do: func(ctx context.Context) error {
+		id, err := service.Store.CreateWebsite(ctx, website)
+		website.ID = id
+		return err
+	}, Undo: func(ctx context.Context) error { return service.Store.DeleteWebsite(ctx, website.ID) }})
+	return plan.Plan{Action: "website.create", Target: subscription.Name + "/" + website.PrimaryDomain, Steps: steps}
+}
+
 // PrepareCreateStatic validates state and prepares a static website without changes.
 func (service WebsiteService) PrepareCreateStatic(ctx context.Context, subscriptionName, primaryDomain string) (plan.Plan, error) {
 	if service.Apache == nil {

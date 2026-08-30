@@ -23,6 +23,8 @@ func newWebsiteCreateCommand() *cobra.Command {
 	var configPath string
 	var dryRun bool
 	var websiteType string
+	var target string
+	var redirectCode int
 	command := &cobra.Command{
 		Use:   "create <subscription> <domain>",
 		Short: "create a PHP-FPM website",
@@ -33,7 +35,7 @@ func newWebsiteCreateCommand() *cobra.Command {
 				return fmt.Errorf("load configuration: %w", err)
 			}
 			ctx := context.Background()
-			if websiteType != "php-fpm" && websiteType != "static" {
+			if websiteType != "php-fpm" && websiteType != "static" && websiteType != "proxy" && websiteType != "redirect" {
 				return fmt.Errorf("website type %q is not implemented", websiteType)
 			}
 			if dryRun {
@@ -42,7 +44,7 @@ func newWebsiteCreateCommand() *cobra.Command {
 					return fmt.Errorf("open website state: %w", err)
 				}
 				defer runtime.Close()
-				operation, err := prepareWebsite(runtime.Service, websiteType, ctx, args[0], args[1])
+				operation, err := prepareWebsite(runtime.Service, websiteType, ctx, args[0], args[1], target, redirectCode)
 				if err != nil {
 					return err
 				}
@@ -55,7 +57,7 @@ func newWebsiteCreateCommand() *cobra.Command {
 			defer runtime.Close()
 			lockCtx, cancel := context.WithTimeout(ctx, time.Duration(cfg.Limits.LockTimeoutSeconds)*time.Second)
 			defer cancel()
-			operationID, err := createWebsite(runtime.Service, websiteType, lockCtx, args[0], args[1])
+			operationID, err := createWebsite(runtime.Service, websiteType, lockCtx, args[0], args[1], target, redirectCode)
 			if err != nil {
 				return err
 			}
@@ -66,19 +68,33 @@ func newWebsiteCreateCommand() *cobra.Command {
 	command.Flags().StringVar(&configPath, "config", meta.ConfigFile, "path to config.toml")
 	command.Flags().BoolVar(&dryRun, "dry-run", false, "show the operation plan without changing the system")
 	command.Flags().StringVar(&websiteType, "type", "php-fpm", "website type: php-fpm or static")
+	command.Flags().StringVar(&target, "target", "", "proxy or redirect target URL")
+	command.Flags().IntVar(&redirectCode, "redirect-code", 301, "redirect status code: 301 or 302")
 	return command
 }
 
-func prepareWebsite(service service.WebsiteService, websiteType string, ctx context.Context, subscription, domain string) (plan.Plan, error) {
+func prepareWebsite(service service.WebsiteService, websiteType string, ctx context.Context, subscription, domain, target string, redirectCode int) (plan.Plan, error) {
 	if websiteType == "static" {
 		return service.PrepareCreateStatic(ctx, subscription, domain)
+	}
+	if websiteType == "proxy" {
+		return service.PrepareCreateProxy(ctx, subscription, domain, target)
+	}
+	if websiteType == "redirect" {
+		return service.PrepareCreateRedirect(ctx, subscription, domain, target, redirectCode)
 	}
 	return service.PrepareCreatePHPFPM(ctx, subscription, domain)
 }
 
-func createWebsite(service service.WebsiteService, websiteType string, ctx context.Context, subscription, domain string) (int64, error) {
+func createWebsite(service service.WebsiteService, websiteType string, ctx context.Context, subscription, domain, target string, redirectCode int) (int64, error) {
 	if websiteType == "static" {
 		return service.CreateStatic(ctx, subscription, domain)
+	}
+	if websiteType == "proxy" {
+		return service.CreateProxy(ctx, subscription, domain, target)
+	}
+	if websiteType == "redirect" {
+		return service.CreateRedirect(ctx, subscription, domain, target, redirectCode)
 	}
 	return service.CreatePHPFPM(ctx, subscription, domain)
 }
