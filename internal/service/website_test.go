@@ -2,13 +2,29 @@ package service
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
 	"provctl/internal/config"
 	"provctl/internal/domain"
+	"provctl/internal/meta"
 	"provctl/internal/plan"
 )
+
+type websiteLogFS struct {
+	*subscriptionFS
+	contents map[string][]byte
+}
+
+func (fs websiteLogFS) ReadFile(path string) ([]byte, error) {
+	contents, ok := fs.contents[path]
+	if !ok {
+		return nil, os.ErrNotExist
+	}
+	return contents, nil
+}
 
 type websiteStore struct {
 	subscription domain.Subscription
@@ -130,5 +146,18 @@ func TestWebsiteService_PrepareSetEnabledBuildsReversiblePlan(t *testing.T) {
 	}
 	if got, want := operation.Action, "website.set-enabled"; got != want {
 		t.Errorf("action = %q, want %q", got, want)
+	}
+}
+
+func TestWebsiteService_ReadLogsReturnsFinalLines(t *testing.T) {
+	path := filepath.Join(meta.LogDir, "acme", "example.test", "access.log")
+	fs := websiteLogFS{subscriptionFS: &subscriptionFS{directories: map[string]bool{}}, contents: map[string][]byte{path: []byte("one\ntwo\nthree\n")}}
+	service := WebsiteService{FS: fs, Store: websiteStore{subscription: domain.Subscription{ID: 1, Name: "acme"}, websites: []domain.Website{{ID: 1, PrimaryDomain: "example.test"}}}}
+	got, err := service.ReadLogs(context.Background(), "acme", "example.test", false, 2)
+	if err != nil {
+		t.Fatalf("ReadLogs() error = %v", err)
+	}
+	if want := "two\nthree\n"; got != want {
+		t.Errorf("ReadLogs() = %q, want %q", got, want)
 	}
 }

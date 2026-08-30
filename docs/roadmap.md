@@ -28,7 +28,9 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   `website disable` atomicky přepínají symlink Apache i hodnotu SQLite s
   rollbackem; oba směry jsou ověřené v `pv`. `website delete` vyžaduje dvojí
   potvrzení, odstraní generovaný vhost a SQLite záznam, ale záměrně zachová
-  obsah webu a logy; je ověřený v `pv`. Zbývají aliasy, logy a `reconcile`.
+  obsah webu a logy; je ověřený v `pv`. `website logs` bezpečně čte omezený
+  konec access/error logu (1–1000 řádků); `--follow` zatím chybí. Zbývají
+  aliasy a `reconcile`.
   Golden testy nyní pokrývají všechny čtyři typy HTTP vhostu.
 - [~] **M4 — PHP-FPM:** automatická detekce a výběr verze, render a atomické
   vytvoření poolu včetně ověření socketu jsou hotové. Zbývá změna verze poolu

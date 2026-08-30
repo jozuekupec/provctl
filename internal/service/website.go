@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"provctl/internal/config"
 	"provctl/internal/domain"
@@ -43,6 +44,43 @@ func (service WebsiteService) ListForSubscription(ctx context.Context, subscript
 		return nil, err
 	}
 	return service.List(ctx, subscription.ID)
+}
+
+// ReadLogs returns the final lines of one website access or error log.
+func (service WebsiteService) ReadLogs(ctx context.Context, subscriptionName, primaryDomain string, errorLog bool, lines int) (string, error) {
+	if service.FS == nil {
+		return "", fmt.Errorf("filesystem is required")
+	}
+	if lines < 1 || lines > 1000 {
+		return "", fmt.Errorf("log lines must be between 1 and 1000")
+	}
+	websites, err := service.ListForSubscription(ctx, subscriptionName)
+	if err != nil {
+		return "", err
+	}
+	found := false
+	for _, website := range websites {
+		if website.PrimaryDomain == primaryDomain {
+			found = true
+			break
+		}
+	}
+	if !found {
+		return "", fmt.Errorf("website %q not found in subscription %q", primaryDomain, subscriptionName)
+	}
+	name := "access.log"
+	if errorLog {
+		name = "error.log"
+	}
+	contents, err := service.FS.ReadFile(filepath.Join(meta.LogDir, subscriptionName, primaryDomain, name))
+	if err != nil {
+		return "", fmt.Errorf("read website log: %w", err)
+	}
+	entries := strings.Split(strings.TrimSuffix(string(contents), "\n"), "\n")
+	if len(entries) > lines {
+		entries = entries[len(entries)-lines:]
+	}
+	return strings.Join(entries, "\n") + "\n", nil
 }
 
 type ApacheVHostApplier interface {

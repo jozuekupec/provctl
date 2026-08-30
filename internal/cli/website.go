@@ -22,6 +22,30 @@ func newWebsiteCommand() *cobra.Command {
 	command.AddCommand(newWebsiteSetEnabledCommand("enable", true))
 	command.AddCommand(newWebsiteSetEnabledCommand("disable", false))
 	command.AddCommand(newWebsiteDeleteCommand())
+	command.AddCommand(newWebsiteLogsCommand())
+	return command
+}
+
+func newWebsiteLogsCommand() *cobra.Command {
+	var configPath string
+	var errorLog bool
+	var lines int
+	command := &cobra.Command{Use: "logs <subscription> <domain>", Short: "show recent website logs", Args: cobra.ExactArgs(2), RunE: func(command *cobra.Command, args []string) error {
+		service, closeRuntime, err := openReadOnlyWebsiteService(configPath)
+		if err != nil {
+			return err
+		}
+		defer closeRuntime()
+		contents, err := service.ReadLogs(context.Background(), args[0], args[1], errorLog, lines)
+		if err != nil {
+			return err
+		}
+		_, err = fmt.Fprint(command.OutOrStdout(), contents)
+		return err
+	}}
+	command.Flags().StringVar(&configPath, "config", meta.ConfigFile, "path to config.toml")
+	command.Flags().BoolVar(&errorLog, "error", false, "show the error log instead of the access log")
+	command.Flags().IntVar(&lines, "lines", 50, "number of lines to show (1-1000)")
 	return command
 }
 
