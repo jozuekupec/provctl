@@ -24,12 +24,15 @@ func (fs *apacheFS) WriteFileAtomic(path string, data []byte, _ os.FileMode) err
 	fs.files[path] = append([]byte(nil), data...)
 	return nil
 }
-func (fs *apacheFS) Remove(path string) error                 { delete(fs.files, path); return nil }
-func (fs *apacheFS) RemoveAll(string) error                   { return nil }
-func (fs *apacheFS) MkdirAll(string, os.FileMode) error       { return nil }
-func (fs *apacheFS) Chown(string, int, int) error             { return nil }
-func (fs *apacheFS) Chmod(string, os.FileMode) error          { return nil }
-func (fs *apacheFS) Symlink(string, string) error             { return nil }
+func (fs *apacheFS) Remove(path string) error           { delete(fs.files, path); return nil }
+func (fs *apacheFS) RemoveAll(string) error             { return nil }
+func (fs *apacheFS) MkdirAll(string, os.FileMode) error { return nil }
+func (fs *apacheFS) Chown(string, int, int) error       { return nil }
+func (fs *apacheFS) Chmod(string, os.FileMode) error    { return nil }
+func (fs *apacheFS) Symlink(oldname, newname string) error {
+	fs.files[newname] = []byte(oldname)
+	return nil
+}
 func (fs *apacheFS) ReadDir(string) ([]os.DirEntry, error)    { return nil, nil }
 func (fs *apacheFS) EvalSymlinks(path string) (string, error) { return path, nil }
 
@@ -103,5 +106,24 @@ func TestApache_ApplyReturnsRollbackForSuccessfulChange(t *testing.T) {
 	}
 	if _, exists := fs.files["/etc/apache2/sites-available/provctl-acme.conf"]; exists {
 		t.Error("new file remains after undo")
+	}
+}
+
+func TestApache_SetVHostEnabledRestoresDisabledSymlink(t *testing.T) {
+	path, enabledPath := "/etc/apache2/sites-available/provctl-acme.conf", "/etc/apache2/sites-enabled/provctl-acme.conf"
+	fs := &apacheFS{files: map[string][]byte{path: []byte("vhost"), enabledPath: []byte(path)}}
+	apache := Apache{FS: fs, Commands: &apacheCommander{}, Systemd: &apacheSystemd{active: true}, Service: "apache2"}
+	undo, err := apache.SetVHostEnabled(context.Background(), path, enabledPath, false)
+	if err != nil {
+		t.Fatalf("SetVHostEnabled() error = %v", err)
+	}
+	if _, exists := fs.files[enabledPath]; exists {
+		t.Error("enabled symlink remains after disabling")
+	}
+	if err := undo(context.Background()); err != nil {
+		t.Fatalf("undo() error = %v", err)
+	}
+	if got := string(fs.files[enabledPath]); got != path {
+		t.Errorf("restored symlink = %q, want %q", got, path)
 	}
 }

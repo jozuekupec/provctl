@@ -88,3 +88,19 @@ func (repository *Repository) DeleteWebsite(ctx context.Context, websiteID int64
 	}
 	return nil
 }
+
+// SetWebsiteEnabled records whether a website vhost is active.
+func (repository *Repository) SetWebsiteEnabled(ctx context.Context, websiteID int64, enabled bool) error {
+	result, err := repository.DB.ExecContext(ctx, `UPDATE websites SET enabled = ?, updated_at = ? WHERE id = ?`, enabled, time.Now().UTC().Format(time.RFC3339), websiteID)
+	if err != nil {
+		return fmt.Errorf("set website %d enabled=%t: %w", websiteID, enabled, err)
+	}
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("count website update %d: %w", websiteID, err)
+	}
+	if rows != 1 {
+		return fmt.Errorf("website %d not found", websiteID)
+	}
+	return nil
+}

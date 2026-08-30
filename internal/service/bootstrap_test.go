@@ -98,6 +98,9 @@ type bootstrapApache struct{}
 func (bootstrapApache) ApplyVHost(context.Context, string, []byte, string) (func(context.Context) error, error) {
 	return func(context.Context) error { return nil }, nil
 }
+func (bootstrapApache) SetVHostEnabled(context.Context, string, string, bool) (func(context.Context) error, error) {
+	return func(context.Context) error { return nil }, nil
+}
 func (bootstrapApache) ValidateAndReload(context.Context) error { return nil }
 
 type bootstrapCommander struct{}

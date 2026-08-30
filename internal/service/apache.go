@@ -61,6 +61,56 @@ func (apache Apache) ApplyVHost(ctx context.Context, path string, contents []byt
 	return apache.apply(ctx, path, contents, enabledPath)
 }
 
+// SetVHostEnabled enables or disables an existing managed vhost. The returned
+// function restores the prior symlink state and reloads Apache.
+func (apache Apache) SetVHostEnabled(ctx context.Context, path, enabledPath string, enabled bool) (func(context.Context) error, error) {
+	if apache.FS == nil || apache.Commands == nil || apache.Systemd == nil || apache.Service == "" {
+		return nil, errors.New("Apache service requires filesystem, commander, systemd, and service name")
+	}
+	if enabledPath == "" {
+		return nil, errors.New("Apache enabled vhost path is required")
+	}
+	if _, err := apache.FS.Stat(enabledPath); enabled == (err == nil) {
+		return nil, fmt.Errorf("Apache vhost %q is already enabled=%t", enabledPath, enabled)
+	} else if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return nil, fmt.Errorf("inspect enabled Apache vhost %q: %w", enabledPath, err)
+	}
+	if enabled {
+		if _, err := apache.FS.Stat(path); err != nil {
+			return nil, fmt.Errorf("inspect Apache vhost %q: %w", path, err)
+		}
+	}
+	if err := apache.configTest(ctx, "baseline"); err != nil {
+		return nil, err
+	}
+	apply := func() error {
+		if enabled {
+			return apache.FS.Symlink(path, enabledPath)
+		}
+		return apache.FS.Remove(enabledPath)
+	}
+	restore := func(restoreCtx context.Context) error {
+		if enabled {
+			if err := apache.FS.Remove(enabledPath); err != nil && !errors.Is(err, os.ErrNotExist) {
+				return fmt.Errorf("remove enabled Apache vhost %q: %w", enabledPath, err)
+			}
+		} else if err := apache.FS.Symlink(path, enabledPath); err != nil {
+			return fmt.Errorf("restore enabled Apache vhost %q: %w", enabledPath, err)
+		}
+		return apache.ValidateAndReload(restoreCtx)
+	}
+	if err := apply(); err != nil {
+		return nil, fmt.Errorf("set Apache vhost enabled=%t: %w", enabled, err)
+	}
+	if err := apache.ValidateAndReload(ctx); err != nil {
+		if restoreErr := restore(ctx); restoreErr != nil {
+			return nil, errors.Join(err, restoreErr)
+		}
+		return nil, err
+	}
+	return restore, nil
+}
+
 func (apache Apache) apply(ctx context.Context, path string, contents []byte, enabledPath string) (func(context.Context) error, error) {
 	if apache.FS == nil || apache.Commands == nil || apache.Systemd == nil || apache.Service == "" {
 		return nil, errors.New("Apache service requires filesystem, commander, systemd, and service name")

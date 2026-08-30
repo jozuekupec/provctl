@@ -10,19 +10,28 @@ import (
 	"provctl/internal/plan"
 )
 
-type websiteStore struct{ subscription domain.Subscription }
+type websiteStore struct {
+	subscription domain.Subscription
+	websites     []domain.Website
+}
 
 func (store websiteStore) SubscriptionByName(context.Context, string) (domain.Subscription, error) {
 	return store.subscription, nil
 }
-func (websiteStore) DomainExists(context.Context, string) (bool, error)            { return false, nil }
-func (websiteStore) CreateWebsite(context.Context, domain.Website) (int64, error)  { return 1, nil }
-func (websiteStore) DeleteWebsite(context.Context, int64) error                    { return nil }
-func (websiteStore) ListWebsites(context.Context, int64) ([]domain.Website, error) { return nil, nil }
+func (websiteStore) DomainExists(context.Context, string) (bool, error)           { return false, nil }
+func (websiteStore) CreateWebsite(context.Context, domain.Website) (int64, error) { return 1, nil }
+func (websiteStore) DeleteWebsite(context.Context, int64) error                   { return nil }
+func (websiteStore) SetWebsiteEnabled(context.Context, int64, bool) error         { return nil }
+func (store websiteStore) ListWebsites(context.Context, int64) ([]domain.Website, error) {
+	return store.websites, nil
+}
 
 type websiteApache struct{}
 
 func (websiteApache) ApplyVHost(context.Context, string, []byte, string) (func(context.Context) error, error) {
+	return func(context.Context) error { return nil }, nil
+}
+func (websiteApache) SetVHostEnabled(context.Context, string, string, bool) (func(context.Context) error, error) {
 	return func(context.Context) error { return nil }, nil
 }
 
@@ -104,5 +113,19 @@ func TestWebsiteService_PrepareCreateRedirectBuildsPlanWithoutChanges(t *testing
 	}
 	if got, want := len(operation.Steps), 5; got != want {
 		t.Errorf("plan steps = %d, want %d", got, want)
+	}
+}
+
+func TestWebsiteService_PrepareSetEnabledBuildsReversiblePlan(t *testing.T) {
+	service := WebsiteService{Store: websiteStore{subscription: domain.Subscription{ID: 1, Name: "acme"}, websites: []domain.Website{{ID: 4, SubscriptionID: 1, PrimaryDomain: "example.test", Enabled: true}}}, Apache: websiteApache{}, Executor: plan.Executor{Journal: &subscriptionJournal{}, Locker: subscriptionLocker{}}, Config: config.Config{Apache: config.Apache{SitesAvailable: "/etc/apache2/sites-available", SitesEnabled: "/etc/apache2/sites-enabled"}}}
+	operation, err := service.PrepareSetEnabled(context.Background(), "acme", "example.test", false)
+	if err != nil {
+		t.Fatalf("PrepareSetEnabled() error = %v", err)
+	}
+	if got, want := len(operation.Steps), 2; got != want {
+		t.Errorf("plan steps = %d, want %d", got, want)
+	}
+	if got, want := operation.Action, "website.set-enabled"; got != want {
+		t.Errorf("action = %q, want %q", got, want)
 	}
 }

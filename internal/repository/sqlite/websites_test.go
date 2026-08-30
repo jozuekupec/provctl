@@ -61,3 +61,32 @@ func TestRepository_ListWebsitesIncludesProxyTarget(t *testing.T) {
 		t.Errorf("Target = %q", target)
 	}
 }
+
+func TestRepository_SetWebsiteEnabledUpdatesPersistedState(t *testing.T) {
+	repository, err := Open(context.Background(), filepath.Join(t.TempDir(), "provctl.db"))
+	if err != nil {
+		t.Fatalf("Open() error = %v", err)
+	}
+	defer repository.Close()
+	if err := repository.CreateSubscription(context.Background(), domain.Subscription{Name: "acme", UnixUser: "acme", UnixUID: 5000, Home: "/vhosts/acme", PHPMaxChildren: 10, PHPMemoryLimit: "256M", PHPUploadMax: "64M", PHPMaxExecTime: 60, SSHAccess: "none"}); err != nil {
+		t.Fatal(err)
+	}
+	subscription, err := repository.SubscriptionByName(context.Background(), "acme")
+	if err != nil {
+		t.Fatal(err)
+	}
+	websiteID, err := repository.CreateWebsite(context.Background(), domain.Website{SubscriptionID: subscription.ID, Type: domain.WebsiteStatic, PrimaryDomain: "example.test", Enabled: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := repository.SetWebsiteEnabled(context.Background(), websiteID, false); err != nil {
+		t.Fatalf("SetWebsiteEnabled() error = %v", err)
+	}
+	websites, err := repository.ListWebsites(context.Background(), subscription.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(websites) != 1 || websites[0].Enabled {
+		t.Errorf("ListWebsites() = %#v, want one disabled website", websites)
+	}
+}

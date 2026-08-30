@@ -24,9 +24,10 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   napojené, perzistují cíl/redirect kód, mají cílené unit testy a byly ověřeny
   v `pv` skutečným HTTP proxy požadavkem i odpovědí `302` s `Location`.
   Read-only `website list <subscription>` a `website show <subscription> <domain>`
-  jsou dostupné přes service vrstvu a ověřené v `pv`; zbývá enable/disable,
-  delete, aliasy, logy a `reconcile`. Golden testy nyní pokrývají všechny
-  čtyři typy HTTP vhostu.
+  jsou dostupné přes service vrstvu a ověřené v `pv`. `website enable` a
+  `website disable` atomicky přepínají symlink Apache i hodnotu SQLite s
+  rollbackem; oba směry jsou ověřené v `pv`. Zbývá delete, aliasy, logy a
+  `reconcile`. Golden testy nyní pokrývají všechny čtyři typy HTTP vhostu.
 - [~] **M4 — PHP-FPM:** automatická detekce a výběr verze, render a atomické
   vytvoření poolu včetně ověření socketu jsou hotové. Zbývá změna verze poolu
   (`php set`) s rollbackem.

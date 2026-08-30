@@ -20,6 +20,7 @@ type WebsiteStore interface {
 	DomainExists(context.Context, string) (bool, error)
 	CreateWebsite(context.Context, domain.Website) (int64, error)
 	DeleteWebsite(context.Context, int64) error
+	SetWebsiteEnabled(context.Context, int64, bool) error
 	ListWebsites(context.Context, int64) ([]domain.Website, error)
 }
 
@@ -46,6 +47,7 @@ func (service WebsiteService) ListForSubscription(ctx context.Context, subscript
 
 type ApacheVHostApplier interface {
 	ApplyVHost(context.Context, string, []byte, string) (func(context.Context) error, error)
+	SetVHostEnabled(context.Context, string, string, bool) (func(context.Context) error, error)
 }
 
 // WebsiteService creates an isolated PHP-FPM website and its Apache vhost.
@@ -131,6 +133,64 @@ func (service WebsiteService) CreateStatic(ctx context.Context, subscriptionName
 		return 0, err
 	}
 	return service.Executor.Run(ctx, operation)
+}
+
+// SetEnabled changes one website's Apache vhost and persisted enabled state.
+func (service WebsiteService) SetEnabled(ctx context.Context, subscriptionName, primaryDomain string, enabled bool) (int64, error) {
+	operation, err := service.PrepareSetEnabled(ctx, subscriptionName, primaryDomain, enabled)
+	if err != nil {
+		return 0, err
+	}
+	return service.Executor.Run(ctx, operation)
+}
+
+// PrepareSetEnabled builds a reversible enable or disable operation.
+func (service WebsiteService) PrepareSetEnabled(ctx context.Context, subscriptionName, primaryDomain string, enabled bool) (plan.Plan, error) {
+	if service.Apache == nil {
+		return plan.Plan{}, fmt.Errorf("Apache vhost applier is required")
+	}
+	if err := domain.ValidateSubscriptionName(subscriptionName); err != nil {
+		return plan.Plan{}, err
+	}
+	if err := domain.ValidateDomain(primaryDomain); err != nil {
+		return plan.Plan{}, err
+	}
+	websites, err := service.ListForSubscription(ctx, subscriptionName)
+	if err != nil {
+		return plan.Plan{}, err
+	}
+	var website domain.Website
+	found := false
+	for _, candidate := range websites {
+		if candidate.PrimaryDomain == primaryDomain {
+			website, found = candidate, true
+			break
+		}
+	}
+	if !found {
+		return plan.Plan{}, fmt.Errorf("website %q not found in subscription %q", primaryDomain, subscriptionName)
+	}
+	if website.Enabled == enabled {
+		return plan.Plan{}, fmt.Errorf("website %q is already enabled=%t", primaryDomain, enabled)
+	}
+	vhostPath := filepath.Join(service.Config.Apache.SitesAvailable, meta.FilePrefix+subscriptionName+"-"+primaryDomain+".conf")
+	enabledPath := filepath.Join(service.Config.Apache.SitesEnabled, filepath.Base(vhostPath))
+	var undoApache func(context.Context) error
+	steps := []plan.Step{{Name: map[bool]string{true: "enable Apache vhost", false: "disable Apache vhost"}[enabled], Preview: fmt.Sprintf("set %s enabled=%t", enabledPath, enabled), Do: func(ctx context.Context) error {
+		var err error
+		undoApache, err = service.Apache.SetVHostEnabled(ctx, vhostPath, enabledPath, enabled)
+		return err
+	}, Undo: func(ctx context.Context) error {
+		if undoApache == nil {
+			return nil
+		}
+		return undoApache(ctx)
+	}}, {Name: "record website enabled state", Preview: fmt.Sprintf("set website %d enabled=%t in SQLite", website.ID, enabled), Do: func(ctx context.Context) error {
+		return service.Store.SetWebsiteEnabled(ctx, website.ID, enabled)
+	}, Undo: func(ctx context.Context) error {
+		return service.Store.SetWebsiteEnabled(ctx, website.ID, website.Enabled)
+	}}}
+	return plan.Plan{Action: "website.set-enabled", Target: subscriptionName + "/" + primaryDomain, Steps: steps}, nil
 }
 
 func (service WebsiteService) CreateProxy(ctx context.Context, subscriptionName, primaryDomain, target string) (int64, error) {
