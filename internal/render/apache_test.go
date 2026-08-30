@@ -48,6 +48,7 @@ func TestRenderApacheStaticHTTP_ContainsIsolatedDocumentRootAndACME(t *testing.T
 	if !containsAll(string(contents), "DocumentRoot /vhosts/acme/sites/static.example.test/public", "AllowOverride None", "Alias /.well-known/acme-challenge/ /state/acme/") {
 		t.Errorf("static vhost is missing required directives:\n%s", contents)
 	}
+	assertApacheGolden(t, "static-http.golden", contents)
 }
 
 func TestRenderApacheProxyHTTP_RestrictsTargetAndSetsHeaders(t *testing.T) {
@@ -58,6 +59,7 @@ func TestRenderApacheProxyHTTP_RestrictsTargetAndSetsHeaders(t *testing.T) {
 	if !containsAll(string(contents), "ProxyRequests Off", "ProxyPass / http://127.0.0.1:8080/ timeout=60", "RequestHeader set X-Forwarded-Proto \"http\"") {
 		t.Errorf("proxy vhost is missing required directives:\n%s", contents)
 	}
+	assertApacheGolden(t, "proxy-http.golden", contents)
 	if _, err := RenderApacheProxyHTTP(ApacheProxyVHost{PrimaryDomain: "proxy.example.test", Target: "http://10.0.0.1:8080", AcmeChallengeRoot: "/state/acme", ProxyTimeout: 60, LogDir: "/logs/acme/proxy.example.test"}, nil); err == nil {
 		t.Error("RenderApacheProxyHTTP() accepted a non-allowlisted target")
 	}
@@ -71,8 +73,20 @@ func TestRenderApacheRedirectHTTP_ValidatesTargetAndStatus(t *testing.T) {
 	if !containsAll(string(contents), "Redirect 301 / https://new.example.test/path", "Alias /.well-known/acme-challenge/ /state/acme/") {
 		t.Errorf("redirect vhost is missing required directives:\n%s", contents)
 	}
+	assertApacheGolden(t, "redirect-http.golden", contents)
 	if _, err := RenderApacheRedirectHTTP(ApacheRedirectVHost{PrimaryDomain: "old.example.test", Target: "mailto:test@example.test", RedirectCode: 301, AcmeChallengeRoot: "/state/acme", LogDir: "/logs/acme/old.example.test"}); err == nil {
 		t.Error("RenderApacheRedirectHTTP() accepted a non-HTTP target")
+	}
+}
+
+func assertApacheGolden(t *testing.T, name string, got []byte) {
+	t.Helper()
+	want, err := os.ReadFile(filepath.Join("testdata", name))
+	if err != nil {
+		t.Fatalf("read golden file: %v", err)
+	}
+	if diff := cmp.Diff(string(want), string(got)); diff != "" {
+		t.Errorf("render mismatch (-want +got):\n%s", diff)
 	}
 }
 

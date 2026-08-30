@@ -25,7 +25,8 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   v `pv` skutečným HTTP proxy požadavkem i odpovědí `302` s `Location`.
   Read-only `website list <subscription>` a `website show <subscription> <domain>`
   jsou dostupné přes service vrstvu a ověřené v `pv`; zbývá enable/disable,
-  delete, aliasy, logy a `reconcile`.
+  delete, aliasy, logy a `reconcile`. Golden testy nyní pokrývají všechny
+  čtyři typy HTTP vhostu.
 - [~] **M4 — PHP-FPM:** automatická detekce a výběr verze, render a atomické
   vytvoření poolu včetně ověření socketu jsou hotové. Zbývá změna verze poolu
   (`php set`) s rollbackem.
