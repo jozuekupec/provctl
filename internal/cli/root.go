@@ -53,6 +53,7 @@ func NewRootCommand() *cobra.Command {
 	root.AddCommand(newWebsiteCommand())
 	root.AddCommand(newPHPCommand())
 	root.AddCommand(newDatabaseCommand())
+	root.AddCommand(newSSHCommand())
 	root.AddCommand(newReconcileCommand())
 	return root
 }

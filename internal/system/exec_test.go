@@ -13,6 +13,7 @@ func TestIsAllowedBinary(t *testing.T) {
 	}{
 		{name: "/usr/bin/systemctl", want: true},
 		{name: "/usr/sbin/php-fpm8.3", want: true},
+		{name: "/usr/bin/ssh-keygen", want: true},
 		{name: "systemctl", want: false},
 		{name: "/bin/sh", want: false},
 	}

@@ -51,7 +51,7 @@ var allowedBinaries = map[string]struct{}{
 	"/usr/sbin/chpasswd": {}, "/usr/bin/crontab": {}, "/usr/bin/certbot": {},
 	"/usr/bin/mysql": {}, "/usr/bin/mysqldump": {}, "/usr/bin/tar": {},
 	"/usr/bin/zstd": {}, "/usr/bin/du": {}, "/usr/bin/openssl": {},
-	"/usr/bin/dig": {}, "/usr/bin/getent": {},
+	"/usr/bin/dig": {}, "/usr/bin/getent": {}, "/usr/bin/ssh-keygen": {},
 }
 
 func IsAllowedBinary(name string) bool {
