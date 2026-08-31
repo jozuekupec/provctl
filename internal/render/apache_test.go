@@ -40,6 +40,16 @@ func TestRenderApachePHPFPMHTTP_ForceHTTPSKeepsACME(t *testing.T) {
 	}
 }
 
+func TestRenderApachePHPFPMTLS_UsesLiveLineage(t *testing.T) {
+	contents, err := RenderApachePHPFPMTLS(ApacheTLSVHost{Subscription: "acme", PrimaryDomain: "example.test", Aliases: []string{"www.example.test"}, DocumentRoot: "/srv/public", CertificateFile: "/etc/letsencrypt/live/provctl-acme-example.test/fullchain.pem", CertificateKey: "/etc/letsencrypt/live/provctl-acme-example.test/privkey.pem", FPMSocket: "/run/php/provctl-acme.sock", ProxyTimeout: 60, LogDir: "/var/log/provctl/acme/example.test"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !containsAll(string(contents), "<VirtualHost *:443>", "SSLEngine on", "SSLCertificateFile /etc/letsencrypt/live/provctl-acme-example.test/fullchain.pem", "ServerAlias www.example.test") {
+		t.Errorf("TLS vhost is incomplete:\n%s", contents)
+	}
+}
+
 func TestRenderApacheStaticHTTP_ContainsIsolatedDocumentRootAndACME(t *testing.T) {
 	contents, err := RenderApacheStaticHTTP(ApacheStaticVHost{PrimaryDomain: "static.example.test", Aliases: []string{"www.static.example.test"}, DocumentRoot: "/vhosts/acme/sites/static.example.test/public", AcmeChallengeRoot: "/state/acme", LogDir: "/logs/acme/static.example.test"})
 	if err != nil {

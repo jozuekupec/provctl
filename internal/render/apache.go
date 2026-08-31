@@ -25,6 +25,20 @@ type ApacheHTTPVHost struct {
 	LogDir            string
 }
 
+// ApacheTLSVHost describes the HTTPS half of a PHP-FPM vhost. It is rendered
+// separately so issuance can keep the HTTP challenge vhost valid first.
+type ApacheTLSVHost struct {
+	Subscription    string
+	PrimaryDomain   string
+	Aliases         []string
+	DocumentRoot    string
+	CertificateFile string
+	CertificateKey  string
+	FPMSocket       string
+	ProxyTimeout    int
+	LogDir          string
+}
+
 // ApacheStaticVHost describes an HTTP vhost serving static content.
 type ApacheStaticVHost struct {
 	PrimaryDomain     string
@@ -60,6 +74,13 @@ func RenderApachePHPFPMHTTP(vhost ApacheHTTPVHost) ([]byte, error) {
 		return nil, fmt.Errorf("incomplete Apache HTTP vhost input")
 	}
 	return renderApacheTemplate("apache/php-fpm-http.conf.tmpl", vhost)
+}
+
+func RenderApachePHPFPMTLS(vhost ApacheTLSVHost) ([]byte, error) {
+	if vhost.Subscription == "" || vhost.PrimaryDomain == "" || vhost.DocumentRoot == "" || vhost.CertificateFile == "" || vhost.CertificateKey == "" || vhost.FPMSocket == "" || vhost.ProxyTimeout <= 0 || vhost.LogDir == "" {
+		return nil, fmt.Errorf("incomplete Apache TLS vhost input")
+	}
+	return renderApacheTemplate("apache/php-fpm-tls.conf.tmpl", vhost)
 }
 
 func RenderApacheStaticHTTP(vhost ApacheStaticVHost) ([]byte, error) {

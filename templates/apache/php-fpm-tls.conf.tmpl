@@ -1,0 +1,27 @@
+<VirtualHost *:443>
+    ServerName {{ .PrimaryDomain }}
+{{- range .Aliases }}
+    ServerAlias {{ . }}
+{{- end }}
+
+    SSLEngine on
+    SSLCertificateFile {{ .CertificateFile }}
+    SSLCertificateKeyFile {{ .CertificateKey }}
+
+    DocumentRoot {{ .DocumentRoot }}
+    <Directory "{{ .DocumentRoot }}">
+        Options -Indexes +FollowSymLinks
+        AllowOverride All
+        Require all granted
+    </Directory>
+
+    <FilesMatch \.php$>
+        SetHandler "proxy:unix:{{ .FPMSocket }}|fcgi://localhost"
+    </FilesMatch>
+    <Proxy "fcgi://localhost">
+        ProxySet timeout={{ .ProxyTimeout }}
+    </Proxy>
+
+    ErrorLog {{ .LogDir }}/ssl-error.log
+    CustomLog {{ .LogDir }}/ssl-access.log combined
+</VirtualHost>
