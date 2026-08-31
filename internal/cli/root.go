@@ -54,6 +54,7 @@ func NewRootCommand() *cobra.Command {
 	root.AddCommand(newPHPCommand())
 	root.AddCommand(newDatabaseCommand())
 	root.AddCommand(newSSHCommand())
+	root.AddCommand(newCronCommand())
 	root.AddCommand(newReconcileCommand())
 	return root
 }

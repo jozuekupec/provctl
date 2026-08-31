@@ -70,7 +70,7 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
 
 ## Následující milníky
 
-- [~] **M5 — MariaDB, SSH a cron:** databázový lifecycle je žurnálovaný a
+- [x] **M5 — MariaDB, SSH a cron:** databázový lifecycle je žurnálovaný a
   dostupný přes `database create|list|password|delete`. Jméno se skládá jako
   `<subscription>_<name>`, před vytvořením se dynamicky ověřuje limit uživatele
   na cílovém MariaDB serveru a SQL jde výhradně přes stdin. Hesla jsou
@@ -90,7 +90,13 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   heslo přes stdin. Klíčový režim bez uloženého klíče je odmítnut. V `pv`
   proběhlo add/list/remove se skutečným ed25519 klíčem i přepnutí
   `none → key → password → none`, včetně ověření shellu a bez vypsání hesla;
-  kontejner byl obnoven na `clean`. Zbývá crontab.
+  kontejner byl obnoven na `clean`. Cron má nyní `cron list|add|remove`,
+  persistenci `cron_jobs`, validaci pětifieldové syntaxe i standardních maker
+  a jednorázově přegeneruje artefakt pouze přes `crontab -u <user> -` na stdin;
+  command ani comment nemohou obsahovat nový řádek. Jednotkové, SQLite a
+  rollback testy prošly v `make test`; v `pv` bylo ověřeno add, list i remove
+  nad skutečným `crontab` uživatele subscription, včetně výsledného
+  generovaného obsahu. Kontejner byl následně obnoven na `clean`.
 - [ ] **M6 — SSL:** stavový automat Certbotu, deploy-hook command a přijetí
   existujících certifikátů.
 - [ ] **M7 — provoz:** backup/restore, health checks, audit log a kvóty.
