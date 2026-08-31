@@ -23,6 +23,7 @@ type WebsiteStore interface {
 	CreateWebsite(context.Context, domain.Website) (int64, error)
 	DeleteWebsite(context.Context, int64) error
 	SetWebsiteEnabled(context.Context, int64, bool) error
+	SetWebsiteSSL(context.Context, int64, bool, bool) error
 	AddWebsiteAlias(context.Context, int64, string) error
 	RemoveWebsiteAlias(context.Context, int64, string) error
 	ListWebsites(context.Context, int64) ([]domain.Website, error)

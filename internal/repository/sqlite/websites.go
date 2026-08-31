@@ -159,3 +159,20 @@ func (repository *Repository) SetWebsiteEnabled(ctx context.Context, websiteID i
 	}
 	return nil
 }
+
+// SetWebsiteSSL records SSL and HTTP-to-HTTPS redirect state together so a
+// generated vhost always has one persisted source of truth.
+func (repository *Repository) SetWebsiteSSL(ctx context.Context, websiteID int64, enabled, forceHTTPS bool) error {
+	result, err := repository.DB.ExecContext(ctx, `UPDATE websites SET ssl_enabled = ?, force_https = ?, updated_at = ? WHERE id = ?`, enabled, forceHTTPS, time.Now().UTC().Format(time.RFC3339), websiteID)
+	if err != nil {
+		return fmt.Errorf("set website %d SSL=%t force_https=%t: %w", websiteID, enabled, forceHTTPS, err)
+	}
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("count website SSL update: %w", err)
+	}
+	if rows != 1 {
+		return fmt.Errorf("website %d not found", websiteID)
+	}
+	return nil
+}

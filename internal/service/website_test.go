@@ -38,6 +38,7 @@ func (websiteStore) DomainExists(context.Context, string) (bool, error)         
 func (websiteStore) CreateWebsite(context.Context, domain.Website) (int64, error) { return 1, nil }
 func (websiteStore) DeleteWebsite(context.Context, int64) error                   { return nil }
 func (websiteStore) SetWebsiteEnabled(context.Context, int64, bool) error         { return nil }
+func (websiteStore) SetWebsiteSSL(context.Context, int64, bool, bool) error       { return nil }
 func (websiteStore) AddWebsiteAlias(context.Context, int64, string) error         { return nil }
 func (websiteStore) RemoveWebsiteAlias(context.Context, int64, string) error      { return nil }
 func (store websiteStore) ListWebsites(context.Context, int64) ([]domain.Website, error) {
