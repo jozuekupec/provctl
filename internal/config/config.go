@@ -4,6 +4,7 @@ package config
 import (
 	"fmt"
 	"io"
+	"net/url"
 	"os"
 
 	"github.com/BurntSushi/toml"
@@ -58,6 +59,7 @@ type Users struct {
 type SSL struct {
 	Email   string `toml:"email"`
 	Staging bool   `toml:"staging"`
+	Server  string `toml:"server"`
 }
 type Logs struct {
 	RetentionDays int  `toml:"retention_days"`
@@ -108,6 +110,12 @@ func (cfg Config) Validate() error {
 	}
 	if cfg.Limits.LockTimeoutSeconds <= 0 {
 		return fmt.Errorf("[limits] lock_timeout_seconds must be positive")
+	}
+	if cfg.SSL.Server != "" {
+		server, err := url.ParseRequestURI(cfg.SSL.Server)
+		if err != nil || server.Scheme != "https" || server.Host == "" {
+			return fmt.Errorf("[ssl] server must be an absolute HTTPS URL")
+		}
 	}
 	return nil
 }

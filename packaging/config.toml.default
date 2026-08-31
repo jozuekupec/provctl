@@ -34,6 +34,8 @@ shell = "/bin/bash"
 [ssl]
 email = ""
 staging = false
+# Optional ACME directory URL, for example Pebble in isolated tests.
+server = ""
 
 [logs]
 retention_days = 14

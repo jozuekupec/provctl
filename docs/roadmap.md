@@ -97,8 +97,10 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   rollback testy prošly v `make test`; v `pv` bylo ověřeno add, list i remove
   nad skutečným `crontab` uživatele subscription, včetně výsledného
   generovaného obsahu. Kontejner byl následně obnoven na `clean`.
-- [ ] **M6 — SSL:** stavový automat Certbotu, deploy-hook command a přijetí
-  existujících certifikátů.
+- [~] **M6 — SSL:** příprava pro stavový automat Certbotu začala
+  konfigurovatelným HTTPS ACME endpointem (`[ssl].server`); prázdná hodnota
+  ponechává výchozí endpoint Certbotu a Pebble lze použít v izolovaném E3.
+  Zbývá lifecycle enable/disable/status, globální deploy hook a adopt.
 - [ ] **M7 — provoz:** backup/restore, health checks, audit log a kvóty.
 - [~] **M8 — TUI:** návrh je zaznamenán v [tui-design.md](tui-design.md) a
   cíleně přebírá konzistentní Bubble Tea vzor z projektu `depo`: hodnotový

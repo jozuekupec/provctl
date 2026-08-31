@@ -29,6 +29,17 @@ func TestDecode_MissingConfigVersionDefaultsToOne(t *testing.T) {
 	}
 }
 
+func TestDecode_SSLServer(t *testing.T) {
+	valid := strings.Replace(defaultConfig, "server = \"\"", "server = \"https://pebble.test/dir\"", 1)
+	if _, err := Decode(strings.NewReader(valid)); err != nil {
+		t.Fatalf("Decode(valid SSL server) error = %v", err)
+	}
+	invalid := strings.Replace(defaultConfig, "server = \"\"", "server = \"http://pebble.test/dir\"", 1)
+	if _, err := Decode(strings.NewReader(invalid)); err == nil {
+		t.Fatal("Decode(invalid SSL server) error = nil, want error")
+	}
+}
+
 const defaultConfig = `
 [meta]
 config_version = 1
@@ -58,6 +69,7 @@ shell = "/bin/bash"
 [ssl]
 email = ""
 staging = false
+server = ""
 [logs]
 retention_days = 14
 compress = true
