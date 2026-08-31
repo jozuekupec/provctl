@@ -63,7 +63,13 @@ func (productionSSLNetwork) Get(ctx context.Context, target string) (int, error)
 	if err != nil {
 		return 0, err
 	}
-	client := &http.Client{Timeout: 5 * time.Second, CheckRedirect: func(_ *http.Request, _ []*http.Request) error { return http.ErrUseLastResponse }}
+	client := &http.Client{
+		Timeout:   5 * time.Second,
+		Transport: &http.Transport{Proxy: nil},
+		CheckRedirect: func(_ *http.Request, _ []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
+	}
 	response, err := client.Do(request)
 	if err != nil {
 		return 0, err
