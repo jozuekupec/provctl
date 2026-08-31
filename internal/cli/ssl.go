@@ -14,7 +14,53 @@ import (
 
 func newSSLCommand() *cobra.Command {
 	command := &cobra.Command{Use: "ssl", Short: "manage Certbot certificates"}
-	command.AddCommand(newSSLStatusCommand(), newSSLDeployHookCommand())
+	command.AddCommand(newSSLEnableCommand(), newSSLDisableCommand(), newSSLStatusCommand(), newSSLDeployHookCommand())
+	return command
+}
+
+func newSSLEnableCommand() *cobra.Command {
+	var configPath string
+	var force, forceHTTPS, renewalCheck bool
+	command := &cobra.Command{Use: "enable <subscription> <domain>", Short: "issue and enable a TLS certificate", Args: cobra.ExactArgs(2), RunE: func(command *cobra.Command, args []string) error {
+		cfg, err := config.Load(configPath)
+		if err != nil {
+			return fmt.Errorf("load configuration: %w", err)
+		}
+		runtime, err := service.NewProductionSSLRuntime(context.Background(), cfg)
+		if err != nil {
+			return fmt.Errorf("open SSL state: %w", err)
+		}
+		defer runtime.Close()
+		return runtime.Service.Enable(context.Background(), args[0], args[1], force, forceHTTPS, renewalCheck)
+	}}
+	command.Flags().StringVar(&configPath, "config", meta.ConfigFile, "path to config.toml")
+	command.Flags().BoolVar(&force, "force", false, "continue when DNS does not match a local server IP")
+	command.Flags().BoolVar(&forceHTTPS, "force-https", true, "redirect HTTP to HTTPS after issuance")
+	command.Flags().BoolVar(&renewalCheck, "renewal-check", true, "verify Certbot renewal after issuance")
+	command.Flags().Bool("no-renewal-check", false, "skip Certbot renewal verification")
+	command.PreRunE = func(command *cobra.Command, _ []string) error {
+		disabled, err := command.Flags().GetBool("no-renewal-check")
+		renewalCheck = !disabled
+		return err
+	}
+	return command
+}
+
+func newSSLDisableCommand() *cobra.Command {
+	var configPath string
+	command := &cobra.Command{Use: "disable <subscription> <domain>", Short: "disable TLS without deleting the certificate", Args: cobra.ExactArgs(2), RunE: func(command *cobra.Command, args []string) error {
+		cfg, err := config.Load(configPath)
+		if err != nil {
+			return fmt.Errorf("load configuration: %w", err)
+		}
+		runtime, err := service.NewProductionSSLRuntime(context.Background(), cfg)
+		if err != nil {
+			return fmt.Errorf("open SSL state: %w", err)
+		}
+		defer runtime.Close()
+		return runtime.Service.Disable(context.Background(), args[0], args[1])
+	}}
+	command.Flags().StringVar(&configPath, "config", meta.ConfigFile, "path to config.toml")
 	return command
 }
 

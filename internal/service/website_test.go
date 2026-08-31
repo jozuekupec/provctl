@@ -184,7 +184,7 @@ func TestWebsiteService_ReadLogsReturnsFinalLines(t *testing.T) {
 	}
 }
 
-func TestWebsiteService_renderHTTPVHost_RendersTLSForEveryWebsiteType(t *testing.T) {
+func TestWebsiteService_RenderVHost_RendersTLSForEveryWebsiteType(t *testing.T) {
 	service := WebsiteService{Config: config.Config{Paths: config.Paths{ACMEChallenge: "/var/lib/provctl/acme-challenge"}, Apache: config.Apache{ProxyTimeout: 60}}}
 	websites := []domain.Website{
 		{Type: domain.WebsitePHPFPM, PrimaryDomain: "php.example.test", DocumentRoot: "/srv/php", SSLEnabled: true},
@@ -194,7 +194,7 @@ func TestWebsiteService_renderHTTPVHost_RendersTLSForEveryWebsiteType(t *testing
 	}
 	for _, website := range websites {
 		t.Run(string(website.Type), func(t *testing.T) {
-			contents, err := service.renderHTTPVHost("acme", website)
+			contents, err := service.RenderVHost("acme", website)
 			if err != nil {
 				t.Fatal(err)
 			}

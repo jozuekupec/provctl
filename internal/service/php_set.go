@@ -204,7 +204,7 @@ func (service PHPService) setPlan(previous, desired domain.Subscription, website
 	}})
 	for _, website := range websites {
 		website := website
-		contents, err := (WebsiteService{Config: service.Config}).renderHTTPVHost(desired.Name, website)
+		contents, err := (WebsiteService{Config: service.Config}).RenderVHost(desired.Name, website)
 		if err != nil {
 			return plan.Plan{}, err
 		}

@@ -202,7 +202,7 @@ func (service ReconcileService) Reconcile(ctx context.Context, subscriptionName 
 }
 
 func (service ReconcileService) renderHTTPVHost(subscriptionName string, website domain.Website) ([]byte, error) {
-	return WebsiteService{Config: service.Config}.renderHTTPVHost(subscriptionName, website)
+	return WebsiteService{Config: service.Config}.RenderVHost(subscriptionName, website)
 }
 
 func (service ReconcileService) vhostPath(subscriptionName, domain string) string {

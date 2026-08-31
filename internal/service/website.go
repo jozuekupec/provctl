@@ -240,7 +240,7 @@ func (service WebsiteService) PrepareAlias(ctx context.Context, subscriptionName
 		aliases = filtered
 	}
 	website.Aliases = aliases
-	contents, err := service.renderHTTPVHost(subscriptionName, website)
+	contents, err := service.RenderVHost(subscriptionName, website)
 	if err != nil {
 		return plan.Plan{}, err
 	}
@@ -265,7 +265,10 @@ func (service WebsiteService) PrepareAlias(ctx context.Context, subscriptionName
 	return plan.Plan{Action: "website.alias." + verb, Target: subscriptionName + "/" + primaryDomain + "/" + alias, Steps: steps}, nil
 }
 
-func (service WebsiteService) renderHTTPVHost(subscriptionName string, website domain.Website) ([]byte, error) {
+// RenderVHost renders the complete HTTP and, when enabled, HTTPS vhost for a
+// persisted website. It is shared by lifecycle services so generated config
+// stays consistent across website and certificate operations.
+func (service WebsiteService) RenderVHost(subscriptionName string, website domain.Website) ([]byte, error) {
 	logDir := filepath.Join(meta.LogDir, subscriptionName, website.PrimaryDomain)
 	var (
 		httpContents []byte

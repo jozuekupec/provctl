@@ -27,6 +27,20 @@ type certificateSystemd struct {
 	err      error
 }
 
+type certificateNetwork struct {
+	addresses map[string][]string
+	serverIPs []string
+	status    int
+}
+
+func (network certificateNetwork) LookupHost(_ context.Context, host string) ([]string, error) {
+	return network.addresses[host], nil
+}
+func (network certificateNetwork) ServerIPs() ([]string, error) { return network.serverIPs, nil }
+func (network certificateNetwork) Get(context.Context, string) (int, error) {
+	return network.status, nil
+}
+
 func (systemd *certificateSystemd) Reload(_ context.Context, unit string) error {
 	systemd.reloaded = unit
 	return systemd.err
@@ -88,5 +102,26 @@ func TestCertificateService_DeployHookUpdatesKnownLineageAndReloads(t *testing.T
 	systemd.err = errors.New("reload failed")
 	if err := service.DeployHook(context.Background(), lineagePath); err == nil {
 		t.Fatal("DeployHook() error = nil")
+	}
+}
+
+func TestSSLService_validateDNS_RequiresEveryDomainToMatchServer(t *testing.T) {
+	service := SSLService{Network: certificateNetwork{serverIPs: []string{"192.0.2.10"}, addresses: map[string][]string{"example.test": {"192.0.2.10"}, "www.example.test": {"2001:db8::1"}}}}
+	if err := service.validateDNS(context.Background(), []string{"example.test"}); err != nil {
+		t.Fatalf("validateDNS() error = %v", err)
+	}
+	if err := service.validateDNS(context.Background(), []string{"example.test", "www.example.test"}); err == nil {
+		t.Fatal("validateDNS() error = nil")
+	}
+}
+
+func TestSSLService_selfCheck_RequiresApacheNotFound(t *testing.T) {
+	service := SSLService{Network: certificateNetwork{status: 404}}
+	if err := service.selfCheck(context.Background(), "example.test"); err != nil {
+		t.Fatalf("selfCheck() error = %v", err)
+	}
+	service.Network = certificateNetwork{status: 301}
+	if err := service.selfCheck(context.Background(), "example.test"); err == nil {
+		t.Fatal("selfCheck() error = nil")
 	}
 }

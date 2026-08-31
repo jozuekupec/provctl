@@ -106,7 +106,12 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   TLS rendering a bezpečné HTTP→HTTPS přesměrování s výjimkou ACME nyní platí
   pro PHP-FPM, static, proxy i redirect weby; rendery jsou kryté jednotkovými
   testy. Jednotkové a SQLite testy včetně architektonické kontroly prošly v
-  `make test`. Zbývá lifecycle enable/disable, self-check/DNS a adopt.
+  `make test`. Stavový automat `ssl enable`/`disable` je nyní dostupný přes
+  CLI: kontroluje enabled web, DNS (s vědomým `--force` pro NAT), ACME HTTP
+  404, explicitně sestavené Certbot argumenty, živý certificate lineage a
+  následné přepnutí vhostu; `disable` lineage nemaže. DNS a HTTP mají vlastní
+  testovací seam. Zbývá hlubší test celé lifecycle cesty v Pebble/Incus a
+  adopt.
 - [ ] **M7 — provoz:** backup/restore, health checks, audit log a kvóty.
 - [~] **M8 — TUI:** návrh je zaznamenán v [tui-design.md](tui-design.md) a
   cíleně přebírá konzistentní Bubble Tea vzor z projektu `depo`: hodnotový
