@@ -103,9 +103,10 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   zatímco hook bezpečně přijímá jen přímý podadresář Certbot live dir,
   aktualizuje známý záznam v SQLite a reloaduje Apache. Je připraven i TLS
   renderer pro PHP-FPM vhost a perzistence `ssl_enabled`/`force_https`.
-  Jednotkové a SQLite testy včetně architektonické kontroly prošly v `make
-  test`. Zbývá lifecycle enable/disable, zapojení TLS rendereru, self-check/DNS
-  a adopt.
+  TLS rendering a bezpečné HTTP→HTTPS přesměrování s výjimkou ACME nyní platí
+  pro PHP-FPM, static, proxy i redirect weby; rendery jsou kryté jednotkovými
+  testy. Jednotkové a SQLite testy včetně architektonické kontroly prošly v
+  `make test`. Zbývá lifecycle enable/disable, self-check/DNS a adopt.
 - [ ] **M7 — provoz:** backup/restore, health checks, audit log a kvóty.
 - [~] **M8 — TUI:** návrh je zaznamenán v [tui-design.md](tui-design.md) a
   cíleně přebírá konzistentní Bubble Tea vzor z projektu `depo`: hodnotový

@@ -1,0 +1,19 @@
+<VirtualHost *:443>
+    ServerName {{ .PrimaryDomain }}
+{{- range .Aliases }}
+    ServerAlias {{ . }}
+{{- end }}
+
+    SSLEngine on
+    SSLCertificateFile {{ .CertificateFile }}
+    SSLCertificateKeyFile {{ .CertificateKey }}
+
+    ProxyPreserveHost On
+    ProxyRequests Off
+    ProxyPass / {{ .Target }}/ timeout={{ .ProxyTimeout }}
+    ProxyPassReverse / {{ .Target }}/
+    RequestHeader set X-Forwarded-Proto "https"
+
+    ErrorLog {{ .LogDir }}/ssl-error.log
+    CustomLog {{ .LogDir }}/ssl-access.log combined
+</VirtualHost>

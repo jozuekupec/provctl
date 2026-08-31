@@ -12,12 +12,17 @@
         Require all granted
         Options None
         AllowOverride None
-    </Directory>
+    </Directory>{{ if .ForceHTTPS }}
+    RewriteEngine On
+    RewriteCond %{REQUEST_URI} !^/\.well-known/acme-challenge/
+    RewriteRule ^ https://%{SERVER_NAME}%{REQUEST_URI} [R=301,L]
+{{- else }}
     <Directory "{{ .DocumentRoot }}">
         Options -Indexes +FollowSymLinks
         AllowOverride None
         Require all granted
     </Directory>
+{{- end }}
 
     ErrorLog {{ .LogDir }}/error.log
     CustomLog {{ .LogDir }}/access.log combined

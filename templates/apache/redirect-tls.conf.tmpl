@@ -1,0 +1,15 @@
+<VirtualHost *:443>
+    ServerName {{ .PrimaryDomain }}
+{{- range .Aliases }}
+    ServerAlias {{ . }}
+{{- end }}
+
+    SSLEngine on
+    SSLCertificateFile {{ .CertificateFile }}
+    SSLCertificateKeyFile {{ .CertificateKey }}
+
+    Redirect {{ .RedirectCode }} / {{ .Target }}
+
+    ErrorLog {{ .LogDir }}/ssl-error.log
+    CustomLog {{ .LogDir }}/ssl-access.log combined
+</VirtualHost>

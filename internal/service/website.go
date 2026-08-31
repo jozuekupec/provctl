@@ -267,24 +267,45 @@ func (service WebsiteService) PrepareAlias(ctx context.Context, subscriptionName
 
 func (service WebsiteService) renderHTTPVHost(subscriptionName string, website domain.Website) ([]byte, error) {
 	logDir := filepath.Join(meta.LogDir, subscriptionName, website.PrimaryDomain)
+	var (
+		httpContents []byte
+		err          error
+	)
 	switch website.Type {
 	case domain.WebsiteStatic:
-		return render.RenderApacheStaticHTTP(render.ApacheStaticVHost{PrimaryDomain: website.PrimaryDomain, Aliases: website.Aliases, DocumentRoot: website.DocumentRoot, AcmeChallengeRoot: service.Config.Paths.ACMEChallenge, LogDir: logDir})
+		httpContents, err = render.RenderApacheStaticHTTP(render.ApacheStaticVHost{PrimaryDomain: website.PrimaryDomain, Aliases: website.Aliases, DocumentRoot: website.DocumentRoot, AcmeChallengeRoot: service.Config.Paths.ACMEChallenge, LogDir: logDir, ForceHTTPS: website.ForceHTTPS})
 	case domain.WebsiteProxy:
-		return render.RenderApacheProxyHTTP(render.ApacheProxyVHost{PrimaryDomain: website.PrimaryDomain, Aliases: website.Aliases, Target: website.Target, AcmeChallengeRoot: service.Config.Paths.ACMEChallenge, ProxyTimeout: service.Config.Apache.ProxyTimeout, LogDir: logDir}, service.Config.Apache.AllowedProxyHosts)
+		httpContents, err = render.RenderApacheProxyHTTP(render.ApacheProxyVHost{PrimaryDomain: website.PrimaryDomain, Aliases: website.Aliases, Target: website.Target, AcmeChallengeRoot: service.Config.Paths.ACMEChallenge, ProxyTimeout: service.Config.Apache.ProxyTimeout, LogDir: logDir, ForceHTTPS: website.ForceHTTPS}, service.Config.Apache.AllowedProxyHosts)
 	case domain.WebsiteRedirect:
-		return render.RenderApacheRedirectHTTP(render.ApacheRedirectVHost{PrimaryDomain: website.PrimaryDomain, Aliases: website.Aliases, Target: website.Target, RedirectCode: website.RedirectCode, AcmeChallengeRoot: service.Config.Paths.ACMEChallenge, LogDir: logDir})
+		httpContents, err = render.RenderApacheRedirectHTTP(render.ApacheRedirectVHost{PrimaryDomain: website.PrimaryDomain, Aliases: website.Aliases, Target: website.Target, RedirectCode: website.RedirectCode, AcmeChallengeRoot: service.Config.Paths.ACMEChallenge, LogDir: logDir, ForceHTTPS: website.ForceHTTPS})
 	case domain.WebsitePHPFPM:
-		httpContents, err := render.RenderApachePHPFPMHTTP(render.ApacheHTTPVHost{Subscription: subscriptionName, PrimaryDomain: website.PrimaryDomain, Aliases: website.Aliases, DocumentRoot: website.DocumentRoot, AcmeChallengeRoot: service.Config.Paths.ACMEChallenge, FPMSocket: filepath.Join("/run/php", meta.FilePrefix+subscriptionName+".sock"), ProxyTimeout: service.Config.Apache.ProxyTimeout, LogDir: logDir, ForceHTTPS: website.ForceHTTPS})
-		if err != nil || !website.SSLEnabled {
-			return httpContents, err
-		}
-		lineageDir := filepath.Join(meta.LetsEncryptLiveDir, meta.FilePrefix+subscriptionName+"-"+website.PrimaryDomain)
-		tlsContents, err := render.RenderApachePHPFPMTLS(render.ApacheTLSVHost{Subscription: subscriptionName, PrimaryDomain: website.PrimaryDomain, Aliases: website.Aliases, DocumentRoot: website.DocumentRoot, CertificateFile: filepath.Join(lineageDir, "fullchain.pem"), CertificateKey: filepath.Join(lineageDir, "privkey.pem"), FPMSocket: filepath.Join("/run/php", meta.FilePrefix+subscriptionName+".sock"), ProxyTimeout: service.Config.Apache.ProxyTimeout, LogDir: logDir})
-		if err != nil {
-			return nil, err
-		}
-		return append(append(httpContents, '\n'), tlsContents...), nil
+		httpContents, err = render.RenderApachePHPFPMHTTP(render.ApacheHTTPVHost{Subscription: subscriptionName, PrimaryDomain: website.PrimaryDomain, Aliases: website.Aliases, DocumentRoot: website.DocumentRoot, AcmeChallengeRoot: service.Config.Paths.ACMEChallenge, FPMSocket: filepath.Join("/run/php", meta.FilePrefix+subscriptionName+".sock"), ProxyTimeout: service.Config.Apache.ProxyTimeout, LogDir: logDir, ForceHTTPS: website.ForceHTTPS})
+	default:
+		return nil, fmt.Errorf("unsupported website type %q", website.Type)
+	}
+	if err != nil || !website.SSLEnabled {
+		return httpContents, err
+	}
+	tlsContents, err := service.renderTLSVHost(subscriptionName, website, logDir)
+	if err != nil {
+		return nil, err
+	}
+	return append(append(httpContents, '\n'), tlsContents...), nil
+}
+
+func (service WebsiteService) renderTLSVHost(subscriptionName string, website domain.Website, logDir string) ([]byte, error) {
+	lineageDir := filepath.Join(meta.LetsEncryptLiveDir, meta.FilePrefix+subscriptionName+"-"+website.PrimaryDomain)
+	certificateFile := filepath.Join(lineageDir, "fullchain.pem")
+	certificateKey := filepath.Join(lineageDir, "privkey.pem")
+	switch website.Type {
+	case domain.WebsiteStatic:
+		return render.RenderApacheStaticTLS(render.ApacheStaticTLSVHost{PrimaryDomain: website.PrimaryDomain, Aliases: website.Aliases, DocumentRoot: website.DocumentRoot, CertificateFile: certificateFile, CertificateKey: certificateKey, LogDir: logDir})
+	case domain.WebsiteProxy:
+		return render.RenderApacheProxyTLS(render.ApacheProxyTLSVHost{PrimaryDomain: website.PrimaryDomain, Aliases: website.Aliases, Target: website.Target, CertificateFile: certificateFile, CertificateKey: certificateKey, ProxyTimeout: service.Config.Apache.ProxyTimeout, LogDir: logDir}, service.Config.Apache.AllowedProxyHosts)
+	case domain.WebsiteRedirect:
+		return render.RenderApacheRedirectTLS(render.ApacheRedirectTLSVHost{PrimaryDomain: website.PrimaryDomain, Aliases: website.Aliases, Target: website.Target, RedirectCode: website.RedirectCode, CertificateFile: certificateFile, CertificateKey: certificateKey, LogDir: logDir})
+	case domain.WebsitePHPFPM:
+		return render.RenderApachePHPFPMTLS(render.ApacheTLSVHost{Subscription: subscriptionName, PrimaryDomain: website.PrimaryDomain, Aliases: website.Aliases, DocumentRoot: website.DocumentRoot, CertificateFile: certificateFile, CertificateKey: certificateKey, FPMSocket: filepath.Join("/run/php", meta.FilePrefix+subscriptionName+".sock"), ProxyTimeout: service.Config.Apache.ProxyTimeout, LogDir: logDir})
 	default:
 		return nil, fmt.Errorf("unsupported website type %q", website.Type)
 	}

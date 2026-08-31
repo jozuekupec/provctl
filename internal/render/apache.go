@@ -46,6 +46,7 @@ type ApacheStaticVHost struct {
 	DocumentRoot      string
 	AcmeChallengeRoot string
 	LogDir            string
+	ForceHTTPS        bool
 }
 
 // ApacheProxyVHost describes a loopback-only HTTP reverse proxy vhost.
@@ -57,6 +58,7 @@ type ApacheProxyVHost struct {
 	AcmeChallengeRoot string
 	ProxyTimeout      int
 	LogDir            string
+	ForceHTTPS        bool
 }
 
 // ApacheRedirectVHost describes an HTTP redirect vhost.
@@ -67,6 +69,39 @@ type ApacheRedirectVHost struct {
 	RedirectCode      int
 	AcmeChallengeRoot string
 	LogDir            string
+	ForceHTTPS        bool
+}
+
+// ApacheStaticTLSVHost describes an HTTPS vhost serving static content.
+type ApacheStaticTLSVHost struct {
+	PrimaryDomain   string
+	Aliases         []string
+	DocumentRoot    string
+	CertificateFile string
+	CertificateKey  string
+	LogDir          string
+}
+
+// ApacheProxyTLSVHost describes an HTTPS reverse-proxy vhost.
+type ApacheProxyTLSVHost struct {
+	PrimaryDomain   string
+	Aliases         []string
+	Target          string
+	CertificateFile string
+	CertificateKey  string
+	ProxyTimeout    int
+	LogDir          string
+}
+
+// ApacheRedirectTLSVHost describes an HTTPS redirect vhost.
+type ApacheRedirectTLSVHost struct {
+	PrimaryDomain   string
+	Aliases         []string
+	Target          string
+	RedirectCode    int
+	CertificateFile string
+	CertificateKey  string
+	LogDir          string
 }
 
 func RenderApachePHPFPMHTTP(vhost ApacheHTTPVHost) ([]byte, error) {
@@ -90,6 +125,13 @@ func RenderApacheStaticHTTP(vhost ApacheStaticVHost) ([]byte, error) {
 	return renderApacheTemplate("apache/static-http.conf.tmpl", vhost)
 }
 
+func RenderApacheStaticTLS(vhost ApacheStaticTLSVHost) ([]byte, error) {
+	if vhost.PrimaryDomain == "" || vhost.DocumentRoot == "" || vhost.CertificateFile == "" || vhost.CertificateKey == "" || vhost.LogDir == "" {
+		return nil, fmt.Errorf("incomplete Apache static TLS vhost input")
+	}
+	return renderApacheTemplate("apache/static-tls.conf.tmpl", vhost)
+}
+
 func RenderApacheProxyHTTP(vhost ApacheProxyVHost, allowedHosts []string) ([]byte, error) {
 	if vhost.PrimaryDomain == "" || vhost.Target == "" || vhost.AcmeChallengeRoot == "" || vhost.ProxyTimeout <= 0 || vhost.LogDir == "" {
 		return nil, fmt.Errorf("incomplete Apache proxy vhost input")
@@ -101,6 +143,17 @@ func RenderApacheProxyHTTP(vhost ApacheProxyVHost, allowedHosts []string) ([]byt
 	vhost.Target = trimTrailingSlash(vhost.Target)
 	vhost.Scheme = parsed.Scheme
 	return renderApacheTemplate("apache/proxy-http.conf.tmpl", vhost)
+}
+
+func RenderApacheProxyTLS(vhost ApacheProxyTLSVHost, allowedHosts []string) ([]byte, error) {
+	if vhost.PrimaryDomain == "" || vhost.Target == "" || vhost.CertificateFile == "" || vhost.CertificateKey == "" || vhost.ProxyTimeout <= 0 || vhost.LogDir == "" {
+		return nil, fmt.Errorf("incomplete Apache proxy TLS vhost input")
+	}
+	if err := ValidateProxyTarget(vhost.Target, allowedHosts); err != nil {
+		return nil, err
+	}
+	vhost.Target = trimTrailingSlash(vhost.Target)
+	return renderApacheTemplate("apache/proxy-tls.conf.tmpl", vhost)
 }
 
 func RenderApacheRedirectHTTP(vhost ApacheRedirectVHost) ([]byte, error) {
@@ -115,6 +168,20 @@ func RenderApacheRedirectHTTP(vhost ApacheRedirectVHost) ([]byte, error) {
 		return nil, fmt.Errorf("redirect target must be an absolute HTTP(S) URL")
 	}
 	return renderApacheTemplate("apache/redirect-http.conf.tmpl", vhost)
+}
+
+func RenderApacheRedirectTLS(vhost ApacheRedirectTLSVHost) ([]byte, error) {
+	if vhost.PrimaryDomain == "" || vhost.Target == "" || vhost.CertificateFile == "" || vhost.CertificateKey == "" || vhost.LogDir == "" {
+		return nil, fmt.Errorf("incomplete Apache redirect TLS vhost input")
+	}
+	if vhost.RedirectCode != 301 && vhost.RedirectCode != 302 {
+		return nil, fmt.Errorf("redirect code must be 301 or 302")
+	}
+	parsed, err := url.ParseRequestURI(vhost.Target)
+	if err != nil || parsed.Scheme == "" || parsed.Host == "" || (parsed.Scheme != "http" && parsed.Scheme != "https") {
+		return nil, fmt.Errorf("redirect target must be an absolute HTTP(S) URL")
+	}
+	return renderApacheTemplate("apache/redirect-tls.conf.tmpl", vhost)
 }
 
 // ValidateProxyTarget restricts reverse proxies to explicitly allowed local targets.

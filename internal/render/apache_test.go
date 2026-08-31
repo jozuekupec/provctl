@@ -61,6 +61,16 @@ func TestRenderApacheStaticHTTP_ContainsIsolatedDocumentRootAndACME(t *testing.T
 	assertApacheGolden(t, "static-http.golden", contents)
 }
 
+func TestRenderApacheStaticHTTP_ForceHTTPSKeepsACME(t *testing.T) {
+	contents, err := RenderApacheStaticHTTP(ApacheStaticVHost{PrimaryDomain: "static.example.test", DocumentRoot: "/srv/public", AcmeChallengeRoot: "/srv/acme", LogDir: "/logs/static", ForceHTTPS: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !containsAll(string(contents), "RewriteRule ^ https://%{SERVER_NAME}%{REQUEST_URI}", "!^/\\.well-known/acme-challenge/") {
+		t.Errorf("forced HTTPS static vhost does not preserve ACME: %s", contents)
+	}
+}
+
 func TestRenderApacheProxyHTTP_RestrictsTargetAndSetsHeaders(t *testing.T) {
 	contents, err := RenderApacheProxyHTTP(ApacheProxyVHost{PrimaryDomain: "proxy.example.test", Target: "http://127.0.0.1:8080/", AcmeChallengeRoot: "/state/acme", ProxyTimeout: 60, LogDir: "/logs/acme/proxy.example.test"}, nil)
 	if err != nil {
@@ -75,6 +85,16 @@ func TestRenderApacheProxyHTTP_RestrictsTargetAndSetsHeaders(t *testing.T) {
 	}
 }
 
+func TestRenderApacheProxyTLS_UsesHTTPSForwardedProto(t *testing.T) {
+	contents, err := RenderApacheProxyTLS(ApacheProxyTLSVHost{PrimaryDomain: "proxy.example.test", Target: "http://127.0.0.1:8080/", CertificateFile: "/cert/fullchain.pem", CertificateKey: "/cert/privkey.pem", ProxyTimeout: 60, LogDir: "/logs/proxy"}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !containsAll(string(contents), "<VirtualHost *:443>", "RequestHeader set X-Forwarded-Proto \"https\"", "SSLCertificateFile /cert/fullchain.pem") {
+		t.Errorf("TLS proxy vhost is incomplete: %s", contents)
+	}
+}
+
 func TestRenderApacheRedirectHTTP_ValidatesTargetAndStatus(t *testing.T) {
 	contents, err := RenderApacheRedirectHTTP(ApacheRedirectVHost{PrimaryDomain: "old.example.test", Target: "https://new.example.test/path", RedirectCode: 301, AcmeChallengeRoot: "/state/acme", LogDir: "/logs/acme/old.example.test"})
 	if err != nil {
@@ -86,6 +106,26 @@ func TestRenderApacheRedirectHTTP_ValidatesTargetAndStatus(t *testing.T) {
 	assertApacheGolden(t, "redirect-http.golden", contents)
 	if _, err := RenderApacheRedirectHTTP(ApacheRedirectVHost{PrimaryDomain: "old.example.test", Target: "mailto:test@example.test", RedirectCode: 301, AcmeChallengeRoot: "/state/acme", LogDir: "/logs/acme/old.example.test"}); err == nil {
 		t.Error("RenderApacheRedirectHTTP() accepted a non-HTTP target")
+	}
+}
+
+func TestRenderApacheRedirectTLS_UsesCertificateAndTarget(t *testing.T) {
+	contents, err := RenderApacheRedirectTLS(ApacheRedirectTLSVHost{PrimaryDomain: "old.example.test", Target: "https://new.example.test/path", RedirectCode: 301, CertificateFile: "/cert/fullchain.pem", CertificateKey: "/cert/privkey.pem", LogDir: "/logs/redirect"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !containsAll(string(contents), "<VirtualHost *:443>", "Redirect 301 / https://new.example.test/path", "SSLCertificateKeyFile /cert/privkey.pem") {
+		t.Errorf("TLS redirect vhost is incomplete: %s", contents)
+	}
+}
+
+func TestRenderApacheStaticTLS_UsesCertificate(t *testing.T) {
+	contents, err := RenderApacheStaticTLS(ApacheStaticTLSVHost{PrimaryDomain: "static.example.test", DocumentRoot: "/srv/public", CertificateFile: "/cert/fullchain.pem", CertificateKey: "/cert/privkey.pem", LogDir: "/logs/static"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !containsAll(string(contents), "<VirtualHost *:443>", "DocumentRoot /srv/public", "SSLEngine on") {
+		t.Errorf("TLS static vhost is incomplete: %s", contents)
 	}
 }
 
