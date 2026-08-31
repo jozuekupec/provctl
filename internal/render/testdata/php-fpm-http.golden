@@ -9,8 +9,8 @@
 
     DocumentRoot /var/www/vhosts/acme/sites/example.test/public
 
-    Alias /.well-known/acme-challenge/ /var/lib/provctl/acme-challenge/
-    <Directory "/var/lib/provctl/acme-challenge">
+    Alias /.well-known/acme-challenge/ /var/lib/provctl/acme-challenge/.well-known/acme-challenge/
+    <Directory "/var/lib/provctl/acme-challenge/.well-known/acme-challenge">
         Require all granted
         Options None
         AllowOverride None

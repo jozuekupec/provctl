@@ -441,7 +441,7 @@ CREATE TABLE operations (
 | `/usr/share/provctl/templates/` | `root:root` | `0755` | výchozí šablony, přepisované upgradem |
 | `/var/lib/provctl/` | `root:root` | `0700` | |
 | `/var/lib/provctl/provctl.db` | `root:root` | `0600` | |
-| `/var/lib/provctl/acme-challenge/` | `root:root` | `0755` | centrální webroot pro ACME |
+| `/var/lib/provctl-acme-challenge/` a `/.well-known/acme-challenge/` | `root:root` | `0755` | centrální webroot pro ACME; je mimo privátní state dir, aby jej Apache mohl číst |
 | `/var/log/provctl/` | `root:adm` | `0750` | |
 | `/var/log/provctl/audit.jsonl` | `root:adm` | `0640` | |
 | `/run/provctl.lock` | `root:root` | `0600` | |
@@ -812,7 +812,7 @@ Volitelně (`--write-credentials <path>`) se zapíše do souboru vlastněného s
 3. zajistit HTTP vhost bez force_https a s aliasem na acme-challenge, reload
 4. self-check: HTTP GET http://<domain>/.well-known/acme-challenge/<random>
    → očekává se 404 z Apache (ne 301, ne connection refused)
-5. certbot certonly --webroot -w /var/lib/provctl/acme-challenge \
+5. certbot certonly --webroot -w /var/lib/provctl-acme-challenge \
        -d <domain> [-d <alias> ...] \
        --non-interactive --agree-tos -m <email> \
        --cert-name provctl-<sub>-<domain>
@@ -830,7 +830,7 @@ Volitelně (`--write-credentials <path>`) se zapíše do souboru vlastněného s
 
 **FAKT:** certbot si při vydání certifikátu uloží použité parametry do `/etc/letsencrypt/renewal/<lineage>.conf` — včetně `authenticator = webroot` a `webroot_path`. `certbot renew` je pak při obnově použije znovu, bez opakování původních přepínačů.
 
-Z toho plyne, že pokud provctl vydá certifikát s `--webroot -w /var/lib/provctl/acme-challenge`, obnova bude sahat na stejný centrální adresář, který je v každém HTTP vhostu vystavený přes `Alias` a je průchozí i při `force_https` (§8.3). **Auto-renew tedy funguje díky návrhu vhostu, ne díky žádné vlastní logice provctl.**
+Z toho plyne, že pokud provctl vydá certifikát s `--webroot -w /var/lib/provctl-acme-challenge`, obnova bude sahat na stejný centrální adresář, který je v každém HTTP vhostu vystavený přes `Alias` a je průchozí i při `force_https` (§8.3). **Auto-renew tedy funguje díky návrhu vhostu, ne díky žádné vlastní logice provctl.**
 
 **[MUST]** provctl **neimplementuje vlastní renew timer ani cron**. Duplicitní mechanismus obnovy vede k zbytečným pokusům a v horším případě k vyčerpání rate limitu Let's Encrypt.
 
@@ -891,7 +891,7 @@ certbot renew --cert-name provctl-<sub>-<domain> --dry-run
 1. Najde v `/etc/letsencrypt/renewal/` všechny lineage, jejichž `domains` obsahují přesouvanou doménu.
 2. Nahlásí je uživateli **před** přesunem.
 3. Po přesunu přenastaví lineage na centrální webroot:
-   `certbot certonly --webroot -w /var/lib/provctl/acme-challenge -d <domény> --cert-name <existující lineage> --keep-until-expiring --non-interactive`
+   `certbot certonly --webroot -w /var/lib/provctl-acme-challenge -d <domény> --cert-name <existující lineage> --keep-until-expiring --non-interactive`
 4. **Ověří** výsledek přes `certbot renew --cert-name <lineage> --dry-run`.
 5. Teprve po úspěšném dry-runu označí adopci za dokončenou. Při selhání dry-runu vypíše hlasité varování a nechá záznam v `operations` se stavem `inconsistent`.
 
@@ -1217,7 +1217,7 @@ provctl                                        # bez argumentů → TUI
 
 **[MUST]** `provctl bootstrap` provede — v tomto pořadí, jako plán s rollbackem (§7):
 
-1. Vytvoří adresáře `/etc/provctl`, `/var/lib/provctl`, `/var/lib/provctl/acme-challenge`, `/var/log/provctl`, vhosts root — se správnými právy dle §6.1.
+1. Vytvoří adresáře `/etc/provctl`, `/var/lib/provctl`, `/var/lib/provctl-acme-challenge`, `/var/log/provctl`, vhosts root — se správnými právy dle §6.1.
 2. Povolí chybějící Apache moduly: `proxy`, `proxy_fcgi`, `proxy_http`, `ssl`, `rewrite`, `headers` (symlinky v `mods-enabled`, stejně jako u vhostů — bez `a2enmod`).
 3. Vytvoří catch-all vhost `provctl-000-default.conf` + self-signed certifikát (§8.7).
 4. Nainstaluje deploy hook pro certbot (§11.3).
@@ -1283,7 +1283,7 @@ config_version = 1
 [paths]
 vhosts          = "/var/www/vhosts"
 backups         = "/var/backups/provctl"
-acme_challenge  = "/var/lib/provctl/acme-challenge"
+acme_challenge  = "/var/lib/provctl-acme-challenge"
 
 [apache]
 service         = "apache2"
@@ -1444,7 +1444,7 @@ contents:
   - dst: /var/lib/provctl
     type: dir
     file_info: { mode: 0700 }
-  - dst: /var/lib/provctl/acme-challenge
+  - dst: /var/lib/provctl-acme-challenge
     type: dir
     file_info: { mode: 0755 }
   - dst: /var/log/provctl
@@ -1472,7 +1472,7 @@ case "$1" in
     # adresáře a práva (nfpm je vytvoří, tady jen pojistka a idempotence)
     install -d -m 0755 -o root -g root /etc/provctl
     install -d -m 0700 -o root -g root /var/lib/provctl
-    install -d -m 0755 -o root -g root /var/lib/provctl/acme-challenge
+    install -d -m 0755 -o root -g root /var/lib/provctl-acme-challenge
     install -d -m 0750 -o root -g adm  /var/log/provctl
 
     # migrace schématu databáze (idempotentní, bez síťových a systémových operací)
@@ -1851,4 +1851,3 @@ Tyto body **nebyly ověřeny** a implementace je musí ošetřit defenzivně (de
 ```
 
 Bez sekce „Co ověřeno NEBYLO" se milník nepovažuje za dokončený.
-

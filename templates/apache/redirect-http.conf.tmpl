@@ -5,8 +5,8 @@
     ServerAlias {{ . }}
 {{- end }}
 
-    Alias /.well-known/acme-challenge/ {{ .AcmeChallengeRoot }}/
-    <Directory "{{ .AcmeChallengeRoot }}">
+    Alias /.well-known/acme-challenge/ {{ .AcmeChallengeRoot }}/.well-known/acme-challenge/
+    <Directory "{{ .AcmeChallengeRoot }}/.well-known/acme-challenge">
         Require all granted
         Options None
         AllowOverride None

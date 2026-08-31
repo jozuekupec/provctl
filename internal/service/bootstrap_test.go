@@ -140,17 +140,17 @@ func TestBootstrap_PrepareReturnsNoStepsWhenReady(t *testing.T) {
 
 func TestBootstrap_PrepareAddsMissingSystemDirectories(t *testing.T) {
 	fs, cfg := readyBootstrapFS(t)
-	for _, path := range []string{meta.ConfigDir, meta.StateDir, cfg.Paths.ACMEChallenge, meta.LogDir, cfg.Paths.VHosts} {
+	for _, path := range []string{meta.ConfigDir, meta.StateDir, cfg.Paths.ACMEChallenge, filepath.Join(cfg.Paths.ACMEChallenge, ".well-known", "acme-challenge"), meta.LogDir, cfg.Paths.VHosts} {
 		delete(fs.entries, path)
 	}
 	operation, err := bootstrapService(fs, cfg).Prepare(context.Background())
 	if err != nil {
 		t.Fatalf("Prepare() error = %v", err)
 	}
-	if got, want := len(operation.Steps), 6; got != want {
+	if got, want := len(operation.Steps), 7; got != want {
 		t.Fatalf("steps = %d, want %d", got, want)
 	}
-	for index, want := range []string{"create configuration directory", "create state directory", "create ACME challenge directory", "create log directory", "create vhosts root", "validate and reload Apache"} {
+	for index, want := range []string{"create configuration directory", "create state directory", "create ACME challenge directory", "create ACME challenge content directory", "create log directory", "create vhosts root", "validate and reload Apache"} {
 		if got := operation.Steps[index].Name; got != want {
 			t.Errorf("step %d = %q, want %q", index, got, want)
 		}
@@ -191,7 +191,7 @@ func readyBootstrapFS(t *testing.T) (*bootstrapFS, config.Config) {
 	t.Helper()
 	cfg := config.Config{Paths: config.Paths{VHosts: "/vhosts", ACMEChallenge: "/state/acme"}, Apache: config.Apache{Service: "apache2", SitesAvailable: "/sites-available", SitesEnabled: "/sites-enabled"}}
 	fs := &bootstrapFS{entries: map[string]bootstrapEntry{}, links: map[string]string{}}
-	for path, mode := range map[string]os.FileMode{meta.ConfigDir: 0o755, meta.StateDir: 0o700, cfg.Paths.ACMEChallenge: 0o755, meta.LogDir: 0o750, cfg.Paths.VHosts: 0o755} {
+	for path, mode := range map[string]os.FileMode{meta.ConfigDir: 0o755, meta.StateDir: 0o700, cfg.Paths.ACMEChallenge: 0o755, filepath.Join(cfg.Paths.ACMEChallenge, ".well-known", "acme-challenge"): 0o755, meta.LogDir: 0o750, cfg.Paths.VHosts: 0o755} {
 		fs.entries[path] = bootstrapEntry{dir: true, mode: mode}
 	}
 	for _, module := range RequiredApacheModules {

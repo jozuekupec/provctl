@@ -2,8 +2,8 @@
 <VirtualHost *:80>
     ServerName proxy.example.test
 
-    Alias /.well-known/acme-challenge/ /state/acme/
-    <Directory "/state/acme">
+    Alias /.well-known/acme-challenge/ /state/acme/.well-known/acme-challenge/
+    <Directory "/state/acme/.well-known/acme-challenge">
         Require all granted
         Options None
         AllowOverride None

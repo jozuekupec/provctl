@@ -110,8 +110,12 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   CLI: kontroluje enabled web, DNS (s vědomým `--force` pro NAT), ACME HTTP
   404, explicitně sestavené Certbot argumenty, živý certificate lineage a
   následné přepnutí vhostu; `disable` lineage nemaže. DNS a HTTP mají vlastní
-  testovací seam. Zbývá hlubší test celé lifecycle cesty v Pebble/Incus a
-  adopt.
+  testovací seam. V `pv` byl nyní ověřen celý tok proti lokálnímu Pebble:
+  Certbot vydal certifikát pro `ssl.test`, `ssl status` četl živou expiraci,
+  HTTPS odpověď prošla, `ssl disable` odstranil TLS konfiguraci a Apache
+  configtest zůstal zelený. Test zároveň opravil webroot pod privátním state
+  directory, strukturu Aliasu pro skutečný Certbot webroot a proxy nezávislý
+  self-check. Zbývá adopt.
 - [ ] **M7 — provoz:** backup/restore, health checks, audit log a kvóty.
 - [~] **M8 — TUI:** návrh je zaznamenán v [tui-design.md](tui-design.md) a
   cíleně přebírá konzistentní Bubble Tea vzor z projektu `depo`: hodnotový

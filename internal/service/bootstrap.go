@@ -91,6 +91,7 @@ func (service BootstrapService) Prepare(ctx context.Context) (plan.Plan, error) 
 		{path: meta.ConfigDir, mode: 0o755, name: "create configuration directory"},
 		{path: meta.StateDir, mode: 0o700, name: "create state directory"},
 		{path: service.Config.Paths.ACMEChallenge, mode: 0o755, name: "create ACME challenge directory"},
+		{path: filepath.Join(service.Config.Paths.ACMEChallenge, ".well-known", "acme-challenge"), mode: 0o755, name: "create ACME challenge content directory"},
 		{path: meta.LogDir, mode: 0o750, name: "create log directory", gid: service.AuditGroup},
 		{path: service.Config.Paths.VHosts, mode: 0o755, name: "create vhosts root"},
 	}
