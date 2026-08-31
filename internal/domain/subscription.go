@@ -27,6 +27,15 @@ type Subscription struct {
 	Status         string
 }
 
+// SSHKey is the persisted public-key metadata for one subscription.
+type SSHKey struct {
+	ID             int64
+	SubscriptionID int64
+	Comment        string
+	Fingerprint    string
+	PublicKey      string
+}
+
 func ValidateSubscriptionName(name string) error {
 	if !subscriptionName.MatchString(name) {
 		return fmt.Errorf("subscription name %q must match %s", name, subscriptionName)

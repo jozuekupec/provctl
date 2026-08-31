@@ -81,7 +81,9 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   a následného odstranění databáze a uživatele; kontejner byl obnoven na `clean`.
   `--write-credentials` bezpečně odmítá existující nebo mimodomovský soubor a
   v `pv` vytvořil nový soubor `0600` vlastněný subscription; kontejner byl opět
-  obnoven na `clean`. Zbývají SSH klíče a crontab.
+  obnoven na `clean`. SSH klíče už mají datový model a testovaný SQLite store
+  včetně atomické změny SSH access režimu; zbývá jejich validace, render
+  `authorized_keys`, CLI a crontab.
 - [ ] **M6 — SSL:** stavový automat Certbotu, deploy-hook command a přijetí
   existujících certifikátů.
 - [ ] **M7 — provoz:** backup/restore, health checks, audit log a kvóty.
