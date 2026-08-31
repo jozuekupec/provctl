@@ -245,8 +245,8 @@ func (service SubscriptionService) createPlan(subscription domain.Subscription) 
 		{"create private directory", filepath.Join(subscription.Home, "private"), 0o700},
 		{"create SSH directory", filepath.Join(subscription.Home, ".ssh"), 0o700},
 	}
-	steps := []plan.Step{{Name: "create Unix user", Preview: fmt.Sprintf("/usr/sbin/useradd --uid %d --home %s --shell %s --user-group --no-create-home %s", subscription.UnixUID, subscription.Home, service.Config.Users.Shell, subscription.UnixUser), Do: func(ctx context.Context) error {
-		return service.Users.Create(ctx, system.CreateUserOptions{Name: subscription.UnixUser, UID: subscription.UnixUID, Home: subscription.Home, Shell: service.Config.Users.Shell, UserGroup: true, NoCreateHome: true})
+	steps := []plan.Step{{Name: "create Unix user", Preview: fmt.Sprintf("/usr/sbin/useradd --uid %d --home %s --shell %s --user-group --no-create-home %s", subscription.UnixUID, subscription.Home, meta.NoLoginShell, subscription.UnixUser), Do: func(ctx context.Context) error {
+		return service.Users.Create(ctx, system.CreateUserOptions{Name: subscription.UnixUser, UID: subscription.UnixUID, Home: subscription.Home, Shell: meta.NoLoginShell, UserGroup: true, NoCreateHome: true})
 	}, Undo: func(ctx context.Context) error { return service.Users.Delete(ctx, subscription.UnixUser, false) }}}
 	for _, directory := range directories {
 		directory := directory
@@ -254,6 +254,9 @@ func (service SubscriptionService) createPlan(subscription domain.Subscription) 
 		steps = append(steps, plan.Step{Name: directory.name, Preview: preview, Do: service.createDirectory(directory.path, subscription.UnixUID, directory.mode), Undo: func(context.Context) error { return service.FS.Remove(directory.path) }})
 	}
 	steps = append(steps, plan.Step{Name: "record subscription", Preview: "insert subscription into SQLite", Do: func(ctx context.Context) error { return service.Store.CreateSubscription(ctx, subscription) }, Undo: func(ctx context.Context) error { return service.Store.DeleteSubscription(ctx, subscription.Name) }})
+	steps = append(steps, plan.Step{Name: "lock subscription password", Preview: "/usr/sbin/usermod --lock " + subscription.UnixUser, Do: func(ctx context.Context) error {
+		return service.Users.LockPassword(ctx, subscription.UnixUser)
+	}})
 	return plan.Plan{Action: "subscription.create", Target: subscription.Name, Steps: steps}
 }
 

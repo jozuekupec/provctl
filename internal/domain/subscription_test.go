@@ -14,3 +14,14 @@ func TestValidateSubscriptionName(t *testing.T) {
 		}
 	}
 }
+
+func TestValidateSSHAccess(t *testing.T) {
+	for _, access := range []string{"none", "key", "password", "key+password"} {
+		if err := ValidateSSHAccess(access); err != nil {
+			t.Errorf("ValidateSSHAccess(%q) = %v", access, err)
+		}
+	}
+	if err := ValidateSSHAccess("all"); err == nil {
+		t.Error("ValidateSSHAccess(\"all\") = nil")
+	}
+}

@@ -3,10 +3,12 @@ package service
 import (
 	"context"
 	"os"
+	"os/user"
 	"strings"
 	"testing"
 
 	"provctl/internal/domain"
+	"provctl/internal/meta"
 	"provctl/internal/plan"
 	"provctl/internal/system"
 	"provctl/internal/system/fake"
@@ -37,6 +39,33 @@ func (store *sshStore) DeleteSSHKey(_ context.Context, _ int64, fingerprint stri
 	}
 	return os.ErrNotExist
 }
+func (store *sshStore) UpdateSSHAccess(_ context.Context, _ int64, access string) error {
+	store.subscription.SSHAccess = access
+	return nil
+}
+
+type sshUsers struct {
+	shells   []string
+	locked   bool
+	password string
+}
+
+func (users *sshUsers) Lookup(string) (*user.User, error)                      { return nil, user.UnknownUserError("") }
+func (users *sshUsers) LookupID(string) (*user.User, error)                    { return nil, user.UnknownUserIdError(0) }
+func (users *sshUsers) Create(context.Context, system.CreateUserOptions) error { return nil }
+func (users *sshUsers) SetShell(_ context.Context, _ string, shell string) error {
+	users.shells = append(users.shells, shell)
+	return nil
+}
+func (users *sshUsers) LockPassword(context.Context, string) error {
+	users.locked = true
+	return nil
+}
+func (users *sshUsers) SetPassword(_ context.Context, _ string, password string) error {
+	users.password = password
+	return nil
+}
+func (users *sshUsers) Delete(context.Context, string, bool) error { return nil }
 
 func TestSSHService_AddAndRemoveRegeneratesAuthorizedKeys(t *testing.T) {
 	files := map[string][]byte{}
@@ -83,5 +112,56 @@ func TestSSHService_PrepareAddRejectsMultilineKey(t *testing.T) {
 	service := SSHService{FS: &subscriptionFS{directories: map[string]bool{}}, Commands: &fake.Commander{}, Store: &sshStore{subscription: domain.Subscription{ID: 4, Name: "acme", Status: "active"}}}
 	if _, err := service.PrepareAdd(context.Background(), "acme", "ssh-ed25519 AAAA\nssh-rsa BBBB"); err == nil {
 		t.Fatal("PrepareAdd() accepted multiline key")
+	}
+}
+
+func TestSSHService_SetAccessAppliesKeyMode(t *testing.T) {
+	files := map[string][]byte{}
+	fs := &fake.FS{
+		StatFunc: func(string) (os.FileInfo, error) { return nil, os.ErrNotExist },
+		ReadFileFunc: func(path string) ([]byte, error) {
+			contents, exists := files[path]
+			if !exists {
+				return nil, os.ErrNotExist
+			}
+			return contents, nil
+		},
+		WriteFileFunc: func(path string, data []byte, _ os.FileMode) error {
+			files[path] = append([]byte(nil), data...)
+			return nil
+		},
+		RemoveFunc: func(path string) error { delete(files, path); return nil }, RemoveAllFunc: func(string) error { return nil },
+		MkdirAllFunc: func(string, os.FileMode) error { return nil }, ChownFunc: func(string, int, int) error { return nil },
+		ChmodFunc: func(string, os.FileMode) error { return nil }, SymlinkFunc: func(string, string) error { return nil },
+		ReadDirFunc: func(string) ([]os.DirEntry, error) { return nil, nil }, EvalSymlinksFunc: func(path string) (string, error) { return path, nil },
+	}
+	store := &sshStore{subscription: domain.Subscription{ID: 4, Name: "acme", UnixUser: "acme", UnixUID: 5000, Home: "/vhosts/acme", Status: "active", SSHAccess: "none"}, keys: []domain.SSHKey{{Fingerprint: "SHA256:key", PublicKey: "ssh-ed25519 AAAA laptop"}}}
+	users := &sshUsers{}
+	service := SSHService{FS: fs, Commands: &fake.Commander{}, Users: users, Store: store, Executor: plan.Executor{Journal: &subscriptionJournal{}, Locker: subscriptionLocker{}}}
+	if password, _, err := service.SetAccess(context.Background(), "acme", "key"); err != nil || password != "" {
+		t.Fatalf("SetAccess() password = %q, err = %v", password, err)
+	}
+	if len(users.shells) != 1 || users.shells[0] != meta.LoginShell || !users.locked || store.subscription.SSHAccess != "key" {
+		t.Errorf("shells=%q locked=%t access=%q", users.shells, users.locked, store.subscription.SSHAccess)
+	}
+	if !strings.Contains(string(files["/vhosts/acme/.ssh/authorized_keys"]), "ssh-ed25519 AAAA laptop") {
+		t.Error("authorized_keys did not contain stored key")
+	}
+}
+
+func TestSSHService_PrepareSetAccessRejectsKeyModeWithoutKey(t *testing.T) {
+	service := SSHService{FS: &subscriptionFS{directories: map[string]bool{}}, Commands: &fake.Commander{}, Users: &sshUsers{}, Store: &sshStore{subscription: domain.Subscription{ID: 4, Name: "acme", Status: "active"}}}
+	if _, _, err := service.PrepareSetAccess(context.Background(), "acme", "key"); err == nil {
+		t.Fatal("PrepareSetAccess() accepted key mode without a key")
+	}
+}
+
+func TestGenerateSSHPasswordHonorsMinimumLength(t *testing.T) {
+	if _, err := GenerateSSHPassword(19); err == nil {
+		t.Fatal("GenerateSSHPassword() accepted short password")
+	}
+	password, err := GenerateSSHPassword(20)
+	if err != nil || len(password) != 20 {
+		t.Errorf("GenerateSSHPassword() = %q, %v", password, err)
 	}
 }

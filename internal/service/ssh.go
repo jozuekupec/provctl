@@ -20,12 +20,14 @@ type SSHKeyStore interface {
 	ListSSHKeys(context.Context, int64) ([]domain.SSHKey, error)
 	CreateSSHKey(context.Context, domain.SSHKey) (int64, error)
 	DeleteSSHKey(context.Context, int64, string) error
+	UpdateSSHAccess(context.Context, int64, string) error
 }
 
 // SSHService makes authorized_keys a generated artifact of SQLite state.
 type SSHService struct {
 	FS       system.FS
 	Commands system.Commander
+	Users    system.Users
 	Store    SSHKeyStore
 	Executor plan.Executor
 }
@@ -42,7 +44,7 @@ func NewProductionSSHRuntime(ctx context.Context) (*SSHRuntime, error) {
 		return nil, err
 	}
 	commander := system.ExecCommander{}
-	return &SSHRuntime{Service: SSHService{FS: system.OSFS{}, Commands: commander, Store: repository, Executor: plan.Executor{Journal: sqlite.OperationJournal{DB: repository.DB}, Locker: system.FileLocker{Path: meta.LockFile}}}, repository: repository}, nil
+	return &SSHRuntime{Service: SSHService{FS: system.OSFS{}, Commands: commander, Users: system.CommandUsers{Commander: commander}, Store: repository, Executor: plan.Executor{Journal: sqlite.OperationJournal{DB: repository.DB}, Locker: system.FileLocker{Path: meta.LockFile}}}, repository: repository}, nil
 }
 
 func NewReadOnlySSHRuntime(ctx context.Context) (*SSHRuntime, error) {
@@ -165,6 +167,89 @@ func (service SSHService) PrepareRemove(ctx context.Context, subscriptionName, f
 		return err
 	}}}
 	return plan.Plan{Action: "ssh.key.remove", Target: subscription.Name + "/" + fingerprint, Steps: steps}, nil
+}
+
+// SetAccess updates the system account and generated authorized_keys to match
+// the selected SSH access mode. A password is returned only once, for modes
+// that enable password authentication.
+func (service SSHService) SetAccess(ctx context.Context, subscriptionName, access string) (string, int64, error) {
+	operation, password, err := service.PrepareSetAccess(ctx, subscriptionName, access)
+	if err != nil {
+		return "", 0, err
+	}
+	operationID, err := service.Executor.Run(ctx, operation)
+	if err != nil {
+		return "", operationID, err
+	}
+	return password, operationID, nil
+}
+
+// PrepareSetAccess creates a journaled plan. Password changes are deliberately
+// last because they cannot be safely rolled back without retaining a secret.
+func (service SSHService) PrepareSetAccess(ctx context.Context, subscriptionName, access string) (plan.Plan, string, error) {
+	if err := domain.ValidateSSHAccess(access); err != nil {
+		return plan.Plan{}, "", err
+	}
+	if service.Users == nil {
+		return plan.Plan{}, "", fmt.Errorf("user manager is required")
+	}
+	subscription, keys, err := service.subscriptionKeys(ctx, subscriptionName)
+	if err != nil {
+		return plan.Plan{}, "", err
+	}
+	usesKeys := access == "key" || access == "key+password"
+	usesPassword := access == "password" || access == "key+password"
+	if usesKeys && len(keys) == 0 {
+		return plan.Plan{}, "", fmt.Errorf("SSH access %q requires at least one SSH key", access)
+	}
+	password := ""
+	if usesPassword {
+		password, err = GenerateSSHPassword(24)
+		if err != nil {
+			return plan.Plan{}, "", err
+		}
+	}
+	desiredKeys := keys
+	if !usesKeys {
+		desiredKeys = nil
+	}
+	previousShell := meta.LoginShell
+	if subscription.SSHAccess == "none" {
+		previousShell = meta.NoLoginShell
+	}
+	desiredShell := meta.LoginShell
+	if access == "none" {
+		desiredShell = meta.NoLoginShell
+	}
+	var undoFile func(context.Context) error
+	steps := []plan.Step{{Name: "write generated authorized_keys", Preview: "write " + authorizedKeysPath(subscription), Do: func(ctx context.Context) error {
+		var writeErr error
+		undoFile, writeErr = service.writeAuthorizedKeys(subscription, desiredKeys)
+		return writeErr
+	}, Undo: func(ctx context.Context) error {
+		if undoFile == nil {
+			return nil
+		}
+		return undoFile(ctx)
+	}}, {Name: "set subscription shell", Preview: "/usr/sbin/usermod --shell " + desiredShell + " " + subscription.UnixUser, Do: func(ctx context.Context) error {
+		return service.Users.SetShell(ctx, subscription.UnixUser, desiredShell)
+	}, Undo: func(ctx context.Context) error {
+		return service.Users.SetShell(ctx, subscription.UnixUser, previousShell)
+	}}, {Name: "record SSH access in SQLite", Preview: "update SSH access to " + access, Do: func(ctx context.Context) error {
+		return service.Store.UpdateSSHAccess(ctx, subscription.ID, access)
+	}, Undo: func(ctx context.Context) error {
+		return service.Store.UpdateSSHAccess(ctx, subscription.ID, subscription.SSHAccess)
+	}}}
+	if usesPassword {
+		steps = append(steps, plan.Step{Name: "set subscription password", Preview: "/usr/sbin/chpasswd", Do: func(ctx context.Context) error {
+			return service.Users.SetPassword(ctx, subscription.UnixUser, password)
+		}})
+	} else {
+		steps = append(steps, plan.Step{Name: "lock subscription password", Preview: "/usr/sbin/usermod --lock " + subscription.UnixUser, Do: func(ctx context.Context) error {
+			return service.Users.LockPassword(ctx, subscription.UnixUser)
+		}})
+	}
+	return plan.Plan{Action: "ssh.access.set", Target: subscription.Name, Steps: steps}, password, nil
 }
 
 func (service SSHService) subscriptionKeys(ctx context.Context, subscriptionName string) (domain.Subscription, []domain.SSHKey, error) {

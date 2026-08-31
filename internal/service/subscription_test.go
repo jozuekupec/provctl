@@ -168,8 +168,13 @@ func TestSubscriptionService_PrepareCreateUsesDiscoveredPHPVersion(t *testing.T)
 	if err != nil {
 		t.Fatalf("PrepareCreate() error = %v", err)
 	}
-	if err := operation.Steps[len(operation.Steps)-1].Do(context.Background()); err != nil {
-		t.Fatalf("record subscription: %v", err)
+	for _, step := range operation.Steps {
+		if step.Name == "record subscription" {
+			if err := step.Do(context.Background()); err != nil {
+				t.Fatalf("record subscription: %v", err)
+			}
+			break
+		}
 	}
 	if got, want := store.values["acme"].PHPVersion, "7.9"; got != want {
 		t.Errorf("PHP version = %q, want %q", got, want)
@@ -186,7 +191,7 @@ func TestSubscriptionService_PrepareCreateDoesNotChangeState(t *testing.T) {
 	if users.created || users.deleted || len(fs.directories) != 0 || len(store.values) != 0 {
 		t.Error("PrepareCreate() changed system or database state")
 	}
-	if got, want := len(operation.Steps), 8; got != want {
+	if got, want := len(operation.Steps), 9; got != want {
 		t.Errorf("plan step count = %d, want %d", got, want)
 	}
 	if operation.Steps[0].Preview == "" {

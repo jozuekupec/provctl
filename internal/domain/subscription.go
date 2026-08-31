@@ -36,6 +36,16 @@ type SSHKey struct {
 	PublicKey      string
 }
 
+// ValidateSSHAccess verifies a supported subscription SSH access mode.
+func ValidateSSHAccess(access string) error {
+	switch access {
+	case "none", "key", "password", "key+password":
+		return nil
+	default:
+		return fmt.Errorf("SSH access %q must be one of none, key, password, key+password", access)
+	}
+}
+
 func ValidateSubscriptionName(name string) error {
 	if !subscriptionName.MatchString(name) {
 		return fmt.Errorf("subscription name %q must match %s", name, subscriptionName)

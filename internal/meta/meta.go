@@ -19,6 +19,8 @@ const (
 	DefaultSSLKey         = DefaultSSLDir + "/private-key.pem"
 	LogrotateConfig       = "/etc/logrotate.d/provctl"
 	AuditLog              = LogDir + "/audit.jsonl"
+	LoginShell            = "/bin/bash"
+	NoLoginShell          = "/usr/sbin/nologin"
 )
 
 // Version is set during release builds with -ldflags -X provctl/internal/meta.Version=….

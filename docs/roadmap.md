@@ -84,8 +84,13 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   obnoven na `clean`. SSH klíče mají datový model, SQLite store a žurnálované
   `ssh key add|list|remove`: klíč se validuje přes `ssh-keygen` na stdin a
   `authorized_keys` se celý přegeneruje s vlastnictvím subscription a právy
-  `0700/0600`. V `pv` proběhlo add/list/remove se skutečným ed25519 klíčem a
-  kontejner byl obnoven na `clean`. Zbývá volba SSH access režimu a crontab.
+  `0700/0600`. Nová subscription vzniká jako `nologin` se zamčeným heslem;
+  `ssh set <sub> --access none|key|password|key+password` žurnálovaně nastaví
+  shell, generovaný soubor, SQLite stav a případně jednorázové kryptografické
+  heslo přes stdin. Klíčový režim bez uloženého klíče je odmítnut. V `pv`
+  proběhlo add/list/remove se skutečným ed25519 klíčem i přepnutí
+  `none → key → password → none`, včetně ověření shellu a bez vypsání hesla;
+  kontejner byl obnoven na `clean`. Zbývá crontab.
 - [ ] **M6 — SSL:** stavový automat Certbotu, deploy-hook command a přijetí
   existujících certifikátů.
 - [ ] **M7 — provoz:** backup/restore, health checks, audit log a kvóty.

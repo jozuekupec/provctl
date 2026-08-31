@@ -15,12 +15,25 @@ import (
 
 const databasePasswordAlphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789"
 
+// GenerateSSHPassword creates a one-time account password that is never
+// persisted by provctl.
+func GenerateSSHPassword(length int) (string, error) {
+	if length < 20 {
+		return "", fmt.Errorf("SSH password length must be at least 20")
+	}
+	return generatePassword(length)
+}
+
 // GenerateDatabasePassword creates a URL- and shell-friendly secret that is
 // never stored by provctl. Callers show it once or write it to an explicit file.
 func GenerateDatabasePassword(length int) (string, error) {
 	if length < 24 {
 		return "", fmt.Errorf("database password length must be at least 24")
 	}
+	return generatePassword(length)
+}
+
+func generatePassword(length int) (string, error) {
 	password := make([]byte, length)
 	limit := big.NewInt(int64(len(databasePasswordAlphabet)))
 	for index := range password {

@@ -18,6 +18,40 @@ func newSSHCommand() *cobra.Command {
 	keys := &cobra.Command{Use: "key", Short: "manage public SSH keys"}
 	keys.AddCommand(newSSHKeyAddCommand(), newSSHKeyListCommand(), newSSHKeyRemoveCommand())
 	command.AddCommand(keys)
+	command.AddCommand(newSSHSetCommand())
+	return command
+}
+
+func newSSHSetCommand() *cobra.Command {
+	var configPath, access string
+	command := &cobra.Command{Use: "set <subscription>", Short: "set subscription SSH access", Args: cobra.ExactArgs(1), RunE: func(command *cobra.Command, args []string) error {
+		cfg, err := config.Load(configPath)
+		if err != nil {
+			return fmt.Errorf("load configuration: %w", err)
+		}
+		runtime, err := service.NewProductionSSHRuntime(context.Background())
+		if err != nil {
+			return fmt.Errorf("open SSH state: %w", err)
+		}
+		defer runtime.Close()
+		ctx, cancel := context.WithTimeout(context.Background(), time.Duration(cfg.Limits.LockTimeoutSeconds)*time.Second)
+		defer cancel()
+		password, operationID, err := runtime.Service.SetAccess(ctx, args[0], access)
+		if err != nil {
+			return err
+		}
+		if password != "" {
+			_, err = fmt.Fprintf(command.OutOrStdout(), "SSH access for subscription %q set to %s (operation %d). Password (shown once): %s\n", args[0], access, operationID, password)
+		} else {
+			_, err = fmt.Fprintf(command.OutOrStdout(), "SSH access for subscription %q set to %s (operation %d).\n", args[0], access, operationID)
+		}
+		return err
+	}}
+	command.Flags().StringVar(&configPath, "config", meta.ConfigFile, "path to config.toml")
+	command.Flags().StringVar(&access, "access", "", "SSH access: none, key, password, or key+password")
+	if err := command.MarkFlagRequired("access"); err != nil {
+		panic(err)
+	}
 	return command
 }
 
