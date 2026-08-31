@@ -275,7 +275,16 @@ func (service WebsiteService) renderHTTPVHost(subscriptionName string, website d
 	case domain.WebsiteRedirect:
 		return render.RenderApacheRedirectHTTP(render.ApacheRedirectVHost{PrimaryDomain: website.PrimaryDomain, Aliases: website.Aliases, Target: website.Target, RedirectCode: website.RedirectCode, AcmeChallengeRoot: service.Config.Paths.ACMEChallenge, LogDir: logDir})
 	case domain.WebsitePHPFPM:
-		return render.RenderApachePHPFPMHTTP(render.ApacheHTTPVHost{Subscription: subscriptionName, PrimaryDomain: website.PrimaryDomain, Aliases: website.Aliases, DocumentRoot: website.DocumentRoot, AcmeChallengeRoot: service.Config.Paths.ACMEChallenge, FPMSocket: filepath.Join("/run/php", meta.FilePrefix+subscriptionName+".sock"), ProxyTimeout: service.Config.Apache.ProxyTimeout, LogDir: logDir, ForceHTTPS: website.ForceHTTPS})
+		httpContents, err := render.RenderApachePHPFPMHTTP(render.ApacheHTTPVHost{Subscription: subscriptionName, PrimaryDomain: website.PrimaryDomain, Aliases: website.Aliases, DocumentRoot: website.DocumentRoot, AcmeChallengeRoot: service.Config.Paths.ACMEChallenge, FPMSocket: filepath.Join("/run/php", meta.FilePrefix+subscriptionName+".sock"), ProxyTimeout: service.Config.Apache.ProxyTimeout, LogDir: logDir, ForceHTTPS: website.ForceHTTPS})
+		if err != nil || !website.SSLEnabled {
+			return httpContents, err
+		}
+		lineageDir := filepath.Join(meta.LetsEncryptLiveDir, meta.FilePrefix+subscriptionName+"-"+website.PrimaryDomain)
+		tlsContents, err := render.RenderApachePHPFPMTLS(render.ApacheTLSVHost{Subscription: subscriptionName, PrimaryDomain: website.PrimaryDomain, Aliases: website.Aliases, DocumentRoot: website.DocumentRoot, CertificateFile: filepath.Join(lineageDir, "fullchain.pem"), CertificateKey: filepath.Join(lineageDir, "privkey.pem"), FPMSocket: filepath.Join("/run/php", meta.FilePrefix+subscriptionName+".sock"), ProxyTimeout: service.Config.Apache.ProxyTimeout, LogDir: logDir})
+		if err != nil {
+			return nil, err
+		}
+		return append(append(httpContents, '\n'), tlsContents...), nil
 	default:
 		return nil, fmt.Errorf("unsupported website type %q", website.Type)
 	}

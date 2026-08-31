@@ -14,8 +14,6 @@ import (
 	"provctl/internal/system"
 )
 
-const letsEncryptLiveDir = "/etc/letsencrypt/live"
-
 type CertificateStore interface {
 	UpdateCertificateNotAfter(context.Context, string, time.Time) (bool, error)
 }
@@ -140,7 +138,7 @@ func (service CertificateService) liveDir() string {
 	if service.LiveDir != "" {
 		return service.LiveDir
 	}
-	return letsEncryptLiveDir
+	return meta.LetsEncryptLiveDir
 }
 
 func commandError(action string, result system.Result, err error) error {

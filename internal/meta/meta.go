@@ -13,6 +13,7 @@ const (
 	PHPConfigDir          = "/etc/php"
 	CertbotCron           = "/etc/cron.d/certbot"
 	DeployHook            = "/etc/letsencrypt/renewal-hooks/deploy/00-provctl.sh"
+	LetsEncryptLiveDir    = "/etc/letsencrypt/live"
 	FilePrefix            = "provctl-"
 	DefaultSSLDir         = StateDir + "/default-ssl"
 	DefaultSSLCertificate = DefaultSSLDir + "/certificate.pem"
