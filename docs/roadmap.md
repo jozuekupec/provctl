@@ -76,9 +76,10 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   na cílovém MariaDB serveru a SQL jde výhradně přes stdin. Hesla jsou
   kryptografická, nezapisují se do SQLite a CLI je vypíše pouze po úspěchu.
   Create má rollback databáze i metadata; delete nejdříve odstraňuje metadata,
-  aby je při selhání serverového dropu vrátil. Zbývá `--write-credentials`, SSH
-  klíče a crontab; skutečný MariaDB integrační běh čeká na opravu unix-socket
-  autentizace testovacího obrazu `pv`.
+  aby je při selhání serverového dropu vrátil. V `pv` byly ověřeny create, list,
+  změna hesla i delete proti skutečné MariaDB přes unix socket, včetně existence
+  a následného odstranění databáze a uživatele; kontejner byl obnoven na `clean`.
+  Zbývá `--write-credentials`, SSH klíče a crontab.
 - [ ] **M6 — SSL:** stavový automat Certbotu, deploy-hook command a přijetí
   existujících certifikátů.
 - [ ] **M7 — provoz:** backup/restore, health checks, audit log a kvóty.
