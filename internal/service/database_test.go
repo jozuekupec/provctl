@@ -84,6 +84,22 @@ func TestDatabaseService_PrepareCreateRejectsServerUserLimit(t *testing.T) {
 	}
 }
 
+func TestDatabaseService_PrepareCreateCredentialsRequiresSafeNewPath(t *testing.T) {
+	store := &databaseStore{subscription: domain.Subscription{ID: 4, Name: "acme", UnixUID: 5000, Home: "/vhosts/acme", Status: "active"}}
+	service := testDatabaseService(store, &databaseMariaDB{limit: 32})
+	service.FS = &subscriptionFS{directories: map[string]bool{"/vhosts/acme": true, "/vhosts/acme/private": true}}
+	operation, password, err := service.PrepareCreateWithCredentials(context.Background(), "acme", "main", "/vhosts/acme/private/mysql.cnf")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(operation.Steps) != 3 || strings.Contains(operation.Steps[2].Preview, password) {
+		t.Errorf("operation = %#v", operation)
+	}
+	if _, _, err := service.PrepareCreateWithCredentials(context.Background(), "acme", "other", "/etc/mysql.cnf"); err == nil {
+		t.Fatal("PrepareCreateWithCredentials() accepted path outside subscription home")
+	}
+}
+
 func TestDatabaseService_CreateRollsBackMariaDBWhenSQLiteFails(t *testing.T) {
 	store := &databaseStore{subscription: domain.Subscription{ID: 4, Name: "acme", Status: "active"}}
 	mariadb := &databaseMariaDB{limit: 32}

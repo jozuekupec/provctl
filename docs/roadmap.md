@@ -79,7 +79,9 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   aby je při selhání serverového dropu vrátil. V `pv` byly ověřeny create, list,
   změna hesla i delete proti skutečné MariaDB přes unix socket, včetně existence
   a následného odstranění databáze a uživatele; kontejner byl obnoven na `clean`.
-  Zbývá `--write-credentials`, SSH klíče a crontab.
+  `--write-credentials` bezpečně odmítá existující nebo mimodomovský soubor a
+  v `pv` vytvořil nový soubor `0600` vlastněný subscription; kontejner byl opět
+  obnoven na `clean`. Zbývají SSH klíče a crontab.
 - [ ] **M6 — SSL:** stavový automat Certbotu, deploy-hook command a přijetí
   existujících certifikátů.
 - [ ] **M7 — provoz:** backup/restore, health checks, audit log a kvóty.

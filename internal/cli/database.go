@@ -20,7 +20,7 @@ func newDatabaseCommand() *cobra.Command {
 }
 
 func newDatabaseCreateCommand() *cobra.Command {
-	var configPath string
+	var configPath, credentialsPath string
 	var dryRun bool
 	command := &cobra.Command{Use: "create <subscription> <name>", Short: "create a prefixed MariaDB database", Args: cobra.ExactArgs(2), RunE: func(command *cobra.Command, args []string) error {
 		cfg, err := config.Load(configPath)
@@ -34,7 +34,7 @@ func newDatabaseCreateCommand() *cobra.Command {
 				return fmt.Errorf("open database state: %w", err)
 			}
 			defer runtime.Close()
-			operation, _, err := runtime.Service.PrepareCreate(ctx, args[0], args[1])
+			operation, _, err := runtime.Service.PrepareCreateWithCredentials(ctx, args[0], args[1], credentialsPath)
 			if err != nil {
 				return err
 			}
@@ -47,7 +47,7 @@ func newDatabaseCreateCommand() *cobra.Command {
 		defer runtime.Close()
 		lockCtx, cancel := context.WithTimeout(ctx, time.Duration(cfg.Limits.LockTimeoutSeconds)*time.Second)
 		defer cancel()
-		password, operationID, err := runtime.Service.Create(lockCtx, args[0], args[1])
+		password, operationID, err := runtime.Service.CreateWithCredentials(lockCtx, args[0], args[1], credentialsPath)
 		if err != nil {
 			return err
 		}
@@ -56,6 +56,7 @@ func newDatabaseCreateCommand() *cobra.Command {
 	}}
 	command.Flags().StringVar(&configPath, "config", meta.ConfigFile, "path to config.toml")
 	command.Flags().BoolVar(&dryRun, "dry-run", false, "show the operation plan without changing the system")
+	command.Flags().StringVar(&credentialsPath, "write-credentials", "", "write one subscription-owned client credentials file")
 	return command
 }
 
