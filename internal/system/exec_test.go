@@ -32,3 +32,10 @@ func TestExecCommander_RejectsUnallowlistedBinary(t *testing.T) {
 		t.Fatalf("Run() error = %v, want ErrBinaryNotAllowed", err)
 	}
 }
+
+func TestExecCommander_RunToFileRejectsUnallowlistedBinary(t *testing.T) {
+	_, err := (ExecCommander{}).RunToFile(context.Background(), t.TempDir()+"/output", 0o600, "/bin/sh")
+	if !errors.Is(err, ErrBinaryNotAllowed) {
+		t.Fatalf("RunToFile() error = %v, want ErrBinaryNotAllowed", err)
+	}
+}

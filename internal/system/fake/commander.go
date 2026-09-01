@@ -4,6 +4,7 @@ package fake
 import (
 	"context"
 	"io"
+	"os"
 	"sync"
 
 	"provctl/internal/system"
@@ -31,6 +32,10 @@ func (fake *Commander) Run(ctx context.Context, name string, args ...string) (sy
 
 func (fake *Commander) RunWithStdin(ctx context.Context, _ io.Reader, name string, args ...string) (system.Result, error) {
 	return fake.record(ctx, name, args, true)
+}
+
+func (fake *Commander) RunToFile(ctx context.Context, _ string, _ os.FileMode, name string, args ...string) (system.Result, error) {
+	return fake.record(ctx, name, args, false)
 }
 
 func (fake *Commander) record(ctx context.Context, name string, args []string, hasStdin bool) (system.Result, error) {

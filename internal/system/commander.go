@@ -3,6 +3,7 @@ package system
 import (
 	"context"
 	"io"
+	"os"
 	"time"
 )
 
@@ -11,6 +12,14 @@ import (
 type Commander interface {
 	Run(ctx context.Context, name string, args ...string) (Result, error)
 	RunWithStdin(ctx context.Context, stdin io.Reader, name string, args ...string) (Result, error)
+}
+
+// OutputFileCommander streams a command's stdout into a caller-selected file.
+// It is deliberately separate from Commander so existing read-only seams stay
+// minimal; implementations must still enforce the binary allowlist.
+type OutputFileCommander interface {
+	Commander
+	RunToFile(ctx context.Context, path string, mode os.FileMode, name string, args ...string) (Result, error)
 }
 
 type Result struct {
