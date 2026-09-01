@@ -56,6 +56,7 @@ func NewRootCommand() *cobra.Command {
 	root.AddCommand(newDatabaseCommand())
 	root.AddCommand(newSSHCommand())
 	root.AddCommand(newCronCommand())
+	root.AddCommand(newBackupCommand())
 	root.AddCommand(newSSLCommand())
 	root.AddCommand(newReconcileCommand())
 	return root

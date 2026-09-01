@@ -39,6 +39,12 @@ sudo dist/provctl subscription create acme --quota-websites 5 --quota-databases 
 
 The non-dry-run form requires the state directory and database created by the upcoming `bootstrap` command; do not create those system paths manually on a workstation.
 
+List recorded archives without changing the server:
+
+```bash
+sudo dist/provctl backup list acme
+```
+
 ## Isolated server tests with Incus
 
 Run E2/E3 integration tests in a Debian 13 VM, then use an unprivileged Incus **system container**. Incus is sufficient; do not also install standalone LXC tooling. Its network and storage stay inside the VM.
