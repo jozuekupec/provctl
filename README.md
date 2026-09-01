@@ -22,10 +22,11 @@ make build                # produces dist/provctl
 dist/provctl --version
 ```
 
-`doctor` is read-only, but checks the host's services and paths, so it may deliberately return a non-zero result on a development machine:
+`doctor` and `health` are read-only, but inspect the host's services and paths, so they may deliberately return a non-zero result on a development machine:
 
 ```bash
 dist/provctl doctor --config packaging/config.toml.default --json
+dist/provctl health acme example.test --config /etc/provctl/config.toml --json
 ```
 
 `subscription create` is a root-facing operation. Its dry run reads the existing database and account state, then prints the exact planned steps without changing the system:

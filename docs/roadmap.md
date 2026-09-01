@@ -97,7 +97,7 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   rollback testy prošly v `make test`; v `pv` bylo ověřeno add, list i remove
   nad skutečným `crontab` uživatele subscription, včetně výsledného
   generovaného obsahu. Kontejner byl následně obnoven na `clean`.
-- [~] **M6 — SSL:** příprava pro stavový automat Certbotu obsahuje
+- [x] **M6 — SSL:** příprava pro stavový automat Certbotu obsahuje
   konfigurovatelný HTTPS ACME endpoint (`[ssl].server`) a nyní i `ssl status`
   a `ssl deploy-hook`. Status čte expiraci z živého lineage přes `openssl`,
   zatímco hook bezpečně přijímá jen přímý podadresář Certbot live dir,
@@ -115,8 +115,16 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   HTTPS odpověď prošla, `ssl disable` odstranil TLS konfiguraci a Apache
   configtest zůstal zelený. Test zároveň opravil webroot pod privátním state
   directory, strukturu Aliasu pro skutečný Certbot webroot a proxy nezávislý
-  self-check. Zbývá adopt.
-- [ ] **M7 — provoz:** backup/restore, health checks, audit log a kvóty.
+  self-check. Převzetí existujících webů a jejich certifikátů patří do
+  samostatného M10 `subscription adopt`.
+- [~] **M7 — provoz:** první read-only část `health` je dostupná jako
+  `provctl health [<subscription> [<domain>]]` v textu i přes `--json`.
+  Kontroluje aktivní Apache, `apachectl configtest`, read-only SQLite spojení,
+  enabled vhost, DocumentRoot, PHP-FPM pool a socket, DNS vůči IP serveru a
+  HTTP/HTTPS odpověď; síť má testovací seam a nepřebírá systémový proxy server.
+  Úspěšná i chybová cesta jsou pokryty offline testy a celý `make test` prošel.
+  Zbývají dny expirace certifikátu, disková kvóta a ostatní části milníku:
+  backup/restore, audit log a vynucené kvóty.
 - [~] **M8 — TUI:** návrh je zaznamenán v [tui-design.md](tui-design.md) a
   cíleně přebírá konzistentní Bubble Tea vzor z projektu `depo`: hodnotový
   model, `Deps`, samostatné routing/render/keys/theme a I/O jen přes `tea.Cmd`.
