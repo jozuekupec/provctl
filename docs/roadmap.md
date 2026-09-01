@@ -163,7 +163,8 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   vybraný website lze přes `e` potvrdit `y` a asynchronně enable/disable přes
   `tea.Cmd` a service seam; modelový test ověřuje cíl i potvrzovací bránu.
   Service i CLI nyní mají žurnálované `subscription suspend|resume`, které
-  TUI následně použije jako druhou povolenou mutaci.
+  TUI používá jako druhou povolenou mutaci: `s` s potvrzením `y` přepíná
+  active/suspended přes `tea.Cmd`; modelový test pokrývá správný cíl i stav.
 - [ ] **M9 — distribuce:** nfpm, maintainer skripty, CI, APT repozitář a
   package testy (`lintian`, `piuparts`, upgrade/purge).
 - [ ] **M10 — migrace:** `subscription adopt` pro existující weby.

@@ -49,7 +49,12 @@ func NewRootCommand() *cobra.Command {
 			return fmt.Errorf("open website mutation state: %w", err)
 		}
 		defer websiteWriteRuntime.Close()
-		_, err = ui.Program(ui.Deps{LoadSubscriptions: runtime.Service.List, LoadWebsites: websiteRuntime.Service.List, SetWebsiteEnabled: websiteWriteRuntime.Service.SetEnabled}).Run()
+		subscriptionWriteRuntime, err := service.NewProductionSubscriptionRuntime(context.Background(), cfg)
+		if err != nil {
+			return fmt.Errorf("open subscription mutation state: %w", err)
+		}
+		defer subscriptionWriteRuntime.Close()
+		_, err = ui.Program(ui.Deps{LoadSubscriptions: runtime.Service.List, LoadWebsites: websiteRuntime.Service.List, SetWebsiteEnabled: websiteWriteRuntime.Service.SetEnabled, SetSubscriptionStatus: subscriptionWriteRuntime.Service.SetStatus}).Run()
 		return err
 	}
 	root.AddCommand(newDoctorCommand())

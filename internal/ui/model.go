@@ -10,9 +10,10 @@ import (
 )
 
 type Deps struct {
-	LoadSubscriptions func(context.Context) ([]domain.Subscription, error)
-	LoadWebsites      func(context.Context, int64) ([]domain.Website, error)
-	SetWebsiteEnabled func(context.Context, string, string, bool) (int64, error)
+	LoadSubscriptions     func(context.Context) ([]domain.Subscription, error)
+	LoadWebsites          func(context.Context, int64) ([]domain.Website, error)
+	SetWebsiteEnabled     func(context.Context, string, string, bool) (int64, error)
+	SetSubscriptionStatus func(context.Context, string, string) (int64, error)
 }
 type websitesLoadedMsg struct {
 	items []domain.Website
@@ -27,6 +28,10 @@ type websiteChangedMsg struct {
 	err     error
 	enabled bool
 	domain  string
+}
+type subscriptionChangedMsg struct {
+	err          error
+	name, status string
 }
 
 type focus int
@@ -77,6 +82,15 @@ func (m appModel) changeWebsite() tea.Msg {
 	subscription := m.items[clamp(m.cursor, len(m.items))]
 	_, err := m.deps.SetWebsiteEnabled(context.Background(), subscription.Name, website.PrimaryDomain, m.confirm.enabled)
 	return websiteChangedMsg{err: err, enabled: m.confirm.enabled, domain: website.PrimaryDomain}
+}
+
+func (m appModel) changeSubscription() tea.Msg {
+	if m.deps.SetSubscriptionStatus == nil || len(m.items) == 0 {
+		return subscriptionChangedMsg{err: context.Canceled}
+	}
+	subscription := m.items[clamp(m.cursor, len(m.items))]
+	_, err := m.deps.SetSubscriptionStatus(context.Background(), subscription.Name, m.confirm.action)
+	return subscriptionChangedMsg{err: err, name: subscription.Name, status: m.confirm.action}
 }
 
 func (m appModel) loadWebsites() tea.Msg {

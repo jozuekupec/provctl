@@ -15,7 +15,10 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.confirm.action != "" {
 			switch msg.String() {
 			case "y":
-				m.status = "changing website…"
+				m.status = "applying change…"
+				if m.confirm.action == "active" || m.confirm.action == "suspended" {
+					return m, m.changeSubscription
+				}
 				return m, m.changeWebsite
 			case "esc", "n", "q":
 				m.confirm, m.status = confirmState{}, "cancelled"
@@ -54,6 +57,18 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.confirm = confirmState{action: "set-enabled", enabled: !website.Enabled, domain: website.PrimaryDomain}
 				m.status = "confirm with y; esc cancels"
 			}
+		case "s":
+			if !m.showWebsites && len(m.items) > 0 {
+				subscription := m.items[clamp(m.cursor, len(m.items))]
+				if subscription.Status == "active" {
+					m.confirm = confirmState{action: "suspended", domain: subscription.Name}
+				} else if subscription.Status == "suspended" {
+					m.confirm = confirmState{action: "active", domain: subscription.Name}
+				}
+				if m.confirm.action != "" {
+					m.status = "confirm with y; esc cancels"
+				}
+			}
 		case "tab":
 			m.focus = (m.focus + 1) % 4
 		case "esc":
@@ -82,6 +97,14 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.status = "website " + msg.domain + " updated; refreshing…"
 		m.output = m.output.append("website " + msg.domain + " enabled=" + fmt.Sprint(msg.enabled))
 		return m, m.loadWebsites
+	case subscriptionChangedMsg:
+		if msg.err != nil {
+			m.status = "subscription change failed: " + msg.err.Error()
+			return m, nil
+		}
+		m.confirm, m.status = confirmState{}, "subscription "+msg.name+" updated; refreshing…"
+		m.output = m.output.append("subscription " + msg.name + " status=" + msg.status)
+		return m, m.loadSubscriptions
 	}
 	return m, nil
 }

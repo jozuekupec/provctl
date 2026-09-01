@@ -69,3 +69,25 @@ func TestModel_ConfirmWebsiteToggleCallsDependency(t *testing.T) {
 	}
 	_ = updated
 }
+
+func TestModel_ConfirmSubscriptionSuspendCallsDependency(t *testing.T) {
+	called := false
+	m := New(Deps{SetSubscriptionStatus: func(_ context.Context, name, status string) (int64, error) {
+		called = name == "acme" && status == "suspended"
+		return 1, nil
+	}})
+	m.items = []domain.Subscription{{ID: 1, Name: "acme", Status: "active"}}
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("s")})
+	m = updated.(appModel)
+	if m.confirm.action != "suspended" {
+		t.Fatalf("confirmation = %#v", m.confirm)
+	}
+	updated, command := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("y")})
+	if message := command(); message.(subscriptionChangedMsg).err != nil {
+		t.Fatal(message.(subscriptionChangedMsg).err)
+	}
+	if !called {
+		t.Fatal("SetSubscriptionStatus was not called")
+	}
+	_ = updated
+}
