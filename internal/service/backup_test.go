@@ -88,3 +88,12 @@ func TestBackupService_ExtractArchiveUsesExplicitTarArguments(t *testing.T) {
 		t.Errorf("calls = %#v", commands.Calls)
 	}
 }
+
+func TestBackupService_PromoteStagingRejectsExistingTarget(t *testing.T) {
+	fs := &fake.FS{StatFunc: func(string) (os.FileInfo, error) { return subscriptionInfo{}, nil }}
+	service := BackupService{FS: fs}
+	err := service.promoteStaging("/vhosts/.restore-acme", "/vhosts/acme")
+	if err == nil || !strings.Contains(err.Error(), "already exists") {
+		t.Fatalf("promoteStaging() error = %v", err)
+	}
+}

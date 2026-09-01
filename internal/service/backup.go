@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -230,6 +231,22 @@ func (service BackupService) extractArchive(ctx context.Context, archive, stagin
 	if _, err := service.Commands.Run(ctx, "/usr/bin/tar", "--numeric-owner", "--acls", "--xattrs", "-p", "--zstd", "-xf", archive, "-C", staging); err != nil {
 		_ = service.FS.RemoveAll(staging)
 		return fmt.Errorf("extract backup archive: %w", err)
+	}
+	return nil
+}
+
+func (service BackupService) promoteStaging(staging, target string) error {
+	if _, err := service.FS.Stat(target); err == nil {
+		return fmt.Errorf("restore target %q already exists", target)
+	} else if !os.IsNotExist(err) {
+		return fmt.Errorf("inspect restore target: %w", err)
+	}
+	mover, ok := service.FS.(system.FileMover)
+	if !ok {
+		return fmt.Errorf("restore filesystem cannot atomically move staged data")
+	}
+	if err := mover.Rename(staging, target); err != nil {
+		return fmt.Errorf("promote restore staging: %w", err)
 	}
 	return nil
 }
