@@ -128,3 +128,12 @@ func PasswordSQL(user, password string) (string, error) {
 	escapedPassword := strings.ReplaceAll(password, "'", "''")
 	return fmt.Sprintf("ALTER USER '%s'@'localhost' IDENTIFIED BY '%s';\n", user, escapedPassword), nil
 }
+
+// RestoreDatabaseSQL builds the non-secret SQL needed before importing one
+// backup dump. The caller supplies a freshly generated password via stdin.
+func RestoreDatabaseSQL(database domain.Database, password string) (string, error) {
+	if database.Name == "" || database.User == "" {
+		return "", fmt.Errorf("backup database identity is required")
+	}
+	return CreateSQL(database.Name, database.User, password)
+}

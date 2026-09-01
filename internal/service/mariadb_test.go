@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"provctl/internal/config"
+	"provctl/internal/domain"
 	"provctl/internal/system"
 )
 
@@ -95,6 +96,16 @@ func TestCreateSQLEscapesPassword(t *testing.T) {
 		t.Fatal(err)
 	}
 	if !strings.Contains(query, "IDENTIFIED BY 'a''b'") {
+		t.Errorf("query = %q", query)
+	}
+}
+
+func TestRestoreDatabaseSQLUsesFreshPassword(t *testing.T) {
+	query, err := RestoreDatabaseSQL(domain.Database{Name: "acme_main", User: "acme_main"}, "fresh-password")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(query, "fresh-password") || !strings.Contains(query, "CREATE DATABASE") {
 		t.Errorf("query = %q", query)
 	}
 }

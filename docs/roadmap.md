@@ -161,6 +161,8 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   restore do stagingu; test zajišťuje absenci shellu a úklid při selhání.
   Staging lze povýšit jen atomickým `FileMover` přesunem do dosud neexistujícího
   home; test kryje odmítnutí existujícího cíle.
+  Databázová část restore má otestovaný helper pro vytvoření identity s novým
+  heslem; výsledné SQL je určené pouze pro existující MariaDB stdin seam.
   Pro databázový dump je
   připraven rozšířený allowlisted command seam pro bezpečné streamování stdout
   do nového souboru bez `sh -c`; je krytý jednotkovým testem.
