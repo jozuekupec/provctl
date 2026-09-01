@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"fmt"
+	"os"
 	"strings"
 	"testing"
 
@@ -73,5 +74,17 @@ func TestBackupService_CreateRejectsBackupQuotaBeforeSystemChanges(t *testing.T)
 	_, err := service.Create(context.Background(), "acme")
 	if err == nil || !strings.Contains(err.Error(), "backup quota") {
 		t.Fatalf("Create() error = %v", err)
+	}
+}
+
+func TestBackupService_ExtractArchiveUsesExplicitTarArguments(t *testing.T) {
+	fs := &fake.FS{MkdirAllFunc: func(string, os.FileMode) error { return nil }, RemoveAllFunc: func(string) error { return nil }}
+	commands := &fake.Commander{}
+	service := BackupService{FS: fs, Commands: commands}
+	if err := service.extractArchive(context.Background(), "/backups/acme/files.tar.zst", "/vhosts/.restore-acme"); err != nil {
+		t.Fatal(err)
+	}
+	if len(commands.Calls) != 1 || commands.Calls[0].Name != "/usr/bin/tar" || strings.Contains(strings.Join(commands.Calls[0].Args, " "), "sh -c") {
+		t.Errorf("calls = %#v", commands.Calls)
 	}
 }

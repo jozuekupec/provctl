@@ -220,6 +220,20 @@ func (service BackupService) PrepareRestore(ctx context.Context, name string, id
 	return metadata, nil
 }
 
+func (service BackupService) extractArchive(ctx context.Context, archive, staging string) error {
+	if service.Commands == nil || service.FS == nil {
+		return fmt.Errorf("restore filesystem and commander are required")
+	}
+	if err := service.FS.MkdirAll(staging, 0o700); err != nil {
+		return fmt.Errorf("create restore staging: %w", err)
+	}
+	if _, err := service.Commands.Run(ctx, "/usr/bin/tar", "--numeric-owner", "--acls", "--xattrs", "-p", "--zstd", "-xf", archive, "-C", staging); err != nil {
+		_ = service.FS.RemoveAll(staging)
+		return fmt.Errorf("extract backup archive: %w", err)
+	}
+	return nil
+}
+
 func (service BackupService) verifyChecksums(backupPath string) error {
 	contents, err := service.FS.ReadFile(filepath.Join(backupPath, "SHA256SUMS"))
 	if err != nil {

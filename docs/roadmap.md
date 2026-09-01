@@ -157,6 +157,8 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   implementace.
   Evidence backupu umí archiv vyhledat samostatně podle ID, takže clean-server
   restore nebude falešně závislý na existenci původního subscription záznamu.
+  Souborový payload se nyní umí rozbalit explicitním allowlisted `tar` během
+  restore do stagingu; test zajišťuje absenci shellu a úklid při selhání.
   Pro databázový dump je
   připraven rozšířený allowlisted command seam pro bezpečné streamování stdout
   do nového souboru bez `sh -c`; je krytý jednotkovým testem.
