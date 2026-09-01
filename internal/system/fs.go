@@ -15,3 +15,9 @@ type FS interface {
 	ReadDir(path string) ([]os.DirEntry, error)
 	EvalSymlinks(path string) (string, error)
 }
+
+// FileMover is an optional capability for operations that require an atomic
+// rename within one filesystem, such as restoring staged data.
+type FileMover interface {
+	Rename(oldPath, newPath string) error
+}

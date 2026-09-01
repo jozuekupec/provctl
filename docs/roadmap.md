@@ -152,6 +152,9 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   `backup restore <subscription> <id> --dry-run` nyní bezpečně ověří
   manifest, identitu subscription a SHA256SUMS bez jakékoli změny systému;
   mutující fáze obnovy stále zbývá.
+  Pro její atomický přesun stagingu existuje testovaný volitelný `FileMover`
+  seam, který nerozšiřuje základní FS kontrakt ani nekomplikuje stávající fake
+  implementace.
   Pro databázový dump je
   připraven rozšířený allowlisted command seam pro bezpečné streamování stdout
   do nového souboru bez `sh -c`; je krytý jednotkovým testem.
