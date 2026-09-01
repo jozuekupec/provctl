@@ -8,6 +8,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 
 	"provctl/internal/domain"
+	"provctl/internal/service"
 )
 
 func TestModel_LoadAndNavigateSubscriptions(t *testing.T) {
@@ -90,4 +91,20 @@ func TestModel_ConfirmSubscriptionSuspendCallsDependency(t *testing.T) {
 		t.Fatal("SetSubscriptionStatus was not called")
 	}
 	_ = updated
+}
+
+func TestModel_HealthWritesChecksToOutput(t *testing.T) {
+	m := New(Deps{RunHealth: func(_ context.Context, name, domain string) ([]service.Check, error) {
+		if name != "acme" || domain != "" {
+			t.Fatalf("scope = %q/%q", name, domain)
+		}
+		return []service.Check{{Name: "Apache", Status: service.CheckOK, Detail: "active"}}, nil
+	}})
+	m.items = []domain.Subscription{{Name: "acme"}}
+	updated, command := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("h")})
+	updated, _ = updated.(appModel).Update(command())
+	m = updated.(appModel)
+	if m.focus != focusOutput || !strings.Contains(strings.Join(m.output.lines, "\n"), "Apache") {
+		t.Errorf("model = %#v", m)
+	}
 }

@@ -44,6 +44,9 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "r":
 			m.status = "loading subscriptions…"
 			return m, m.loadSubscriptions
+		case "h":
+			m.status = "running health checks…"
+			return m, m.loadHealth
 		case "enter":
 			m.showWebsites, m.focus, m.status = true, focusWebsites, "loading websites…"
 			return m, m.loadWebsites
@@ -105,6 +108,15 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.confirm, m.status = confirmState{}, "subscription "+msg.name+" updated; refreshing…"
 		m.output = m.output.append("subscription " + msg.name + " status=" + msg.status)
 		return m, m.loadSubscriptions
+	case healthLoadedMsg:
+		if msg.err != nil {
+			m.status = "health failed: " + msg.err.Error()
+			return m, nil
+		}
+		for _, check := range msg.checks {
+			m.output = m.output.append(string(check.Status) + " " + check.Name + ": " + check.Detail)
+		}
+		m.focus, m.status = focusOutput, "health checks completed"
 	}
 	return m, nil
 }

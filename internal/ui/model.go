@@ -7,6 +7,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 
 	"provctl/internal/domain"
+	"provctl/internal/service"
 )
 
 type Deps struct {
@@ -14,6 +15,7 @@ type Deps struct {
 	LoadWebsites          func(context.Context, int64) ([]domain.Website, error)
 	SetWebsiteEnabled     func(context.Context, string, string, bool) (int64, error)
 	SetSubscriptionStatus func(context.Context, string, string) (int64, error)
+	RunHealth             func(context.Context, string, string) ([]service.Check, error)
 }
 type websitesLoadedMsg struct {
 	items []domain.Website
@@ -32,6 +34,10 @@ type websiteChangedMsg struct {
 type subscriptionChangedMsg struct {
 	err          error
 	name, status string
+}
+type healthLoadedMsg struct {
+	checks []service.Check
+	err    error
 }
 
 type focus int
@@ -91,6 +97,15 @@ func (m appModel) changeSubscription() tea.Msg {
 	subscription := m.items[clamp(m.cursor, len(m.items))]
 	_, err := m.deps.SetSubscriptionStatus(context.Background(), subscription.Name, m.confirm.action)
 	return subscriptionChangedMsg{err: err, name: subscription.Name, status: m.confirm.action}
+}
+
+func (m appModel) loadHealth() tea.Msg {
+	if m.deps.RunHealth == nil || len(m.items) == 0 {
+		return healthLoadedMsg{err: context.Canceled}
+	}
+	subscription := m.items[clamp(m.cursor, len(m.items))]
+	checks, err := m.deps.RunHealth(context.Background(), subscription.Name, "")
+	return healthLoadedMsg{checks: checks, err: err}
 }
 
 func (m appModel) loadWebsites() tea.Msg {
