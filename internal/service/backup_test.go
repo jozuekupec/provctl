@@ -31,6 +31,8 @@ func (store backupStore) BackupByID(_ context.Context, _ int64, id int64) (domai
 	}
 	return domain.Backup{}, context.Canceled
 }
+func (backupStore) CreateBackup(context.Context, domain.Backup) (int64, error) { return 1, nil }
+func (backupStore) FinishBackup(context.Context, int64, int64, string) error   { return nil }
 
 func TestBackupService_ListForSubscriptionRejectsInvalidName(t *testing.T) {
 	_, err := (BackupService{Store: backupStore{}}).ListForSubscription(context.Background(), "BAD")
@@ -62,5 +64,13 @@ func TestBackupService_InspectReadsMatchingManifest(t *testing.T) {
 	}
 	if metadata.FormatVersion != 1 || metadata.Subscription.Name != "acme" {
 		t.Errorf("metadata = %#v", metadata)
+	}
+}
+
+func TestBackupService_CreateRejectsBackupQuotaBeforeSystemChanges(t *testing.T) {
+	service := BackupService{Store: backupStore{subscription: domain.Subscription{ID: 1, Name: "acme", QuotaBackups: 1}, backups: []domain.Backup{{ID: 1}}}}
+	_, err := service.Create(context.Background(), "acme")
+	if err == nil || !strings.Contains(err.Error(), "backup quota") {
+		t.Fatalf("Create() error = %v", err)
 	}
 }

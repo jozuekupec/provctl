@@ -14,7 +14,30 @@ import (
 
 func newBackupCommand() *cobra.Command {
 	command := &cobra.Command{Use: "backup", Short: "manage subscription backups"}
-	command.AddCommand(newBackupListCommand(), newBackupInspectCommand())
+	command.AddCommand(newBackupCreateCommand(), newBackupListCommand(), newBackupInspectCommand())
+	return command
+}
+
+func newBackupCreateCommand() *cobra.Command {
+	var configPath string
+	command := &cobra.Command{Use: "create <subscription>", Short: "create a subscription backup", Args: cobra.ExactArgs(1), RunE: func(command *cobra.Command, args []string) error {
+		cfg, err := config.Load(configPath)
+		if err != nil {
+			return fmt.Errorf("load configuration: %w", err)
+		}
+		runtime, err := service.NewProductionBackupRuntime(context.Background(), cfg)
+		if err != nil {
+			return fmt.Errorf("open backup state: %w", err)
+		}
+		defer runtime.Close()
+		id, err := runtime.Service.Create(context.Background(), args[0])
+		if err != nil {
+			return err
+		}
+		_, err = fmt.Fprintf(command.OutOrStdout(), "Created backup %d for subscription %q.\n", id, args[0])
+		return err
+	}}
+	command.Flags().StringVar(&configPath, "config", meta.ConfigFile, "path to config.toml")
 	return command
 }
 

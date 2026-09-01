@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"provctl/internal/config"
 	"provctl/internal/domain"
@@ -20,12 +21,92 @@ type BackupStore interface {
 	SubscriptionByName(context.Context, string) (domain.Subscription, error)
 	ListBackups(context.Context, int64) ([]domain.Backup, error)
 	BackupByID(context.Context, int64, int64) (domain.Backup, error)
+	CreateBackup(context.Context, domain.Backup) (int64, error)
+	FinishBackup(context.Context, int64, int64, string) error
 }
 
 type BackupService struct {
-	Store  BackupStore
-	FS     system.FS
-	Config config.Config
+	Store    BackupStore
+	FS       system.FS
+	Config   config.Config
+	Commands system.Commander
+	Locker   system.Locker
+}
+
+func (service BackupService) Create(ctx context.Context, name string) (backupID int64, returnErr error) {
+	if err := domain.ValidateSubscriptionName(name); err != nil {
+		return 0, err
+	}
+	subscription, err := service.Store.SubscriptionByName(ctx, name)
+	if err != nil {
+		return 0, err
+	}
+	backups, err := service.Store.ListBackups(ctx, subscription.ID)
+	if err != nil {
+		return 0, fmt.Errorf("list backups: %w", err)
+	}
+	if subscription.QuotaBackups > 0 && len(backups) >= subscription.QuotaBackups {
+		return 0, fmt.Errorf("subscription %q has reached its backup quota of %d", name, subscription.QuotaBackups)
+	}
+	if service.FS == nil || service.Commands == nil || service.Locker == nil {
+		return 0, fmt.Errorf("backup filesystem, commander, and locker are required")
+	}
+	unlock, err := service.Locker.Lock(ctx, "backup.create "+name)
+	if err != nil {
+		return 0, err
+	}
+	defer unlock()
+	started := time.Now().UTC()
+	directory := filepath.Join(service.Config.Paths.Backups, name, started.Format("2006-01-02T15-04-05Z"))
+	if err := service.FS.MkdirAll(directory, 0o700); err != nil {
+		return 0, fmt.Errorf("create backup directory: %w", err)
+	}
+	backupID, err = service.Store.CreateBackup(ctx, domain.Backup{SubscriptionID: subscription.ID, Path: directory, Status: "running", StartedAt: started})
+	if err != nil {
+		return 0, err
+	}
+	finished := false
+	defer func() {
+		if !finished {
+			_ = service.Store.FinishBackup(context.Background(), backupID, 0, "failed")
+		}
+	}()
+	archive := filepath.Join(directory, "files.tar.zst")
+	_, err = service.Commands.Run(ctx, "/usr/bin/tar", "--numeric-owner", "--acls", "--xattrs", "-p", "--exclude=tmp", "--exclude=*/storage/framework/cache/*", "-I", "/usr/bin/zstd", "-cf", archive, "-C", subscription.Home, ".")
+	if err != nil {
+		return backupID, fmt.Errorf("archive subscription files: %w", err)
+	}
+	metadata, err := json.MarshalIndent(domain.BackupMetadata{FormatVersion: 1, ProvctlVersion: meta.Version, CreatedAt: started, Subscription: subscription}, "", "  ")
+	if err != nil {
+		return backupID, fmt.Errorf("encode backup metadata: %w", err)
+	}
+	if err := service.FS.WriteFileAtomic(filepath.Join(directory, "metadata.json"), append(metadata, '\n'), 0o600); err != nil {
+		return backupID, err
+	}
+	if err := service.writeChecksums(directory, []string{"metadata.json", "files.tar.zst"}); err != nil {
+		return backupID, err
+	}
+	info, err := service.FS.Stat(archive)
+	if err != nil {
+		return backupID, fmt.Errorf("stat backup archive: %w", err)
+	}
+	if err := service.Store.FinishBackup(ctx, backupID, info.Size(), "complete"); err != nil {
+		return backupID, err
+	}
+	finished = true
+	return backupID, nil
+}
+
+func (service BackupService) writeChecksums(directory string, names []string) error {
+	lines := make([]string, 0, len(names))
+	for _, name := range names {
+		contents, err := service.FS.ReadFile(filepath.Join(directory, name))
+		if err != nil {
+			return err
+		}
+		lines = append(lines, fmt.Sprintf("%x  %s", sha256.Sum256(contents), name))
+	}
+	return service.FS.WriteFileAtomic(filepath.Join(directory, "SHA256SUMS"), []byte(strings.Join(lines, "\n")+"\n"), 0o600)
 }
 
 func (service BackupService) ListForSubscription(ctx context.Context, name string) ([]domain.Backup, error) {
@@ -123,6 +204,14 @@ func NewReadOnlyBackupRuntime(ctx context.Context, cfg config.Config) (*BackupRu
 		return nil, err
 	}
 	return &BackupRuntime{Service: BackupService{Store: repository, FS: system.OSFS{}, Config: cfg}, repository: repository}, nil
+}
+
+func NewProductionBackupRuntime(ctx context.Context, cfg config.Config) (*BackupRuntime, error) {
+	repository, err := sqlite.Open(ctx, meta.DatabaseFile)
+	if err != nil {
+		return nil, err
+	}
+	return &BackupRuntime{Service: BackupService{Store: repository, FS: system.OSFS{}, Commands: system.ExecCommander{}, Locker: system.FileLocker{Path: "/run/provctl-backup.lock"}, Config: cfg}, repository: repository}, nil
 }
 
 func (runtime *BackupRuntime) Close() error { return runtime.repository.Close() }

@@ -143,7 +143,11 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   SHA256SUMS přes filesystem seam bez spouštění shellu.
   SQLite nyní také atomicky eviduje životní cyklus budoucí archivace
   `running → complete|failed`, včetně výsledné velikosti a času dokončení;
-  přímé vytvoření archivu a restore stále zbývají. Pro databázový dump je
+  `backup create <subscription>` nyní vytváří per-subscription zamčený,
+  číselně vlastněný `tar.zst` archiv souborů, bezpečný manifest a kontrolní
+  součty a dokončuje či označí selhání evidence; kvóta počtu záloh se
+  kontroluje před systémovou změnou. Stále zbývají databázové dumpy a restore.
+  Pro databázový dump je
   připraven rozšířený allowlisted command seam pro bezpečné streamování stdout
   do nového souboru bez `sh -c`; je krytý jednotkovým testem.
 - [~] **M8 — TUI:** návrh je zaznamenán v [tui-design.md](tui-design.md) a
