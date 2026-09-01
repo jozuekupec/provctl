@@ -108,3 +108,19 @@ func TestModel_HealthWritesChecksToOutput(t *testing.T) {
 		t.Errorf("model = %#v", m)
 	}
 }
+
+func TestModel_LoadDatabasesShowsDetail(t *testing.T) {
+	m := New(Deps{LoadDatabases: func(_ context.Context, name string) ([]domain.Database, error) {
+		if name != "acme" {
+			t.Fatalf("name = %q", name)
+		}
+		return []domain.Database{{Name: "acme_main"}}, nil
+	}})
+	m.items = []domain.Subscription{{Name: "acme"}}
+	updated, command := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("b")})
+	updated, _ = updated.(appModel).Update(command())
+	m = updated.(appModel)
+	if m.focus != focusDetail || !strings.Contains(m.detail(), "acme_main") {
+		t.Errorf("detail = %q", m.detail())
+	}
+}

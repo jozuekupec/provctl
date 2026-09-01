@@ -47,6 +47,9 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "h":
 			m.status = "running health checks…"
 			return m, m.loadHealth
+		case "b":
+			m.status = "loading databases…"
+			return m, m.loadDatabases
 		case "enter":
 			m.showWebsites, m.focus, m.status = true, focusWebsites, "loading websites…"
 			return m, m.loadWebsites
@@ -91,6 +94,12 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.websites, m.websiteCursor, m.status = append([]domain.Website(nil), msg.items...), 0, "esc subscriptions • d detail • o output • q quit"
 		m.output = m.output.append("websites loaded")
+	case databasesLoadedMsg:
+		if msg.err != nil {
+			m.status = "database load failed: " + msg.err.Error()
+			return m, nil
+		}
+		m.databases, m.focus, m.status = append([]domain.Database(nil), msg.items...), focusDetail, "databases loaded"
 	case websiteChangedMsg:
 		if msg.err != nil {
 			m.status = "website change failed: " + msg.err.Error()

@@ -1,6 +1,9 @@
 package ui
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 func (m appModel) detail() string {
 	if m.showWebsites && len(m.websites) > 0 {
@@ -11,5 +14,9 @@ func (m appModel) detail() string {
 		return "No selection."
 	}
 	subscription := m.items[clamp(m.cursor, len(m.items))]
-	return fmt.Sprintf("Subscription: %s\nStatus: %s\nUser: %s\nHome: %s\nPHP: %s", subscription.Name, subscription.Status, subscription.UnixUser, subscription.Home, subscription.PHPVersion)
+	names := make([]string, 0, len(m.databases))
+	for _, database := range m.databases {
+		names = append(names, database.Name)
+	}
+	return fmt.Sprintf("Subscription: %s\nStatus: %s\nUser: %s\nHome: %s\nPHP: %s\nWebsites: %d\nDatabases: %s", subscription.Name, subscription.Status, subscription.UnixUser, subscription.Home, subscription.PHPVersion, len(m.websites), strings.Join(names, ", "))
 }

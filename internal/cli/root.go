@@ -59,7 +59,12 @@ func NewRootCommand() *cobra.Command {
 			return fmt.Errorf("open health state: %w", err)
 		}
 		defer healthRuntime.Close()
-		_, err = ui.Program(ui.Deps{LoadSubscriptions: runtime.Service.List, LoadWebsites: websiteRuntime.Service.List, SetWebsiteEnabled: websiteWriteRuntime.Service.SetEnabled, SetSubscriptionStatus: subscriptionWriteRuntime.Service.SetStatus, RunHealth: healthRuntime.Service.Run}).Run()
+		databaseRuntime, err := service.NewReadOnlyDatabaseRuntime(context.Background(), cfg)
+		if err != nil {
+			return fmt.Errorf("open database TUI state: %w", err)
+		}
+		defer databaseRuntime.Close()
+		_, err = ui.Program(ui.Deps{LoadSubscriptions: runtime.Service.List, LoadWebsites: websiteRuntime.Service.List, LoadDatabases: databaseRuntime.Service.ListForSubscription, SetWebsiteEnabled: websiteWriteRuntime.Service.SetEnabled, SetSubscriptionStatus: subscriptionWriteRuntime.Service.SetStatus, RunHealth: healthRuntime.Service.Run}).Run()
 		return err
 	}
 	root.AddCommand(newDoctorCommand())

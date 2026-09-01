@@ -167,7 +167,9 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   active/suspended přes `tea.Cmd`; modelový test pokrývá správný cíl i stav.
   Klávesa `h` spouští health ve `tea.Cmd` pro vybranou subscription a výsledné
   read-only kontroly posílá do Output panelu; modelový test ověřuje scope i
-  zobrazení výsledku.
+  zobrazení výsledku. Klávesa `b` nyní přes service seam načte databáze
+  vybrané subscription a zobrazí jejich jména v Detailu; tok je krytý
+  modelovým testem.
 - [ ] **M9 — distribuce:** nfpm, maintainer skripty, CI, APT repozitář a
   package testy (`lintian`, `piuparts`, upgrade/purge).
 - [ ] **M10 — migrace:** `subscription adopt` pro existující weby.
