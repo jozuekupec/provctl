@@ -78,13 +78,10 @@ func NewProductionSubscriptionRuntime(ctx context.Context, cfg config.Config) (*
 	}
 	return &SubscriptionRuntime{
 		Service: SubscriptionService{
-			FS:    system.OSFS{},
-			Users: system.CommandUsers{Commander: commander},
-			Store: repository,
-			Executor: plan.Executor{
-				Journal: sqlite.OperationJournal{DB: repository.DB},
-				Locker:  system.FileLocker{Path: meta.LockFile},
-			},
+			FS:         system.OSFS{},
+			Users:      system.CommandUsers{Commander: commander},
+			Store:      repository,
+			Executor:   productionExecutor(repository),
 			PHPVersion: version.Version,
 			Config:     cfg,
 		},

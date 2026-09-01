@@ -127,7 +127,7 @@ func NewProductionWebsiteRuntime(ctx context.Context, cfg config.Config) (*Websi
 		Service: WebsiteService{
 			FS:       system.OSFS{},
 			Store:    repository,
-			Executor: plan.Executor{Journal: sqlite.OperationJournal{DB: repository.DB}, Locker: system.FileLocker{Path: meta.LockFile}},
+			Executor: productionExecutor(repository),
 			Apache:   Apache{FS: system.OSFS{}, Commands: commander, Systemd: systemd, Service: cfg.Apache.Service},
 			PHPFPM:   PHPFPM{FS: system.OSFS{}, Commands: commander, Systemd: systemd},
 			Version:  version,

@@ -39,7 +39,7 @@ func NewProductionCronRuntime(ctx context.Context) (*CronRuntime, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &CronRuntime{Service: CronService{Commands: system.ExecCommander{}, Store: repository, Executor: plan.Executor{Journal: sqlite.OperationJournal{DB: repository.DB}, Locker: system.FileLocker{Path: meta.LockFile}}}, repository: repository}, nil
+	return &CronRuntime{Service: CronService{Commands: system.ExecCommander{}, Store: repository, Executor: productionExecutor(repository)}, repository: repository}, nil
 }
 
 func NewReadOnlyCronRuntime(ctx context.Context) (*CronRuntime, error) {

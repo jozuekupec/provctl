@@ -4,7 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
+	"provctl/internal/audit"
 	"provctl/internal/system"
 )
 
@@ -26,6 +28,7 @@ type Journal interface {
 type Executor struct {
 	Journal Journal
 	Locker  system.Locker
+	Audit   audit.Writer
 }
 
 type ExecutionError struct {
@@ -38,7 +41,20 @@ func (err ExecutionError) Error() string {
 }
 func (err ExecutionError) Unwrap() error { return err.Err }
 
-func (executor Executor) Run(ctx context.Context, operation Plan) (int64, error) {
+func (executor Executor) Run(ctx context.Context, operation Plan) (operationID int64, returnErr error) {
+	started := time.Now()
+	defer func() {
+		if executor.Audit == nil {
+			return
+		}
+		status := "ok"
+		if returnErr != nil {
+			status = "failed"
+		}
+		// The audit entry intentionally has no step previews, command arguments,
+		// SQL, or error string, because those may contain secrets.
+		_ = executor.Audit.Write(context.Background(), audit.Entry{Timestamp: started, Action: operation.Action, Target: operation.Target, Status: status, DurationMS: time.Since(started).Milliseconds(), OperationID: operationID})
+	}()
 	if executor.Journal == nil || executor.Locker == nil {
 		return 0, errors.New("plan executor requires journal and locker")
 	}

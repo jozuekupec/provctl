@@ -53,7 +53,7 @@ func NewProductionBootstrapRuntime(ctx context.Context, cfg config.Config) (*Boo
 	}
 	commander := system.ExecCommander{}
 	systemd := system.CommandSystemd{Commander: commander}
-	return &BootstrapRuntime{Service: BootstrapService{FS: fs, Modules: ApacheModules{FS: fs, AvailablePath: "/etc/apache2/mods-available", EnabledPath: "/etc/apache2/mods-enabled"}, Certificate: DefaultCertificate{FS: fs, Commands: commander, Directory: meta.DefaultSSLDir, Certificate: meta.DefaultSSLCertificate, Key: meta.DefaultSSLKey}, Apache: Apache{FS: fs, Commands: commander, Systemd: systemd, Service: cfg.Apache.Service}, Executor: plan.Executor{Journal: sqlite.OperationJournal{DB: repository.DB}, Locker: system.FileLocker{Path: meta.LockFile}}, Config: cfg, AuditGroup: auditGroup}, repository: repository}, nil
+	return &BootstrapRuntime{Service: BootstrapService{FS: fs, Modules: ApacheModules{FS: fs, AvailablePath: "/etc/apache2/mods-available", EnabledPath: "/etc/apache2/mods-enabled"}, Certificate: DefaultCertificate{FS: fs, Commands: commander, Directory: meta.DefaultSSLDir, Certificate: meta.DefaultSSLCertificate, Key: meta.DefaultSSLKey}, Apache: Apache{FS: fs, Commands: commander, Systemd: systemd, Service: cfg.Apache.Service}, Executor: productionExecutor(repository), Config: cfg, AuditGroup: auditGroup}, repository: repository}, nil
 }
 func (runtime *BootstrapRuntime) Close() error { return runtime.repository.Close() }
 func NewBootstrapPreview(cfg config.Config) (BootstrapService, error) {

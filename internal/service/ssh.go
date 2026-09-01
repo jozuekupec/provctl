@@ -44,7 +44,7 @@ func NewProductionSSHRuntime(ctx context.Context) (*SSHRuntime, error) {
 		return nil, err
 	}
 	commander := system.ExecCommander{}
-	return &SSHRuntime{Service: SSHService{FS: system.OSFS{}, Commands: commander, Users: system.CommandUsers{Commander: commander}, Store: repository, Executor: plan.Executor{Journal: sqlite.OperationJournal{DB: repository.DB}, Locker: system.FileLocker{Path: meta.LockFile}}}, repository: repository}, nil
+	return &SSHRuntime{Service: SSHService{FS: system.OSFS{}, Commands: commander, Users: system.CommandUsers{Commander: commander}, Store: repository, Executor: productionExecutor(repository)}, repository: repository}, nil
 }
 
 func NewReadOnlySSHRuntime(ctx context.Context) (*SSHRuntime, error) {

@@ -59,7 +59,7 @@ func NewProductionPHPRuntime(ctx context.Context, cfg config.Config) (*PHPRuntim
 		FS: system.OSFS{}, Systemd: systemd, Store: repository,
 		PHPFPM:   PHPFPM{FS: system.OSFS{}, Commands: commander, Systemd: systemd},
 		Apache:   Apache{FS: system.OSFS{}, Commands: commander, Systemd: systemd, Service: cfg.Apache.Service},
-		Executor: plan.Executor{Journal: sqlite.OperationJournal{DB: repository.DB}, Locker: system.FileLocker{Path: meta.LockFile}}, Config: cfg,
+		Executor: productionExecutor(repository), Config: cfg,
 	}, repository: repository}, nil
 }
 

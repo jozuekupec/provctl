@@ -63,7 +63,7 @@ func NewProductionReconcileRuntime(ctx context.Context, cfg config.Config) (*Rec
 		FS:       system.OSFS{},
 		Store:    repository,
 		Apache:   Apache{FS: system.OSFS{}, Commands: commander, Systemd: systemd, Service: cfg.Apache.Service},
-		Executor: plan.Executor{Journal: sqlite.OperationJournal{DB: repository.DB}, Locker: system.FileLocker{Path: meta.LockFile}},
+		Executor: productionExecutor(repository),
 		Config:   cfg,
 	}, repository: repository}, nil
 }

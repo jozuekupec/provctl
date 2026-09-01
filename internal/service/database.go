@@ -51,7 +51,7 @@ func NewProductionDatabaseRuntime(ctx context.Context, cfg config.Config) (*Data
 	commander := system.ExecCommander{}
 	return &DatabaseRuntime{Service: DatabaseService{
 		FS: system.OSFS{}, Store: repository, MariaDB: MariaDB{Commands: commander, Config: cfg.MariaDB},
-		Executor: plan.Executor{Journal: sqlite.OperationJournal{DB: repository.DB}, Locker: system.FileLocker{Path: meta.LockFile}}, Config: cfg,
+		Executor: productionExecutor(repository), Config: cfg,
 	}, repository: repository}, nil
 }
 
