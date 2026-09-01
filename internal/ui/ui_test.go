@@ -46,3 +46,26 @@ func TestModel_DetailUsesSelectedWebsite(t *testing.T) {
 		t.Errorf("detail = %q", got)
 	}
 }
+
+func TestModel_ConfirmWebsiteToggleCallsDependency(t *testing.T) {
+	called := false
+	m := New(Deps{SetWebsiteEnabled: func(_ context.Context, subscription, domain string, enabled bool) (int64, error) {
+		called = subscription == "acme" && domain == "example.test" && !enabled
+		return 1, nil
+	}})
+	m.items = []domain.Subscription{{ID: 1, Name: "acme"}}
+	m.websites, m.showWebsites = []domain.Website{{PrimaryDomain: "example.test", Enabled: true}}, true
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("e")})
+	m = updated.(appModel)
+	if m.confirm.action == "" {
+		t.Fatal("toggle did not request confirmation")
+	}
+	updated, command := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("y")})
+	if message := command(); message.(websiteChangedMsg).err != nil {
+		t.Fatal(message.(websiteChangedMsg).err)
+	}
+	if !called {
+		t.Fatal("SetWebsiteEnabled was not called")
+	}
+	_ = updated
+}

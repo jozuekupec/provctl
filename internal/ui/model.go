@@ -12,6 +12,7 @@ import (
 type Deps struct {
 	LoadSubscriptions func(context.Context) ([]domain.Subscription, error)
 	LoadWebsites      func(context.Context, int64) ([]domain.Website, error)
+	SetWebsiteEnabled func(context.Context, string, string, bool) (int64, error)
 }
 type websitesLoadedMsg struct {
 	items []domain.Website
@@ -21,6 +22,11 @@ type websitesLoadedMsg struct {
 type subscriptionsLoadedMsg struct {
 	items []domain.Subscription
 	err   error
+}
+type websiteChangedMsg struct {
+	err     error
+	enabled bool
+	domain  string
 }
 
 type focus int
@@ -33,6 +39,11 @@ const (
 )
 
 type outputState struct{ lines []string }
+type confirmState struct {
+	action  string
+	enabled bool
+	domain  string
+}
 
 func (output outputState) append(line string) outputState {
 	next := append([]string(nil), output.lines...)
@@ -55,6 +66,17 @@ type appModel struct {
 	focus         focus
 	output        outputState
 	status        string
+	confirm       confirmState
+}
+
+func (m appModel) changeWebsite() tea.Msg {
+	if m.deps.SetWebsiteEnabled == nil || len(m.items) == 0 || len(m.websites) == 0 {
+		return websiteChangedMsg{err: context.Canceled}
+	}
+	website := m.websites[clamp(m.websiteCursor, len(m.websites))]
+	subscription := m.items[clamp(m.cursor, len(m.items))]
+	_, err := m.deps.SetWebsiteEnabled(context.Background(), subscription.Name, website.PrimaryDomain, m.confirm.enabled)
+	return websiteChangedMsg{err: err, enabled: m.confirm.enabled, domain: website.PrimaryDomain}
 }
 
 func (m appModel) loadWebsites() tea.Msg {

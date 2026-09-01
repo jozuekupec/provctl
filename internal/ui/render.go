@@ -40,6 +40,9 @@ func (m appModel) View() string {
 		lines = append(lines, "", "Output")
 		lines = append(lines, m.output.lines...)
 	}
+	if m.confirm.action != "" {
+		lines = append(lines, "", "Confirm", fmt.Sprintf("Set %s enabled=%t? Press y to continue, esc to cancel.", m.confirm.domain, m.confirm.enabled))
+	}
 	lines = append(lines, "", m.status)
 	return strings.Join(lines, "\n")
 }

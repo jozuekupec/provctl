@@ -159,7 +159,9 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   načítá přes `tea.Cmd`, umí pohyb a refresh a má modelový test. Websites se
   nyní načtou pro vybranou subscription přes service vrstvu. Detail a omezený
   copy-on-write output panel jsou hotové a testované; následují potvrzované
-  mutace a vizuální terminálové ověření.
+  mutace a vizuální terminálové ověření. První omezená mutace je dostupná:
+  vybraný website lze přes `e` potvrdit `y` a asynchronně enable/disable přes
+  `tea.Cmd` a service seam; modelový test ověřuje cíl i potvrzovací bránu.
 - [ ] **M9 — distribuce:** nfpm, maintainer skripty, CI, APT repozitář a
   package testy (`lintian`, `piuparts`, upgrade/purge).
 - [ ] **M10 — migrace:** `subscription adopt` pro existující weby.
