@@ -71,3 +71,29 @@ func TestRepository_FinishBackupUpdatesOnlyRunningRecord(t *testing.T) {
 		t.Errorf("backup = %#v", backup)
 	}
 }
+
+func TestRepository_BackupByIDAnyFindsRecordedBackup(t *testing.T) {
+	repository, err := Open(context.Background(), filepath.Join(t.TempDir(), "provctl.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer repository.Close()
+	if err := repository.CreateSubscription(context.Background(), domain.Subscription{Name: "acme", UnixUser: "acme", UnixUID: 5000, Home: "/vhosts/acme", PHPMaxChildren: 10, PHPMemoryLimit: "256M", PHPUploadMax: "64M", PHPMaxExecTime: 60, SSHAccess: "none"}); err != nil {
+		t.Fatal(err)
+	}
+	var subscriptionID int64
+	if err := repository.DB.QueryRow("SELECT id FROM subscriptions WHERE name = 'acme'").Scan(&subscriptionID); err != nil {
+		t.Fatal(err)
+	}
+	id, err := repository.CreateBackup(context.Background(), domain.Backup{SubscriptionID: subscriptionID, Path: "/backups/acme/archive", Status: "running", StartedAt: time.Now()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	backup, err := repository.BackupByIDAny(context.Background(), id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if backup.Path != "/backups/acme/archive" || backup.SubscriptionID != subscriptionID {
+		t.Errorf("backup = %#v", backup)
+	}
+}

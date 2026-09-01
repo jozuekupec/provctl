@@ -37,6 +37,17 @@ func (repository *Repository) BackupByID(ctx context.Context, subscriptionID, id
 	return backup, nil
 }
 
+// BackupByIDAny returns a backup even when the original subscription metadata
+// is no longer present, which is required to restore onto a clean server.
+func (repository *Repository) BackupByIDAny(ctx context.Context, id int64) (domain.Backup, error) {
+	row := repository.DB.QueryRowContext(ctx, `SELECT id, subscription_id, path, COALESCE(size_bytes, 0), status, started_at, COALESCE(finished_at, '') FROM backups WHERE id = ?`, id)
+	backup, err := scanBackup(row)
+	if err != nil {
+		return domain.Backup{}, fmt.Errorf("find backup %d: %w", id, err)
+	}
+	return backup, nil
+}
+
 func (repository *Repository) CreateBackup(ctx context.Context, backup domain.Backup) (int64, error) {
 	result, err := repository.DB.ExecContext(ctx, `INSERT INTO backups (subscription_id, path, status, started_at) VALUES (?, ?, ?, ?)`, backup.SubscriptionID, backup.Path, backup.Status, backup.StartedAt.UTC().Format(time.RFC3339))
 	if err != nil {

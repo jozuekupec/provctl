@@ -155,6 +155,8 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   Pro její atomický přesun stagingu existuje testovaný volitelný `FileMover`
   seam, který nerozšiřuje základní FS kontrakt ani nekomplikuje stávající fake
   implementace.
+  Evidence backupu umí archiv vyhledat samostatně podle ID, takže clean-server
+  restore nebude falešně závislý na existenci původního subscription záznamu.
   Pro databázový dump je
   připraven rozšířený allowlisted command seam pro bezpečné streamování stdout
   do nového souboru bez `sh -c`; je krytý jednotkovým testem.
