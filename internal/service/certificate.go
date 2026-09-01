@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"provctl/internal/audit"
 	"provctl/internal/config"
 	"provctl/internal/domain"
 	"provctl/internal/meta"
@@ -93,6 +94,7 @@ type CertificateService struct {
 	Systemd  system.Systemd
 	Apache   string
 	LiveDir  string
+	Audit    audit.Writer
 }
 
 // SSLService coordinates the documented Certbot state machine. Certbot
@@ -106,12 +108,17 @@ type SSLService struct {
 	Apache   ApacheVHostApplier
 	Websites WebsiteService
 	Config   config.Config
+	Audit    audit.Writer
 }
 
 // Enable issues a certificate after making the HTTP ACME endpoint reachable,
 // then switches the generated vhost to TLS. DNS mismatch is deliberately a
 // guarded warning: NAT deployments may need --force.
-func (service SSLService) Enable(ctx context.Context, subscriptionName, primaryDomain string, force, forceHTTPS, renewalCheck bool) error {
+func (service SSLService) Enable(ctx context.Context, subscriptionName, primaryDomain string, force, forceHTTPS, renewalCheck bool) (returnErr error) {
+	started := time.Now()
+	defer func() {
+		writeDirectAudit(service.Audit, "ssl.enable", subscriptionName+"/"+primaryDomain, started, returnErr)
+	}()
 	if service.Store == nil || service.Network == nil || service.Commands == nil || service.FS == nil || service.Apache == nil {
 		return errors.New("SSL enable requires store, network, filesystem, commander, and Apache")
 	}
@@ -195,7 +202,11 @@ func (service SSLService) Enable(ctx context.Context, subscriptionName, primaryD
 
 // Disable removes TLS from the generated configuration and leaves Certbot's
 // lineage untouched to avoid consuming issuance rate limits on re-enable.
-func (service SSLService) Disable(ctx context.Context, subscriptionName, primaryDomain string) error {
+func (service SSLService) Disable(ctx context.Context, subscriptionName, primaryDomain string) (returnErr error) {
+	started := time.Now()
+	defer func() {
+		writeDirectAudit(service.Audit, "ssl.disable", subscriptionName+"/"+primaryDomain, started, returnErr)
+	}()
 	if service.Store == nil || service.Apache == nil {
 		return errors.New("SSL disable requires store and Apache")
 	}
@@ -311,7 +322,7 @@ func NewProductionCertificateRuntime(ctx context.Context, apacheService string) 
 		return nil, err
 	}
 	commander := system.ExecCommander{}
-	return &CertificateRuntime{Service: CertificateService{Store: repository, FS: system.OSFS{}, Commands: commander, Systemd: system.CommandSystemd{Commander: commander}, Apache: apacheService}, repository: repository}, nil
+	return &CertificateRuntime{Service: CertificateService{Store: repository, FS: system.OSFS{}, Commands: commander, Systemd: system.CommandSystemd{Commander: commander}, Apache: apacheService, Audit: audit.FileWriter{Path: meta.AuditLog}}, repository: repository}, nil
 }
 
 func NewProductionSSLRuntime(ctx context.Context, cfg config.Config) (*SSLRuntime, error) {
@@ -322,7 +333,7 @@ func NewProductionSSLRuntime(ctx context.Context, cfg config.Config) (*SSLRuntim
 	commander := system.ExecCommander{}
 	systemd := system.CommandSystemd{Commander: commander}
 	apache := Apache{FS: system.OSFS{}, Commands: commander, Systemd: systemd, Service: cfg.Apache.Service}
-	return &SSLRuntime{Service: SSLService{Store: repository, Network: productionSSLNetwork{}, Commands: commander, FS: system.OSFS{}, Apache: apache, Websites: WebsiteService{Config: cfg}, Config: cfg}, repository: repository}, nil
+	return &SSLRuntime{Service: SSLService{Store: repository, Network: productionSSLNetwork{}, Commands: commander, FS: system.OSFS{}, Apache: apache, Websites: WebsiteService{Config: cfg}, Config: cfg, Audit: audit.FileWriter{Path: meta.AuditLog}}, repository: repository}, nil
 }
 
 func (runtime *CertificateRuntime) Close() error { return runtime.repository.Close() }
@@ -346,7 +357,11 @@ func (service CertificateService) Status(ctx context.Context, subscription, prim
 // DeployHook updates the cached expiry when the lineage is known and reloads
 // Apache. It intentionally succeeds for a Certbot lineage not managed by
 // provctl so the global hook also covers externally issued certificates.
-func (service CertificateService) DeployHook(ctx context.Context, lineagePath string) error {
+func (service CertificateService) DeployHook(ctx context.Context, lineagePath string) (returnErr error) {
+	started := time.Now()
+	defer func() {
+		writeDirectAudit(service.Audit, "ssl.deploy-hook", filepath.Base(lineagePath), started, returnErr)
+	}()
 	if service.Store == nil || service.Systemd == nil || service.Commands == nil {
 		return errors.New("certificate hook requires store, commander, and systemd")
 	}

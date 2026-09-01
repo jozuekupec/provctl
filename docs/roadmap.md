@@ -131,8 +131,9 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   databází a záloh. Audit JSONL je nyní centrálně připojený k executorům všech
   žurnálovaných produkčních operací; zapisuje pouze aktéra, akci, cíl, stav,
   délku a operation ID, nikdy argumenty, SQL, hesla ani chyby s potenciálně
-  citlivým obsahem. Záznam má samostatný test formátu; zbývá pokrýt přímé
-  mutace mimo executor a backup/restore.
+  citlivým obsahem. Záznam má samostatný test formátu; audit nyní pokrývá i
+  přímé `ssl enable|disable` a Certbot deploy-hook. Zbývá backup/restore a
+  vynucené kvóty počtu objektů.
 - [~] **M8 — TUI:** návrh je zaznamenán v [tui-design.md](tui-design.md) a
   cíleně přebírá konzistentní Bubble Tea vzor z projektu `depo`: hodnotový
   model, `Deps`, samostatné routing/render/keys/theme a I/O jen přes `tea.Cmd`.
