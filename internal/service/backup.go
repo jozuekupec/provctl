@@ -207,6 +207,19 @@ func (service BackupService) Inspect(ctx context.Context, name string, id int64)
 	return metadata, nil
 }
 
+// PrepareRestore validates an archive before any restore action is permitted.
+// The mutating restore path must call this first.
+func (service BackupService) PrepareRestore(ctx context.Context, name string, id int64) (domain.BackupMetadata, error) {
+	metadata, err := service.Inspect(ctx, name, id)
+	if err != nil {
+		return domain.BackupMetadata{}, err
+	}
+	if metadata.Subscription.Home == "" || metadata.Subscription.UnixUser == "" {
+		return domain.BackupMetadata{}, fmt.Errorf("backup metadata has no subscription identity")
+	}
+	return metadata, nil
+}
+
 func (service BackupService) verifyChecksums(backupPath string) error {
 	contents, err := service.FS.ReadFile(filepath.Join(backupPath, "SHA256SUMS"))
 	if err != nil {

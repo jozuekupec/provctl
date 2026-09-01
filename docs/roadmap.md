@@ -149,6 +149,9 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   kontroluje před systémovou změnou. Zálohu doplňují konzistentní databázové
   dumpy (`mysqldump` → zstd) bez shellu, zahrnuté v metadatech i checksumách.
   Stále zbývá restore.
+  `backup restore <subscription> <id> --dry-run` nyní bezpečně ověří
+  manifest, identitu subscription a SHA256SUMS bez jakékoli změny systému;
+  mutující fáze obnovy stále zbývá.
   Pro databázový dump je
   připraven rozšířený allowlisted command seam pro bezpečné streamování stdout
   do nového souboru bez `sh -c`; je krytý jednotkovým testem.

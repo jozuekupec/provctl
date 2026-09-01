@@ -14,7 +14,39 @@ import (
 
 func newBackupCommand() *cobra.Command {
 	command := &cobra.Command{Use: "backup", Short: "manage subscription backups"}
-	command.AddCommand(newBackupCreateCommand(), newBackupListCommand(), newBackupInspectCommand())
+	command.AddCommand(newBackupCreateCommand(), newBackupListCommand(), newBackupInspectCommand(), newBackupRestoreCommand())
+	return command
+}
+
+func newBackupRestoreCommand() *cobra.Command {
+	var configPath string
+	var dryRun bool
+	command := &cobra.Command{Use: "restore <subscription> <id>", Short: "validate and restore a subscription backup", Args: cobra.ExactArgs(2), RunE: func(command *cobra.Command, args []string) error {
+		if !dryRun {
+			return fmt.Errorf("restore is not yet enabled; rerun with --dry-run to validate the archive")
+		}
+		cfg, err := config.Load(configPath)
+		if err != nil {
+			return fmt.Errorf("load configuration: %w", err)
+		}
+		var id int64
+		if _, err := fmt.Sscan(args[1], &id); err != nil {
+			return fmt.Errorf("parse backup ID: %w", err)
+		}
+		runtime, err := service.NewReadOnlyBackupRuntime(context.Background(), cfg)
+		if err != nil {
+			return fmt.Errorf("open backup state: %w", err)
+		}
+		defer runtime.Close()
+		metadata, err := runtime.Service.PrepareRestore(context.Background(), args[0], id)
+		if err != nil {
+			return err
+		}
+		_, err = fmt.Fprintf(command.OutOrStdout(), "Validated backup for subscription %q from %s; no changes made.\n", metadata.Subscription.Name, metadata.CreatedAt.UTC().Format("2006-01-02T15:04:05Z"))
+		return err
+	}}
+	command.Flags().StringVar(&configPath, "config", meta.ConfigFile, "path to config.toml")
+	command.Flags().BoolVar(&dryRun, "dry-run", false, "validate the backup without restoring")
 	return command
 }
 
