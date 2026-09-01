@@ -4,6 +4,7 @@ import (
 	"context"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"provctl/internal/domain"
 )
@@ -39,5 +40,34 @@ func TestRepository_ListBackups_OrdersNewestFirst(t *testing.T) {
 	}
 	if got, want := backups[1].SizeBytes, int64(10); got != want {
 		t.Errorf("size = %d, want %d", got, want)
+	}
+}
+
+func TestRepository_FinishBackupUpdatesOnlyRunningRecord(t *testing.T) {
+	repository, err := Open(context.Background(), filepath.Join(t.TempDir(), "provctl.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer repository.Close()
+	if err := repository.CreateSubscription(context.Background(), domain.Subscription{Name: "acme", UnixUser: "acme", UnixUID: 5000, Home: "/vhosts/acme", PHPMaxChildren: 10, PHPMemoryLimit: "256M", PHPUploadMax: "64M", PHPMaxExecTime: 60, SSHAccess: "none"}); err != nil {
+		t.Fatal(err)
+	}
+	var subscriptionID int64
+	if err := repository.DB.QueryRow("SELECT id FROM subscriptions WHERE name = 'acme'").Scan(&subscriptionID); err != nil {
+		t.Fatal(err)
+	}
+	id, err := repository.CreateBackup(context.Background(), domain.Backup{SubscriptionID: subscriptionID, Path: "/backups/acme/next", Status: "running", StartedAt: time.Now()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := repository.FinishBackup(context.Background(), id, 42, "complete"); err != nil {
+		t.Fatal(err)
+	}
+	backup, err := repository.BackupByID(context.Background(), subscriptionID, id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if backup.Status != "complete" || backup.SizeBytes != 42 || backup.FinishedAt.IsZero() {
+		t.Errorf("backup = %#v", backup)
 	}
 }

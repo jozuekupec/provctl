@@ -37,6 +37,36 @@ func (repository *Repository) BackupByID(ctx context.Context, subscriptionID, id
 	return backup, nil
 }
 
+func (repository *Repository) CreateBackup(ctx context.Context, backup domain.Backup) (int64, error) {
+	result, err := repository.DB.ExecContext(ctx, `INSERT INTO backups (subscription_id, path, status, started_at) VALUES (?, ?, ?, ?)`, backup.SubscriptionID, backup.Path, backup.Status, backup.StartedAt.UTC().Format(time.RFC3339))
+	if err != nil {
+		return 0, fmt.Errorf("insert backup: %w", err)
+	}
+	id, err := result.LastInsertId()
+	if err != nil {
+		return 0, fmt.Errorf("read backup ID: %w", err)
+	}
+	return id, nil
+}
+
+func (repository *Repository) FinishBackup(ctx context.Context, id, sizeBytes int64, status string) error {
+	if status != "complete" && status != "failed" {
+		return fmt.Errorf("invalid final backup status %q", status)
+	}
+	result, err := repository.DB.ExecContext(ctx, `UPDATE backups SET size_bytes = ?, status = ?, finished_at = ? WHERE id = ? AND status = 'running'`, sizeBytes, status, time.Now().UTC().Format(time.RFC3339), id)
+	if err != nil {
+		return fmt.Errorf("finish backup %d: %w", id, err)
+	}
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("count backup update: %w", err)
+	}
+	if rows != 1 {
+		return fmt.Errorf("running backup %d not found", id)
+	}
+	return nil
+}
+
 type backupScanner interface{ Scan(...any) error }
 
 func scanBackup(scanner backupScanner) (domain.Backup, error) {

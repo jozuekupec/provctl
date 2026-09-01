@@ -141,6 +141,9 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   vytvoření archivu a restore. `provctl backup inspect <subscription> <id>`
   nyní navíc bezpečně ověřuje cestu, `metadata.json`, formát verze 1 a
   SHA256SUMS přes filesystem seam bez spouštění shellu.
+  SQLite nyní také atomicky eviduje životní cyklus budoucí archivace
+  `running → complete|failed`, včetně výsledné velikosti a času dokončení;
+  přímé vytvoření archivu a restore stále zbývají.
 - [~] **M8 — TUI:** návrh je zaznamenán v [tui-design.md](tui-design.md) a
   cíleně přebírá konzistentní Bubble Tea vzor z projektu `depo`: hodnotový
   model, `Deps`, samostatné routing/render/keys/theme a I/O jen přes `tea.Cmd`.
