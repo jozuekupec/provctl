@@ -13,3 +13,11 @@ type Backup struct {
 	StartedAt      time.Time
 	FinishedAt     time.Time
 }
+
+// BackupMetadata is the non-secret manifest stored in metadata.json.
+type BackupMetadata struct {
+	FormatVersion  int          `json:"format_version"`
+	ProvctlVersion string       `json:"provctl_version"`
+	CreatedAt      time.Time    `json:"created_at"`
+	Subscription   Subscription `json:"subscription"`
+}

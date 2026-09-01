@@ -138,7 +138,9 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   přímé `ssl enable|disable` a Certbot deploy-hook. Backup základ nyní
   obsahuje doménový model, SQLite čtení historie (včetně `running` a
   `failed`) a read-only `provctl backup list <subscription>`; zbývá bezpečné
-  vytvoření archivu, ověřovací `inspect` a restore.
+  vytvoření archivu a restore. `provctl backup inspect <subscription> <id>`
+  nyní navíc bezpečně ověřuje cestu, `metadata.json`, formát verze 1 a
+  SHA256SUMS přes filesystem seam bez spouštění shellu.
 - [~] **M8 — TUI:** návrh je zaznamenán v [tui-design.md](tui-design.md) a
   cíleně přebírá konzistentní Bubble Tea vzor z projektu `depo`: hodnotový
   model, `Deps`, samostatné routing/render/keys/theme a I/O jen přes `tea.Cmd`.

@@ -28,6 +28,15 @@ func (repository *Repository) ListBackups(ctx context.Context, subscriptionID in
 	return backups, nil
 }
 
+func (repository *Repository) BackupByID(ctx context.Context, subscriptionID, id int64) (domain.Backup, error) {
+	row := repository.DB.QueryRowContext(ctx, `SELECT id, subscription_id, path, COALESCE(size_bytes, 0), status, started_at, COALESCE(finished_at, '') FROM backups WHERE subscription_id = ? AND id = ?`, subscriptionID, id)
+	backup, err := scanBackup(row)
+	if err != nil {
+		return domain.Backup{}, fmt.Errorf("find backup %d: %w", id, err)
+	}
+	return backup, nil
+}
+
 type backupScanner interface{ Scan(...any) error }
 
 func scanBackup(scanner backupScanner) (domain.Backup, error) {

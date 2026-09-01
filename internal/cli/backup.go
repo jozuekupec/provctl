@@ -14,7 +14,34 @@ import (
 
 func newBackupCommand() *cobra.Command {
 	command := &cobra.Command{Use: "backup", Short: "manage subscription backups"}
-	command.AddCommand(newBackupListCommand())
+	command.AddCommand(newBackupListCommand(), newBackupInspectCommand())
+	return command
+}
+
+func newBackupInspectCommand() *cobra.Command {
+	var configPath string
+	command := &cobra.Command{Use: "inspect <subscription> <id>", Short: "inspect a backup manifest", Args: cobra.ExactArgs(2), RunE: func(command *cobra.Command, args []string) error {
+		cfg, err := config.Load(configPath)
+		if err != nil {
+			return fmt.Errorf("load configuration: %w", err)
+		}
+		var id int64
+		if _, err := fmt.Sscan(args[1], &id); err != nil {
+			return fmt.Errorf("parse backup ID: %w", err)
+		}
+		runtime, err := service.NewReadOnlyBackupRuntime(context.Background(), cfg)
+		if err != nil {
+			return fmt.Errorf("open backup state: %w", err)
+		}
+		defer runtime.Close()
+		metadata, err := runtime.Service.Inspect(context.Background(), args[0], id)
+		if err != nil {
+			return err
+		}
+		_, err = fmt.Fprintf(command.OutOrStdout(), "Format: %d\nCreated: %s\nSubscription: %s\n", metadata.FormatVersion, metadata.CreatedAt.UTC().Format("2006-01-02T15:04:05Z"), metadata.Subscription.Name)
+		return err
+	}}
+	command.Flags().StringVar(&configPath, "config", meta.ConfigFile, "path to config.toml")
 	return command
 }
 
