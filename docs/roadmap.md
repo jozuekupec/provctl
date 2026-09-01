@@ -124,8 +124,11 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   HTTP/HTTPS odpověď a živou expiraci certifikátu (`WARN` pod 21 dní, `FAIL`
   pod 7 dní nebo po expiraci); síť a čtení certifikátu mají testovací seam a
   síť nepřebírá systémový proxy server. Úspěšná i chybová cesta jsou pokryty
-  offline testy a celý `make test` prošel. Zbývá disková kvóta a ostatní části
-  milníku: backup/restore, audit log a vynucené kvóty.
+  offline testy a celý `make test` prošel. Měřenou diskovou kvótu lze nyní při
+  vytvoření subscription nastavit přes `--quota-disk 20G`; ukládá se do
+  SQLite, `health` ji změří přes `du -sb` a hlásí `WARN` nad 90 % a `FAIL` po
+  překročení. Zbývá backup/restore, audit log a vynucené kvóty počtu webů,
+  databází a záloh.
 - [~] **M8 — TUI:** návrh je zaznamenán v [tui-design.md](tui-design.md) a
   cíleně přebírá konzistentní Bubble Tea vzor z projektu `depo`: hodnotový
   model, `Deps`, samostatné routing/render/keys/theme a I/O jen přes `tea.Cmd`.

@@ -35,7 +35,7 @@ func TestRepository_ListAndFindSubscriptions(t *testing.T) {
 	defer repository.Close()
 	for _, subscription := range []domain.Subscription{
 		{Name: "beta", UnixUser: "beta", UnixUID: 5001, Home: "/vhosts/beta", PHPMaxChildren: 10, PHPMemoryLimit: "256M", PHPUploadMax: "64M", PHPMaxExecTime: 60, SSHAccess: "none"},
-		{Name: "acme", UnixUser: "acme", UnixUID: 5000, Home: "/vhosts/acme", PHPMaxChildren: 10, PHPMemoryLimit: "256M", PHPUploadMax: "64M", PHPMaxExecTime: 60, SSHAccess: "none"},
+		{Name: "acme", UnixUser: "acme", UnixUID: 5000, Home: "/vhosts/acme", PHPMaxChildren: 10, PHPMemoryLimit: "256M", PHPUploadMax: "64M", PHPMaxExecTime: 60, SSHAccess: "none", QuotaDiskBytes: 20 * 1024 * 1024 * 1024},
 	} {
 		if err := repository.CreateSubscription(context.Background(), subscription); err != nil {
 			t.Fatalf("CreateSubscription(%q) error = %v", subscription.Name, err)
@@ -57,5 +57,8 @@ func TestRepository_ListAndFindSubscriptions(t *testing.T) {
 	}
 	if got, want := found.UnixUID, 5001; got != want {
 		t.Errorf("UnixUID = %d, want %d", got, want)
+	}
+	if got, want := subscriptions[0].QuotaDiskBytes, int64(20*1024*1024*1024); got != want {
+		t.Errorf("QuotaDiskBytes = %d, want %d", got, want)
 	}
 }

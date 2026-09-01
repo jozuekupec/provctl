@@ -55,6 +55,10 @@ type SubscriptionService struct {
 	Config     config.Config
 }
 
+type SubscriptionCreateOptions struct {
+	QuotaDiskBytes int64
+}
+
 // SubscriptionRuntime owns the database connection used by a production command.
 type SubscriptionRuntime struct {
 	Service    SubscriptionService
@@ -108,7 +112,11 @@ func NewReadOnlySubscriptionRuntime(ctx context.Context, cfg config.Config) (*Su
 func (runtime *SubscriptionRuntime) Close() error { return runtime.repository.Close() }
 
 func (service SubscriptionService) Create(ctx context.Context, name string) (int64, error) {
-	operation, err := service.PrepareCreate(ctx, name)
+	return service.CreateWithOptions(ctx, name, SubscriptionCreateOptions{})
+}
+
+func (service SubscriptionService) CreateWithOptions(ctx context.Context, name string, options SubscriptionCreateOptions) (int64, error) {
+	operation, err := service.PrepareCreateWithOptions(ctx, name, options)
 	if err != nil {
 		return 0, err
 	}
@@ -171,8 +179,15 @@ func (service SubscriptionService) validateDeletionTarget(subscription domain.Su
 
 // PrepareCreate validates the request and reads current state without changing it.
 func (service SubscriptionService) PrepareCreate(ctx context.Context, name string) (plan.Plan, error) {
+	return service.PrepareCreateWithOptions(ctx, name, SubscriptionCreateOptions{})
+}
+
+func (service SubscriptionService) PrepareCreateWithOptions(ctx context.Context, name string, options SubscriptionCreateOptions) (plan.Plan, error) {
 	if err := domain.ValidateSubscriptionName(name); err != nil {
 		return plan.Plan{}, err
+	}
+	if options.QuotaDiskBytes < 0 {
+		return plan.Plan{}, errors.New("disk quota must not be negative")
 	}
 	exists, err := service.Store.SubscriptionExists(ctx, name)
 	if err != nil {
@@ -195,7 +210,7 @@ func (service SubscriptionService) PrepareCreate(ctx context.Context, name strin
 	if phpVersion == "" {
 		phpVersion = service.Config.PHP.DefaultVersion
 	}
-	subscription := domain.Subscription{Name: name, UnixUser: name, UnixUID: uid, Home: home, PHPVersion: phpVersion, PHPMaxChildren: service.Config.PHP.MaxChildren, PHPMemoryLimit: service.Config.PHP.MemoryLimit, PHPUploadMax: service.Config.PHP.UploadMax, PHPMaxExecTime: service.Config.PHP.MaxExecTime, SSHAccess: "none"}
+	subscription := domain.Subscription{Name: name, UnixUser: name, UnixUID: uid, Home: home, PHPVersion: phpVersion, PHPMaxChildren: service.Config.PHP.MaxChildren, PHPMemoryLimit: service.Config.PHP.MemoryLimit, PHPUploadMax: service.Config.PHP.UploadMax, PHPMaxExecTime: service.Config.PHP.MaxExecTime, SSHAccess: "none", QuotaDiskBytes: options.QuotaDiskBytes}
 	return service.createPlan(subscription), nil
 }
 

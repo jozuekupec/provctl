@@ -162,7 +162,30 @@ func (service HealthService) checkWebsite(ctx context.Context, subscription doma
 	if website.SSLEnabled {
 		checks = append(checks, service.checkHTTP(ctx, prefix, website.PrimaryDomain, true), service.checkCertificate(ctx, prefix, subscription.Name, website.PrimaryDomain))
 	}
+	if subscription.QuotaDiskBytes > 0 {
+		checks = append(checks, service.checkDisk(ctx, prefix, subscription))
+	}
 	return checks
+}
+
+func (service HealthService) checkDisk(ctx context.Context, prefix string, subscription domain.Subscription) Check {
+	result, err := service.Commands.Run(ctx, "/usr/bin/du", "-sb", subscription.Home)
+	if err != nil {
+		return Check{Name: prefix + " disk", Status: CheckFail, Detail: fmt.Sprintf("cannot measure disk usage: %v", err), Hint: "verify the subscription home"}
+	}
+	var used int64
+	if _, err := fmt.Sscan(result.Stdout, &used); err != nil || used < 0 {
+		return Check{Name: prefix + " disk", Status: CheckFail, Detail: "cannot parse disk usage", Hint: "verify the du command output"}
+	}
+	percent := float64(used) / float64(subscription.QuotaDiskBytes) * 100
+	detail := fmt.Sprintf("%d of %d bytes (%.0f%%)", used, subscription.QuotaDiskBytes, percent)
+	if used > subscription.QuotaDiskBytes {
+		return Check{Name: prefix + " disk", Status: CheckFail, Detail: detail, Hint: "free disk space or raise the quota"}
+	}
+	if percent > 90 {
+		return Check{Name: prefix + " disk", Status: CheckWarn, Detail: detail, Hint: "free disk space or raise the quota"}
+	}
+	return Check{Name: prefix + " disk", Status: CheckOK, Detail: detail}
 }
 
 func (service HealthService) checkCertificate(ctx context.Context, prefix, subscriptionName, domainName string) Check {

@@ -25,6 +25,7 @@ type Subscription struct {
 	PHPMaxExecTime int
 	SSHAccess      string
 	Status         string
+	QuotaDiskBytes int64
 }
 
 // SSHKey is the persisted public-key metadata for one subscription.

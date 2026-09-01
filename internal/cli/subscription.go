@@ -3,6 +3,9 @@ package cli
 import (
 	"context"
 	"fmt"
+	"regexp"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -136,7 +139,7 @@ func openReadOnlySubscriptionService(configPath string) (service.SubscriptionSer
 }
 
 func newSubscriptionCreateCommand() *cobra.Command {
-	var configPath string
+	var configPath, quotaDisk string
 	var dryRun bool
 	command := &cobra.Command{
 		Use:   "create <name>",
@@ -147,6 +150,11 @@ func newSubscriptionCreateCommand() *cobra.Command {
 			if err != nil {
 				return fmt.Errorf("load configuration: %w", err)
 			}
+			quotaBytes, err := parseByteSize(quotaDisk)
+			if err != nil {
+				return fmt.Errorf("parse --quota-disk: %w", err)
+			}
+			options := service.SubscriptionCreateOptions{QuotaDiskBytes: quotaBytes}
 			ctx := context.Background()
 			if dryRun {
 				runtime, err := service.NewReadOnlySubscriptionRuntime(ctx, cfg)
@@ -154,7 +162,7 @@ func newSubscriptionCreateCommand() *cobra.Command {
 					return fmt.Errorf("open subscription state: %w", err)
 				}
 				defer runtime.Close()
-				operation, err := runtime.Service.PrepareCreate(ctx, args[0])
+				operation, err := runtime.Service.PrepareCreateWithOptions(ctx, args[0], options)
 				if err != nil {
 					return err
 				}
@@ -167,7 +175,7 @@ func newSubscriptionCreateCommand() *cobra.Command {
 			defer runtime.Close()
 			lockCtx, cancel := context.WithTimeout(ctx, time.Duration(cfg.Limits.LockTimeoutSeconds)*time.Second)
 			defer cancel()
-			operationID, err := runtime.Service.Create(lockCtx, args[0])
+			operationID, err := runtime.Service.CreateWithOptions(lockCtx, args[0], options)
 			if err != nil {
 				return err
 			}
@@ -176,8 +184,34 @@ func newSubscriptionCreateCommand() *cobra.Command {
 		},
 	}
 	command.Flags().StringVar(&configPath, "config", meta.ConfigFile, "path to config.toml")
+	command.Flags().StringVar(&quotaDisk, "quota-disk", "", "measured disk quota (for example 20G)")
 	command.Flags().BoolVar(&dryRun, "dry-run", false, "show the operation plan without changing the system")
 	return command
+}
+
+var byteSize = regexp.MustCompile(`^([1-9][0-9]*)([KMGT]?)$`)
+
+func parseByteSize(value string) (int64, error) {
+	if value == "" {
+		return 0, nil
+	}
+	match := byteSize.FindStringSubmatch(strings.ToUpper(value))
+	if match == nil {
+		return 0, fmt.Errorf("must be a positive size such as 20G")
+	}
+	amount, err := strconv.ParseInt(match[1], 10, 64)
+	if err != nil {
+		return 0, err
+	}
+	for range match[2] {
+		for range strings.Index("KMGT", match[2]) + 1 {
+			if amount > (1<<63-1)/1024 {
+				return 0, fmt.Errorf("size is too large")
+			}
+			amount *= 1024
+		}
+	}
+	return amount, nil
 }
 
 func writePlan(command *cobra.Command, operation plan.Plan) error {
@@ -205,6 +239,6 @@ func writeSubscriptionList(command *cobra.Command, subscriptions []domain.Subscr
 }
 
 func writeSubscription(command *cobra.Command, subscription domain.Subscription) error {
-	_, err := fmt.Fprintf(command.OutOrStdout(), "Name: %s\nUnix user: %s\nUID: %d\nHome: %s\nStatus: %s\nPHP version: %s\nSSH access: %s\n", subscription.Name, subscription.UnixUser, subscription.UnixUID, subscription.Home, subscription.Status, subscription.PHPVersion, subscription.SSHAccess)
+	_, err := fmt.Fprintf(command.OutOrStdout(), "Name: %s\nUnix user: %s\nUID: %d\nHome: %s\nStatus: %s\nPHP version: %s\nSSH access: %s\nDisk quota: %d bytes\n", subscription.Name, subscription.UnixUser, subscription.UnixUID, subscription.Home, subscription.Status, subscription.PHPVersion, subscription.SSHAccess, subscription.QuotaDiskBytes)
 	return err
 }

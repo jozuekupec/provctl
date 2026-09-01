@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"io"
 	"os"
 	"path/filepath"
 	"testing"
@@ -49,6 +50,16 @@ func (network healthNetwork) Get(context.Context, string, string) (int, error) {
 type healthDatabase struct{ err error }
 
 func (database healthDatabase) PingContext(context.Context) error { return database.err }
+
+type healthCommander struct{ result system.Result }
+
+func (commander healthCommander) Run(context.Context, string, ...string) (system.Result, error) {
+	return commander.result, nil
+}
+
+func (commander healthCommander) RunWithStdin(context.Context, io.Reader, string, ...string) (system.Result, error) {
+	return commander.result, nil
+}
 
 type healthCertificates struct{ notAfter time.Time }
 
@@ -143,5 +154,17 @@ func TestHealthService_RunWarnsForCertificateExpiringSoon(t *testing.T) {
 	}
 	if checks[len(checks)-1].Status != CheckWarn {
 		t.Errorf("certificate check status = %s, want WARN", checks[len(checks)-1].Status)
+	}
+}
+
+func TestHealthService_CheckDisk(t *testing.T) {
+	service := HealthService{Commands: healthCommander{result: system.Result{Stdout: "950\t/vhosts/acme\n"}}}
+	subscription := domain.Subscription{Name: "acme", Home: "/vhosts/acme", QuotaDiskBytes: 1000}
+	if got := service.checkDisk(context.Background(), "acme/example.test", subscription); got.Status != CheckWarn {
+		t.Errorf("checkDisk() status = %s, want WARN", got.Status)
+	}
+	service.Commands = healthCommander{result: system.Result{Stdout: "1001\t/vhosts/acme\n"}}
+	if got := service.checkDisk(context.Background(), "acme/example.test", subscription); got.Status != CheckFail {
+		t.Errorf("checkDisk() status = %s, want FAIL", got.Status)
 	}
 }
