@@ -23,6 +23,34 @@ func newSubscriptionCommand() *cobra.Command {
 	command.AddCommand(newSubscriptionListCommand())
 	command.AddCommand(newSubscriptionShowCommand())
 	command.AddCommand(newSubscriptionDeleteCommand())
+	command.AddCommand(newSubscriptionStatusCommand("suspend", "suspended"))
+	command.AddCommand(newSubscriptionStatusCommand("resume", "active"))
+	return command
+}
+
+func newSubscriptionStatusCommand(action, status string) *cobra.Command {
+	var configPath string
+	command := &cobra.Command{Use: action + " <name>", Short: action + " a subscription", Args: cobra.ExactArgs(1), RunE: func(command *cobra.Command, args []string) error {
+		cfg, err := config.Load(configPath)
+		if err != nil {
+			return fmt.Errorf("load configuration: %w", err)
+		}
+		runtime, err := service.NewProductionSubscriptionRuntime(context.Background(), cfg)
+		if err != nil {
+			return fmt.Errorf("open subscription state: %w", err)
+		}
+		defer runtime.Close()
+		ctx, cancel := context.WithTimeout(context.Background(), time.Duration(cfg.Limits.LockTimeoutSeconds)*time.Second)
+		defer cancel()
+		id, err := runtime.Service.SetStatus(ctx, args[0], status)
+		if err != nil {
+			return err
+		}
+		pastTense := map[string]string{"suspend": "Suspended", "resume": "Resumed"}[action]
+		_, err = fmt.Fprintf(command.OutOrStdout(), "%s subscription %q (operation %d).\n", pastTense, args[0], id)
+		return err
+	}}
+	command.Flags().StringVar(&configPath, "config", meta.ConfigFile, "path to config.toml")
 	return command
 }
 

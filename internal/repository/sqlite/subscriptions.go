@@ -116,6 +116,24 @@ func (repository *Repository) DeleteSubscription(ctx context.Context, name strin
 	return nil
 }
 
+func (repository *Repository) SetSubscriptionStatus(ctx context.Context, id int64, status string) error {
+	if status != "active" && status != "suspended" && status != "archived" {
+		return fmt.Errorf("invalid subscription status %q", status)
+	}
+	result, err := repository.DB.ExecContext(ctx, `UPDATE subscriptions SET status = ?, updated_at = ? WHERE id = ?`, status, time.Now().UTC().Format(time.RFC3339), id)
+	if err != nil {
+		return fmt.Errorf("update subscription status: %w", err)
+	}
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("count subscription status update: %w", err)
+	}
+	if rows != 1 {
+		return fmt.Errorf("subscription %d not found", id)
+	}
+	return nil
+}
+
 // UpdatePHPSettings atomically records a subscription PHP version and mirrors
 // it to every PHP-FPM website owned by that subscription.
 func (repository *Repository) UpdatePHPSettings(ctx context.Context, subscription domain.Subscription) error {

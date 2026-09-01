@@ -118,6 +118,16 @@ func (store *subscriptionStore) DeleteSubscription(_ context.Context, name strin
 	delete(store.values, name)
 	return nil
 }
+func (store *subscriptionStore) SetSubscriptionStatus(_ context.Context, id int64, status string) error {
+	for name, subscription := range store.values {
+		if subscription.ID == id {
+			subscription.Status = status
+			store.values[name] = subscription
+			return nil
+		}
+	}
+	return errors.New("not found")
+}
 
 type subscriptionJournal struct{ status plan.OperationStatus }
 

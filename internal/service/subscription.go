@@ -25,6 +25,7 @@ type SubscriptionStore interface {
 	SubscriptionByName(context.Context, string) (domain.Subscription, error)
 	CreateSubscription(context.Context, domain.Subscription) error
 	DeleteSubscription(context.Context, string) error
+	SetSubscriptionStatus(context.Context, int64, string) error
 }
 
 func (service SubscriptionService) List(ctx context.Context) ([]domain.Subscription, error) {
@@ -128,6 +129,29 @@ func (service SubscriptionService) Delete(ctx context.Context, name string, forc
 	if err != nil {
 		return 0, err
 	}
+	return service.Executor.Run(ctx, operation)
+}
+
+func (service SubscriptionService) SetStatus(ctx context.Context, name, status string) (int64, error) {
+	if status != "active" && status != "suspended" {
+		return 0, fmt.Errorf("unsupported subscription status %q", status)
+	}
+	subscription, err := service.Show(ctx, name)
+	if err != nil {
+		return 0, err
+	}
+	if subscription.Status == status {
+		return 0, fmt.Errorf("subscription %q is already %s", name, status)
+	}
+	if subscription.Status == "archived" {
+		return 0, fmt.Errorf("subscription %q is archived", name)
+	}
+	previous := subscription.Status
+	operation := plan.Plan{Action: "subscription.set-status", Target: name, Steps: []plan.Step{{Name: "record subscription status", Preview: "set subscription status to " + status, Do: func(ctx context.Context) error {
+		return service.Store.SetSubscriptionStatus(ctx, subscription.ID, status)
+	}, Undo: func(ctx context.Context) error {
+		return service.Store.SetSubscriptionStatus(ctx, subscription.ID, previous)
+	}}}}
 	return service.Executor.Run(ctx, operation)
 }
 
