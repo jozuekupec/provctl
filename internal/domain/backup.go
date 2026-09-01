@@ -20,4 +20,5 @@ type BackupMetadata struct {
 	ProvctlVersion string       `json:"provctl_version"`
 	CreatedAt      time.Time    `json:"created_at"`
 	Subscription   Subscription `json:"subscription"`
+	Databases      []Database   `json:"databases"`
 }

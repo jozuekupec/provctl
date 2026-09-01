@@ -146,7 +146,9 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   `backup create <subscription>` nyní vytváří per-subscription zamčený,
   číselně vlastněný `tar.zst` archiv souborů, bezpečný manifest a kontrolní
   součty a dokončuje či označí selhání evidence; kvóta počtu záloh se
-  kontroluje před systémovou změnou. Stále zbývají databázové dumpy a restore.
+  kontroluje před systémovou změnou. Zálohu doplňují konzistentní databázové
+  dumpy (`mysqldump` → zstd) bez shellu, zahrnuté v metadatech i checksumách.
+  Stále zbývá restore.
   Pro databázový dump je
   připraven rozšířený allowlisted command seam pro bezpečné streamování stdout
   do nového souboru bez `sh -c`; je krytý jednotkovým testem.

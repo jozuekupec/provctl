@@ -23,14 +23,16 @@ type BackupStore interface {
 	BackupByID(context.Context, int64, int64) (domain.Backup, error)
 	CreateBackup(context.Context, domain.Backup) (int64, error)
 	FinishBackup(context.Context, int64, int64, string) error
+	ListDatabases(context.Context, int64) ([]domain.Database, error)
 }
 
 type BackupService struct {
-	Store    BackupStore
-	FS       system.FS
-	Config   config.Config
-	Commands system.Commander
-	Locker   system.Locker
+	Store     BackupStore
+	FS        system.FS
+	Config    config.Config
+	Commands  system.Commander
+	Locker    system.Locker
+	LockerFor func(string) system.Locker
 }
 
 func (service BackupService) Create(ctx context.Context, name string) (backupID int64, returnErr error) {
@@ -48,10 +50,14 @@ func (service BackupService) Create(ctx context.Context, name string) (backupID 
 	if subscription.QuotaBackups > 0 && len(backups) >= subscription.QuotaBackups {
 		return 0, fmt.Errorf("subscription %q has reached its backup quota of %d", name, subscription.QuotaBackups)
 	}
-	if service.FS == nil || service.Commands == nil || service.Locker == nil {
+	if service.FS == nil || service.Commands == nil || (service.Locker == nil && service.LockerFor == nil) {
 		return 0, fmt.Errorf("backup filesystem, commander, and locker are required")
 	}
-	unlock, err := service.Locker.Lock(ctx, "backup.create "+name)
+	locker := service.Locker
+	if service.LockerFor != nil {
+		locker = service.LockerFor(name)
+	}
+	unlock, err := locker.Lock(ctx, "backup.create "+name)
 	if err != nil {
 		return 0, err
 	}
@@ -76,14 +82,48 @@ func (service BackupService) Create(ctx context.Context, name string) (backupID 
 	if err != nil {
 		return backupID, fmt.Errorf("archive subscription files: %w", err)
 	}
-	metadata, err := json.MarshalIndent(domain.BackupMetadata{FormatVersion: 1, ProvctlVersion: meta.Version, CreatedAt: started, Subscription: subscription}, "", "  ")
+	databases, err := service.Store.ListDatabases(ctx, subscription.ID)
+	if err != nil {
+		return backupID, fmt.Errorf("list databases: %w", err)
+	}
+	checksums := []string{"files.tar.zst"}
+	if len(databases) > 0 {
+		output, ok := service.Commands.(system.OutputFileCommander)
+		if !ok {
+			return backupID, fmt.Errorf("backup commander cannot write database dumps")
+		}
+		if err := service.FS.MkdirAll(filepath.Join(directory, "db"), 0o700); err != nil {
+			return backupID, err
+		}
+		for _, database := range databases {
+			raw := filepath.Join(directory, "db", database.Name+".sql")
+			args := []string{"--single-transaction", "--quick", "--routines", "--triggers", "--events"}
+			if service.Config.MariaDB.DefaultsFile != "" {
+				args = append(args, "--defaults-extra-file="+service.Config.MariaDB.DefaultsFile)
+			}
+			args = append(args, database.Name)
+			if _, err := output.RunToFile(ctx, raw, 0o600, "/usr/bin/mysqldump", args...); err != nil {
+				return backupID, fmt.Errorf("dump database %q: %w", database.Name, err)
+			}
+			compressed := raw + ".zst"
+			if _, err := output.RunToFile(ctx, compressed, 0o600, "/usr/bin/zstd", "-q", "-c", raw); err != nil {
+				return backupID, fmt.Errorf("compress database dump %q: %w", database.Name, err)
+			}
+			if err := service.FS.Remove(raw); err != nil {
+				return backupID, fmt.Errorf("remove uncompressed database dump: %w", err)
+			}
+			checksums = append(checksums, filepath.Join("db", database.Name+".sql.zst"))
+		}
+	}
+	metadata, err := json.MarshalIndent(domain.BackupMetadata{FormatVersion: 1, ProvctlVersion: meta.Version, CreatedAt: started, Subscription: subscription, Databases: databases}, "", "  ")
 	if err != nil {
 		return backupID, fmt.Errorf("encode backup metadata: %w", err)
 	}
 	if err := service.FS.WriteFileAtomic(filepath.Join(directory, "metadata.json"), append(metadata, '\n'), 0o600); err != nil {
 		return backupID, err
 	}
-	if err := service.writeChecksums(directory, []string{"metadata.json", "files.tar.zst"}); err != nil {
+	checksums = append([]string{"metadata.json"}, checksums...)
+	if err := service.writeChecksums(directory, checksums); err != nil {
 		return backupID, err
 	}
 	info, err := service.FS.Stat(archive)
@@ -211,7 +251,9 @@ func NewProductionBackupRuntime(ctx context.Context, cfg config.Config) (*Backup
 	if err != nil {
 		return nil, err
 	}
-	return &BackupRuntime{Service: BackupService{Store: repository, FS: system.OSFS{}, Commands: system.ExecCommander{}, Locker: system.FileLocker{Path: "/run/provctl-backup.lock"}, Config: cfg}, repository: repository}, nil
+	return &BackupRuntime{Service: BackupService{Store: repository, FS: system.OSFS{}, Commands: system.ExecCommander{}, LockerFor: func(name string) system.Locker {
+		return system.FileLocker{Path: filepath.Join("/run", "provctl-"+name+".lock")}
+	}, Config: cfg}, repository: repository}, nil
 }
 
 func (runtime *BackupRuntime) Close() error { return runtime.repository.Close() }
