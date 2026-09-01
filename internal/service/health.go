@@ -33,16 +33,23 @@ type HealthNetwork interface {
 	Get(context.Context, string, string) (int, error)
 }
 
+// CertificateStatusReader reads the live certificate expiry without consulting
+// cached SQLite metadata.
+type CertificateStatusReader interface {
+	Status(context.Context, string, string) (SSLStatus, error)
+}
+
 // HealthService performs read-only operational checks. It never takes the
 // operation lock and never attempts to repair a failed check.
 type HealthService struct {
-	FS       system.FS
-	Store    HealthStore
-	Commands system.Commander
-	Systemd  system.Systemd
-	Network  HealthNetwork
-	Database interface{ PingContext(context.Context) error }
-	Config   config.Config
+	FS           system.FS
+	Store        HealthStore
+	Commands     system.Commander
+	Systemd      system.Systemd
+	Network      HealthNetwork
+	Certificates CertificateStatusReader
+	Database     interface{ PingContext(context.Context) error }
+	Config       config.Config
 }
 
 // HealthRuntime owns the read-only database connection used by health.
@@ -60,7 +67,8 @@ func NewProductionHealthRuntime(ctx context.Context, cfg config.Config) (*Health
 	return &HealthRuntime{Service: HealthService{
 		FS: system.OSFS{}, Store: repository, Commands: commander,
 		Systemd: system.CommandSystemd{Commander: commander}, Network: productionHealthNetwork{},
-		Database: repository.DB, Config: cfg,
+		Certificates: CertificateService{FS: system.OSFS{}, Commands: commander},
+		Database:     repository.DB, Config: cfg,
 	}, repository: repository}, nil
 }
 
@@ -68,8 +76,8 @@ func (runtime *HealthRuntime) Close() error { return runtime.repository.Close() 
 
 // Run returns global checks and checks for all websites, or the requested scope.
 func (service HealthService) Run(ctx context.Context, subscriptionName, primaryDomain string) ([]Check, error) {
-	if service.FS == nil || service.Store == nil || service.Commands == nil || service.Systemd == nil || service.Network == nil || service.Database == nil {
-		return nil, errors.New("health requires filesystem, store, commander, systemd, network, and database")
+	if service.FS == nil || service.Store == nil || service.Commands == nil || service.Systemd == nil || service.Network == nil || service.Certificates == nil || service.Database == nil {
+		return nil, errors.New("health requires filesystem, store, commander, systemd, network, certificates, and database")
 	}
 	checks := []Check{
 		service.checkService(ctx, service.Config.Apache.Service, "Apache service"),
@@ -152,9 +160,27 @@ func (service HealthService) checkWebsite(ctx context.Context, subscription doma
 	}
 	checks = append(checks, service.checkDNS(ctx, prefix, website.PrimaryDomain), service.checkHTTP(ctx, prefix, website.PrimaryDomain, false))
 	if website.SSLEnabled {
-		checks = append(checks, service.checkHTTP(ctx, prefix, website.PrimaryDomain, true))
+		checks = append(checks, service.checkHTTP(ctx, prefix, website.PrimaryDomain, true), service.checkCertificate(ctx, prefix, subscription.Name, website.PrimaryDomain))
 	}
 	return checks
+}
+
+func (service HealthService) checkCertificate(ctx context.Context, prefix, subscriptionName, domainName string) Check {
+	status, err := service.Certificates.Status(ctx, subscriptionName, domainName)
+	if err != nil {
+		return Check{Name: prefix + " certificate", Status: CheckFail, Detail: fmt.Sprintf("cannot inspect live certificate: %v", err), Hint: "renew or reissue the certificate"}
+	}
+	days := time.Until(status.NotAfter).Hours() / 24
+	if days < 0 {
+		return Check{Name: prefix + " certificate", Status: CheckFail, Detail: "certificate has expired", Hint: "renew or reissue the certificate"}
+	}
+	if days < 7 {
+		return Check{Name: prefix + " certificate", Status: CheckFail, Detail: fmt.Sprintf("expires in %.0f days", days), Hint: "renew or reissue the certificate immediately"}
+	}
+	if days < 21 {
+		return Check{Name: prefix + " certificate", Status: CheckWarn, Detail: fmt.Sprintf("expires in %.0f days", days), Hint: "verify the renewal path"}
+	}
+	return Check{Name: prefix + " certificate", Status: CheckOK, Detail: fmt.Sprintf("expires in %.0f days", days)}
 }
 
 func (service HealthService) checkVHost(prefix, subscription string, website domain.Website) Check {

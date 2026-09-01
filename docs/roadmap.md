@@ -121,10 +121,11 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   `provctl health [<subscription> [<domain>]]` v textu i přes `--json`.
   Kontroluje aktivní Apache, `apachectl configtest`, read-only SQLite spojení,
   enabled vhost, DocumentRoot, PHP-FPM pool a socket, DNS vůči IP serveru a
-  HTTP/HTTPS odpověď; síť má testovací seam a nepřebírá systémový proxy server.
-  Úspěšná i chybová cesta jsou pokryty offline testy a celý `make test` prošel.
-  Zbývají dny expirace certifikátu, disková kvóta a ostatní části milníku:
-  backup/restore, audit log a vynucené kvóty.
+  HTTP/HTTPS odpověď a živou expiraci certifikátu (`WARN` pod 21 dní, `FAIL`
+  pod 7 dní nebo po expiraci); síť a čtení certifikátu mají testovací seam a
+  síť nepřebírá systémový proxy server. Úspěšná i chybová cesta jsou pokryty
+  offline testy a celý `make test` prošel. Zbývá disková kvóta a ostatní části
+  milníku: backup/restore, audit log a vynucené kvóty.
 - [~] **M8 — TUI:** návrh je zaznamenán v [tui-design.md](tui-design.md) a
   cíleně přebírá konzistentní Bubble Tea vzor z projektu `depo`: hodnotový
   model, `Deps`, samostatné routing/render/keys/theme a I/O jen přes `tea.Cmd`.

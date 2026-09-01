@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"provctl/internal/config"
 	"provctl/internal/domain"
@@ -49,6 +50,12 @@ type healthDatabase struct{ err error }
 
 func (database healthDatabase) PingContext(context.Context) error { return database.err }
 
+type healthCertificates struct{ notAfter time.Time }
+
+func (certificates healthCertificates) Status(context.Context, string, string) (SSLStatus, error) {
+	return SSLStatus{NotAfter: certificates.notAfter}, nil
+}
+
 func TestHealthService_RunHealthyStaticWebsite(t *testing.T) {
 	temporary := t.TempDir()
 	documentRoot := filepath.Join(temporary, "public")
@@ -66,7 +73,7 @@ func TestHealthService_RunHealthyStaticWebsite(t *testing.T) {
 	service := HealthService{
 		FS: system.OSFS{}, Store: healthStore{subscriptions: []domain.Subscription{subscription}, websites: map[int64][]domain.Website{7: {{PrimaryDomain: "example.test", DocumentRoot: documentRoot, Enabled: true, Type: domain.WebsiteStatic}}}},
 		Commands: &fake.Commander{}, Systemd: &fake.Systemd{IsActiveFunc: func(context.Context, string) (bool, error) { return true, nil }},
-		Network: healthNetwork{status: 200}, Database: healthDatabase{}, Config: config.Config{Apache: config.Apache{Service: "apache2", SitesEnabled: enabled}},
+		Network: healthNetwork{status: 200}, Certificates: healthCertificates{notAfter: time.Now().Add(30 * 24 * time.Hour)}, Database: healthDatabase{}, Config: config.Config{Apache: config.Apache{Service: "apache2", SitesEnabled: enabled}},
 	}
 	checks, err := service.Run(context.Background(), "acme", "example.test")
 	if err != nil {
@@ -97,7 +104,7 @@ func TestHealthService_RunReportsHTTPFailure(t *testing.T) {
 	service := HealthService{
 		FS: system.OSFS{}, Store: healthStore{subscriptions: []domain.Subscription{subscription}, websites: map[int64][]domain.Website{7: {{PrimaryDomain: "example.test", DocumentRoot: documentRoot, Enabled: true, Type: domain.WebsiteStatic}}}},
 		Commands: &fake.Commander{}, Systemd: &fake.Systemd{IsActiveFunc: func(context.Context, string) (bool, error) { return true, nil }},
-		Network: healthNetwork{status: 503}, Database: healthDatabase{}, Config: config.Config{Apache: config.Apache{Service: "apache2", SitesEnabled: enabled}},
+		Network: healthNetwork{status: 503}, Certificates: healthCertificates{notAfter: time.Now().Add(30 * 24 * time.Hour)}, Database: healthDatabase{}, Config: config.Config{Apache: config.Apache{Service: "apache2", SitesEnabled: enabled}},
 	}
 	checks, err := service.Run(context.Background(), "acme", "example.test")
 	if err != nil {
@@ -105,5 +112,36 @@ func TestHealthService_RunReportsHTTPFailure(t *testing.T) {
 	}
 	if !HasFailure(checks) {
 		t.Errorf("Run() did not report the failed HTTP check: %#v", checks)
+	}
+}
+
+func TestHealthService_RunWarnsForCertificateExpiringSoon(t *testing.T) {
+	temporary := t.TempDir()
+	documentRoot := filepath.Join(temporary, "public")
+	enabled := filepath.Join(temporary, "enabled")
+	if err := os.MkdirAll(documentRoot, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(enabled, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(enabled, "provctl-acme-example.test.conf"), nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	subscription := domain.Subscription{ID: 7, Name: "acme"}
+	service := HealthService{
+		FS: system.OSFS{}, Store: healthStore{subscriptions: []domain.Subscription{subscription}, websites: map[int64][]domain.Website{7: {{PrimaryDomain: "example.test", DocumentRoot: documentRoot, Enabled: true, SSLEnabled: true, Type: domain.WebsiteStatic}}}},
+		Commands: &fake.Commander{}, Systemd: &fake.Systemd{IsActiveFunc: func(context.Context, string) (bool, error) { return true, nil }},
+		Network: healthNetwork{status: 200}, Certificates: healthCertificates{notAfter: time.Now().Add(10 * 24 * time.Hour)}, Database: healthDatabase{}, Config: config.Config{Apache: config.Apache{Service: "apache2", SitesEnabled: enabled}},
+	}
+	checks, err := service.Run(context.Background(), "acme", "example.test")
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	if HasFailure(checks) {
+		t.Errorf("Run() returned failed checks: %#v", checks)
+	}
+	if checks[len(checks)-1].Status != CheckWarn {
+		t.Errorf("certificate check status = %s, want WARN", checks[len(checks)-1].Status)
 	}
 }
