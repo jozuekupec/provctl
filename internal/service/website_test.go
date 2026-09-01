@@ -108,6 +108,14 @@ func TestWebsiteService_PrepareCreateStaticBuildsPlanWithoutChanges(t *testing.T
 	}
 }
 
+func TestWebsiteService_PrepareCreateStaticRejectsWebsiteQuota(t *testing.T) {
+	service := WebsiteService{Store: websiteStore{subscription: domain.Subscription{ID: 1, Name: "acme", Status: "active", QuotaWebsites: 1}, websites: []domain.Website{{ID: 1}}}, Apache: websiteApache{}, Config: config.Config{Apache: config.Apache{SitesAvailable: "/etc/apache2/sites-available", SitesEnabled: "/etc/apache2/sites-enabled"}}}
+	_, err := service.PrepareCreateStatic(context.Background(), "acme", "static.example.test")
+	if err == nil || !strings.Contains(err.Error(), "website quota") {
+		t.Fatalf("PrepareCreateStatic() error = %v, want quota error", err)
+	}
+}
+
 func TestWebsiteService_PrepareCreateProxyBuildsPlanWithoutChanges(t *testing.T) {
 	fs := &subscriptionFS{directories: map[string]bool{}}
 	service := WebsiteService{FS: fs, Store: websiteStore{subscription: domain.Subscription{ID: 1, Name: "acme", UnixUID: 5000, Home: "/vhosts/acme", Status: "active"}}, Apache: websiteApache{}, Executor: plan.Executor{Journal: &subscriptionJournal{}, Locker: subscriptionLocker{}}, Config: config.Config{Paths: config.Paths{ACMEChallenge: "/var/lib/provctl/acme-challenge"}, Apache: config.Apache{SitesAvailable: "/etc/apache2/sites-available", SitesEnabled: "/etc/apache2/sites-enabled", ProxyTimeout: 60}}}

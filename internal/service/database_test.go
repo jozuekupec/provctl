@@ -84,6 +84,14 @@ func TestDatabaseService_PrepareCreateRejectsServerUserLimit(t *testing.T) {
 	}
 }
 
+func TestDatabaseService_PrepareCreateRejectsDatabaseQuota(t *testing.T) {
+	store := &databaseStore{subscription: domain.Subscription{ID: 4, Name: "acme", Status: "active", QuotaDatabases: 1}, databases: []domain.Database{{Name: "acme_existing"}}}
+	_, _, err := testDatabaseService(store, &databaseMariaDB{limit: 32}).PrepareCreate(context.Background(), "acme", "main")
+	if err == nil || !strings.Contains(err.Error(), "database quota") {
+		t.Fatalf("PrepareCreate() error = %v, want quota error", err)
+	}
+}
+
 func TestDatabaseService_PrepareCreateCredentialsRequiresSafeNewPath(t *testing.T) {
 	store := &databaseStore{subscription: domain.Subscription{ID: 4, Name: "acme", UnixUID: 5000, Home: "/vhosts/acme", Status: "active"}}
 	service := testDatabaseService(store, &databaseMariaDB{limit: 32})

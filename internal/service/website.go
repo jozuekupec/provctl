@@ -475,6 +475,9 @@ func (service WebsiteService) prepareHTTPWebsite(ctx context.Context, subscripti
 	if subscription.Status != "active" {
 		return domain.Subscription{}, "", "", "", fmt.Errorf("subscription %q is %s", subscriptionName, subscription.Status)
 	}
+	if err := service.ensureWebsiteQuota(ctx, subscription); err != nil {
+		return domain.Subscription{}, "", "", "", err
+	}
 	exists, err := service.Store.DomainExists(ctx, primaryDomain)
 	if err != nil {
 		return domain.Subscription{}, "", "", "", fmt.Errorf("check domain: %w", err)
@@ -485,6 +488,20 @@ func (service WebsiteService) prepareHTTPWebsite(ctx context.Context, subscripti
 	logDir := filepath.Join(meta.LogDir, subscription.Name, primaryDomain)
 	vhostPath := filepath.Join(service.Config.Apache.SitesAvailable, meta.FilePrefix+subscription.Name+"-"+primaryDomain+".conf")
 	return subscription, logDir, vhostPath, filepath.Join(service.Config.Apache.SitesEnabled, filepath.Base(vhostPath)), nil
+}
+
+func (service WebsiteService) ensureWebsiteQuota(ctx context.Context, subscription domain.Subscription) error {
+	if subscription.QuotaWebsites == 0 {
+		return nil
+	}
+	websites, err := service.Store.ListWebsites(ctx, subscription.ID)
+	if err != nil {
+		return fmt.Errorf("list websites: %w", err)
+	}
+	if len(websites) >= subscription.QuotaWebsites {
+		return fmt.Errorf("subscription %q has reached its website quota of %d", subscription.Name, subscription.QuotaWebsites)
+	}
+	return nil
 }
 
 func (service WebsiteService) createHTTPOnlyPlan(subscription domain.Subscription, website domain.Website, logDir, vhostPath, enabledPath string, contents []byte) plan.Plan {
@@ -529,6 +546,9 @@ func (service WebsiteService) PrepareCreateStatic(ctx context.Context, subscript
 	if subscription.Status != "active" {
 		return plan.Plan{}, fmt.Errorf("subscription %q is %s", subscriptionName, subscription.Status)
 	}
+	if err := service.ensureWebsiteQuota(ctx, subscription); err != nil {
+		return plan.Plan{}, err
+	}
 	exists, err := service.Store.DomainExists(ctx, primaryDomain)
 	if err != nil {
 		return plan.Plan{}, fmt.Errorf("check domain: %w", err)
@@ -565,6 +585,9 @@ func (service WebsiteService) PrepareCreatePHPFPM(ctx context.Context, subscript
 	}
 	if subscription.Status != "active" {
 		return plan.Plan{}, fmt.Errorf("subscription %q is %s", subscriptionName, subscription.Status)
+	}
+	if err := service.ensureWebsiteQuota(ctx, subscription); err != nil {
+		return plan.Plan{}, err
 	}
 	exists, err := service.Store.DomainExists(ctx, primaryDomain)
 	if err != nil {

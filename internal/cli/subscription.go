@@ -140,6 +140,7 @@ func openReadOnlySubscriptionService(configPath string) (service.SubscriptionSer
 
 func newSubscriptionCreateCommand() *cobra.Command {
 	var configPath, quotaDisk string
+	var quotaWebsites, quotaDatabases, quotaBackups int
 	var dryRun bool
 	command := &cobra.Command{
 		Use:   "create <name>",
@@ -154,7 +155,10 @@ func newSubscriptionCreateCommand() *cobra.Command {
 			if err != nil {
 				return fmt.Errorf("parse --quota-disk: %w", err)
 			}
-			options := service.SubscriptionCreateOptions{QuotaDiskBytes: quotaBytes}
+			if quotaWebsites < 0 || quotaDatabases < 0 || quotaBackups < 0 {
+				return fmt.Errorf("object quotas must not be negative")
+			}
+			options := service.SubscriptionCreateOptions{QuotaDiskBytes: quotaBytes, QuotaWebsites: quotaWebsites, QuotaDatabases: quotaDatabases, QuotaBackups: quotaBackups}
 			ctx := context.Background()
 			if dryRun {
 				runtime, err := service.NewReadOnlySubscriptionRuntime(ctx, cfg)
@@ -185,6 +189,9 @@ func newSubscriptionCreateCommand() *cobra.Command {
 	}
 	command.Flags().StringVar(&configPath, "config", meta.ConfigFile, "path to config.toml")
 	command.Flags().StringVar(&quotaDisk, "quota-disk", "", "measured disk quota (for example 20G)")
+	command.Flags().IntVar(&quotaWebsites, "quota-websites", 0, "maximum websites (0 means unlimited)")
+	command.Flags().IntVar(&quotaDatabases, "quota-databases", 0, "maximum databases (0 means unlimited)")
+	command.Flags().IntVar(&quotaBackups, "quota-backups", 0, "maximum backups (0 means unlimited)")
 	command.Flags().BoolVar(&dryRun, "dry-run", false, "show the operation plan without changing the system")
 	return command
 }
@@ -239,6 +246,6 @@ func writeSubscriptionList(command *cobra.Command, subscriptions []domain.Subscr
 }
 
 func writeSubscription(command *cobra.Command, subscription domain.Subscription) error {
-	_, err := fmt.Fprintf(command.OutOrStdout(), "Name: %s\nUnix user: %s\nUID: %d\nHome: %s\nStatus: %s\nPHP version: %s\nSSH access: %s\nDisk quota: %d bytes\n", subscription.Name, subscription.UnixUser, subscription.UnixUID, subscription.Home, subscription.Status, subscription.PHPVersion, subscription.SSHAccess, subscription.QuotaDiskBytes)
+	_, err := fmt.Fprintf(command.OutOrStdout(), "Name: %s\nUnix user: %s\nUID: %d\nHome: %s\nStatus: %s\nPHP version: %s\nSSH access: %s\nDisk quota: %d bytes\nWebsite quota: %d\nDatabase quota: %d\nBackup quota: %d\n", subscription.Name, subscription.UnixUser, subscription.UnixUID, subscription.Home, subscription.Status, subscription.PHPVersion, subscription.SSHAccess, subscription.QuotaDiskBytes, subscription.QuotaWebsites, subscription.QuotaDatabases, subscription.QuotaBackups)
 	return err
 }

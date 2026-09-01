@@ -253,6 +253,9 @@ func (service DatabaseService) prepareDatabase(ctx context.Context, subscription
 	if err != nil {
 		return domain.Subscription{}, domain.Database{}, fmt.Errorf("list databases: %w", err)
 	}
+	if subscription.QuotaDatabases > 0 && len(databases) >= subscription.QuotaDatabases {
+		return domain.Subscription{}, domain.Database{}, fmt.Errorf("subscription %q has reached its database quota of %d", subscriptionName, subscription.QuotaDatabases)
+	}
 	for _, database := range databases {
 		if database.Name == name {
 			return domain.Subscription{}, domain.Database{}, fmt.Errorf("database %q already exists", name)

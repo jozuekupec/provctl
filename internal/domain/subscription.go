@@ -26,6 +26,9 @@ type Subscription struct {
 	SSHAccess      string
 	Status         string
 	QuotaDiskBytes int64
+	QuotaWebsites  int
+	QuotaDatabases int
+	QuotaBackups   int
 }
 
 // SSHKey is the persisted public-key metadata for one subscription.

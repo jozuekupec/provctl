@@ -57,6 +57,9 @@ type SubscriptionService struct {
 
 type SubscriptionCreateOptions struct {
 	QuotaDiskBytes int64
+	QuotaWebsites  int
+	QuotaDatabases int
+	QuotaBackups   int
 }
 
 // SubscriptionRuntime owns the database connection used by a production command.
@@ -183,8 +186,8 @@ func (service SubscriptionService) PrepareCreateWithOptions(ctx context.Context,
 	if err := domain.ValidateSubscriptionName(name); err != nil {
 		return plan.Plan{}, err
 	}
-	if options.QuotaDiskBytes < 0 {
-		return plan.Plan{}, errors.New("disk quota must not be negative")
+	if options.QuotaDiskBytes < 0 || options.QuotaWebsites < 0 || options.QuotaDatabases < 0 || options.QuotaBackups < 0 {
+		return plan.Plan{}, errors.New("quotas must not be negative")
 	}
 	exists, err := service.Store.SubscriptionExists(ctx, name)
 	if err != nil {
@@ -207,7 +210,7 @@ func (service SubscriptionService) PrepareCreateWithOptions(ctx context.Context,
 	if phpVersion == "" {
 		phpVersion = service.Config.PHP.DefaultVersion
 	}
-	subscription := domain.Subscription{Name: name, UnixUser: name, UnixUID: uid, Home: home, PHPVersion: phpVersion, PHPMaxChildren: service.Config.PHP.MaxChildren, PHPMemoryLimit: service.Config.PHP.MemoryLimit, PHPUploadMax: service.Config.PHP.UploadMax, PHPMaxExecTime: service.Config.PHP.MaxExecTime, SSHAccess: "none", QuotaDiskBytes: options.QuotaDiskBytes}
+	subscription := domain.Subscription{Name: name, UnixUser: name, UnixUID: uid, Home: home, PHPVersion: phpVersion, PHPMaxChildren: service.Config.PHP.MaxChildren, PHPMemoryLimit: service.Config.PHP.MemoryLimit, PHPUploadMax: service.Config.PHP.UploadMax, PHPMaxExecTime: service.Config.PHP.MaxExecTime, SSHAccess: "none", QuotaDiskBytes: options.QuotaDiskBytes, QuotaWebsites: options.QuotaWebsites, QuotaDatabases: options.QuotaDatabases, QuotaBackups: options.QuotaBackups}
 	return service.createPlan(subscription), nil
 }
 

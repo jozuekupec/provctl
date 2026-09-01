@@ -34,6 +34,7 @@ dist/provctl health acme example.test --config /etc/provctl/config.toml --json
 ```bash
 sudo dist/provctl subscription create acme --config /etc/provctl/config.toml --dry-run
 sudo dist/provctl subscription create acme --quota-disk 20G
+sudo dist/provctl subscription create acme --quota-websites 5 --quota-databases 3 --quota-backups 2
 ```
 
 The non-dry-run form requires the state directory and database created by the upcoming `bootstrap` command; do not create those system paths manually on a workstation.
