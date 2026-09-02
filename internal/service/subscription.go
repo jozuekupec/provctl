@@ -26,6 +26,11 @@ type SubscriptionStore interface {
 	CreateSubscription(context.Context, domain.Subscription) error
 	DeleteSubscription(context.Context, string) error
 	SetSubscriptionStatus(context.Context, int64, string) error
+	ListDatabases(context.Context, int64) ([]domain.Database, error)
+	DeleteDatabase(context.Context, int64, string) error
+	ListWebsites(context.Context, int64) ([]domain.Website, error)
+	DeleteWebsite(context.Context, int64) error
+	DeleteCertificatesBySubscription(context.Context, int64) error
 }
 
 func (service SubscriptionService) List(ctx context.Context) ([]domain.Subscription, error) {
@@ -52,6 +57,7 @@ type SubscriptionService struct {
 	Users      system.Users
 	Store      SubscriptionStore
 	Executor   plan.Executor
+	MariaDB    MariaDBExecutor
 	PHPVersion string
 	Config     config.Config
 }
@@ -86,6 +92,7 @@ func NewProductionSubscriptionRuntime(ctx context.Context, cfg config.Config) (*
 			Users:      system.CommandUsers{Commander: commander},
 			Store:      repository,
 			Executor:   productionExecutor(repository),
+			MariaDB:    MariaDB{Commands: commander, Config: cfg.MariaDB},
 			PHPVersion: version.Version,
 			Config:     cfg,
 		},
@@ -105,7 +112,7 @@ func NewReadOnlySubscriptionRuntime(ctx context.Context, cfg config.Config) (*Su
 		return nil, err
 	}
 	return &SubscriptionRuntime{
-		Service:    SubscriptionService{FS: system.OSFS{}, Users: system.CommandUsers{Commander: commander}, Store: repository, PHPVersion: version.Version, Config: cfg},
+		Service:    SubscriptionService{FS: system.OSFS{}, Users: system.CommandUsers{Commander: commander}, Store: repository, MariaDB: MariaDB{Commands: commander, Config: cfg.MariaDB}, PHPVersion: version.Version, Config: cfg},
 		repository: repository,
 	}, nil
 }
@@ -133,7 +140,7 @@ func (service SubscriptionService) Delete(ctx context.Context, name string, forc
 }
 
 func (service SubscriptionService) SetStatus(ctx context.Context, name, status string) (int64, error) {
-	if status != "active" && status != "suspended" {
+	if status != "active" && status != "suspended" && status != "archived" {
 		return 0, fmt.Errorf("unsupported subscription status %q", status)
 	}
 	subscription, err := service.Show(ctx, name)
@@ -167,6 +174,17 @@ func (service SubscriptionService) PrepareDelete(ctx context.Context, name strin
 	if err := service.validateDeletionTarget(subscription); err != nil {
 		return plan.Plan{}, err
 	}
+	databases, err := service.Store.ListDatabases(ctx, subscription.ID)
+	if err != nil {
+		return plan.Plan{}, fmt.Errorf("list subscription databases: %w", err)
+	}
+	if len(databases) > 0 && service.MariaDB == nil {
+		return plan.Plan{}, fmt.Errorf("MariaDB executor is required to delete subscription databases")
+	}
+	websites, err := service.Store.ListWebsites(ctx, subscription.ID)
+	if err != nil {
+		return plan.Plan{}, fmt.Errorf("list subscription websites: %w", err)
+	}
 	account, err := service.Users.Lookup(subscription.UnixUser)
 	if err != nil {
 		return plan.Plan{}, fmt.Errorf("look up subscription user %q: %w", subscription.UnixUser, err)
@@ -174,7 +192,7 @@ func (service SubscriptionService) PrepareDelete(ctx context.Context, name strin
 	if account.Uid != strconv.Itoa(subscription.UnixUID) || filepath.Clean(account.HomeDir) != filepath.Clean(subscription.Home) {
 		return plan.Plan{}, fmt.Errorf("unix user %q does not match stored subscription identity", subscription.UnixUser)
 	}
-	return service.deletePlan(subscription), nil
+	return service.deletePlan(subscription, databases, websites), nil
 }
 
 func (service SubscriptionService) validateDeletionTarget(subscription domain.Subscription) error {
@@ -299,12 +317,47 @@ func (service SubscriptionService) createPlan(subscription domain.Subscription) 
 	return plan.Plan{Action: "subscription.create", Target: subscription.Name, Steps: steps}
 }
 
-func (service SubscriptionService) deletePlan(subscription domain.Subscription) plan.Plan {
-	steps := []plan.Step{
-		{Name: "remove subscription home", Preview: fmt.Sprintf("remove recursively %s", subscription.Home), Do: func(context.Context) error { return service.FS.RemoveAll(subscription.Home) }},
-		{Name: "delete Unix user", Preview: fmt.Sprintf("/usr/sbin/userdel %s", subscription.UnixUser), Do: func(ctx context.Context) error { return service.Users.Delete(ctx, subscription.UnixUser, false) }},
-		{Name: "delete subscription record", Preview: "delete subscription from SQLite", Do: func(ctx context.Context) error { return service.Store.DeleteSubscription(ctx, subscription.Name) }},
+func (service SubscriptionService) deletePlan(subscription domain.Subscription, databases []domain.Database, websites []domain.Website) plan.Plan {
+	steps := make([]plan.Step, 0, len(databases)*2+len(websites)*3+5)
+	for _, website := range websites {
+		website := website
+		available := filepath.Join(service.Config.Apache.SitesAvailable, meta.FilePrefix+subscription.Name+"-"+website.PrimaryDomain+".conf")
+		enabled := filepath.Join(service.Config.Apache.SitesEnabled, filepath.Base(available))
+		steps = append(steps,
+			plan.Step{Name: "remove generated Apache vhost", Preview: "remove " + available, Do: func(context.Context) error {
+				if err := service.FS.Remove(enabled); err != nil && !errors.Is(err, os.ErrNotExist) {
+					return err
+				}
+				if err := service.FS.Remove(available); err != nil && !errors.Is(err, os.ErrNotExist) {
+					return err
+				}
+				return nil
+			}},
+			plan.Step{Name: "delete website record", Preview: "delete website " + website.PrimaryDomain + " from SQLite", Do: func(ctx context.Context) error {
+				return service.Store.DeleteWebsite(ctx, website.ID)
+			}},
+		)
 	}
+	for _, database := range databases {
+		database := database
+		drop, _ := DropSQL(database.Name, database.User)
+		steps = append(steps,
+			plan.Step{Name: "drop MariaDB database", Preview: "drop database " + database.Name, Do: func(ctx context.Context) error {
+				return service.MariaDB.Execute(ctx, drop)
+			}},
+			plan.Step{Name: "delete database record", Preview: "delete database " + database.Name + " from SQLite", Do: func(ctx context.Context) error {
+				return service.Store.DeleteDatabase(ctx, subscription.ID, database.Name)
+			}},
+		)
+	}
+	steps = append(steps,
+		plan.Step{Name: "delete certificate metadata", Preview: "delete certificate metadata from SQLite", Do: func(ctx context.Context) error {
+			return service.Store.DeleteCertificatesBySubscription(ctx, subscription.ID)
+		}},
+		plan.Step{Name: "remove subscription home", Preview: fmt.Sprintf("remove recursively %s", subscription.Home), Do: func(context.Context) error { return service.FS.RemoveAll(subscription.Home) }},
+		plan.Step{Name: "delete Unix user", Preview: fmt.Sprintf("/usr/sbin/userdel %s", subscription.UnixUser), Do: func(ctx context.Context) error { return service.Users.Delete(ctx, subscription.UnixUser, false) }},
+		plan.Step{Name: "delete subscription record", Preview: "delete subscription record from SQLite", Do: func(ctx context.Context) error { return service.Store.DeleteSubscription(ctx, subscription.Name) }},
+	)
 	return plan.Plan{Action: "subscription.delete", Target: subscription.Name, Steps: steps}
 }
 

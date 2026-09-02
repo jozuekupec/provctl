@@ -25,6 +25,7 @@ func newSubscriptionCommand() *cobra.Command {
 	command.AddCommand(newSubscriptionDeleteCommand())
 	command.AddCommand(newSubscriptionStatusCommand("suspend", "suspended"))
 	command.AddCommand(newSubscriptionStatusCommand("resume", "active"))
+	command.AddCommand(newSubscriptionStatusCommand("archive", "archived"))
 	return command
 }
 
@@ -46,7 +47,7 @@ func newSubscriptionStatusCommand(action, status string) *cobra.Command {
 		if err != nil {
 			return err
 		}
-		pastTense := map[string]string{"suspend": "Suspended", "resume": "Resumed"}[action]
+		pastTense := map[string]string{"suspend": "Suspended", "resume": "Resumed", "archive": "Archived"}[action]
 		_, err = fmt.Fprintf(command.OutOrStdout(), "%s subscription %q (operation %d).\n", pastTense, args[0], id)
 		return err
 	}}

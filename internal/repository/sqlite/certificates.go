@@ -64,6 +64,15 @@ func (repository *Repository) ListCertificates(ctx context.Context, subscription
 	return certificates, nil
 }
 
+// DeleteCertificatesBySubscription removes certificate metadata when its owning
+// subscription is permanently removed. Certificate files are not touched here.
+func (repository *Repository) DeleteCertificatesBySubscription(ctx context.Context, subscriptionID int64) error {
+	if _, err := repository.DB.ExecContext(ctx, `DELETE FROM certificates WHERE subscription_id = ?`, subscriptionID); err != nil {
+		return fmt.Errorf("delete certificates for subscription %d: %w", subscriptionID, err)
+	}
+	return nil
+}
+
 func (repository *Repository) CertificateByLineage(ctx context.Context, lineage string) (domain.Certificate, error) {
 	row := repository.DB.QueryRowContext(ctx, `SELECT id, subscription_id, lineage, primary_domain, sans, COALESCE(issuer, ''), COALESCE(not_before, ''), COALESCE(not_after, ''), COALESCE(last_checked_at, '') FROM certificates WHERE lineage = ?`, lineage)
 	return scanCertificate(row)

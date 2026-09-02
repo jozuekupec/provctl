@@ -128,6 +128,17 @@ func (store *subscriptionStore) SetSubscriptionStatus(_ context.Context, id int6
 	}
 	return errors.New("not found")
 }
+func (*subscriptionStore) ListDatabases(context.Context, int64) ([]domain.Database, error) {
+	return nil, nil
+}
+func (*subscriptionStore) DeleteDatabase(context.Context, int64, string) error { return nil }
+func (*subscriptionStore) ListWebsites(context.Context, int64) ([]domain.Website, error) {
+	return nil, nil
+}
+func (*subscriptionStore) DeleteWebsite(context.Context, int64) error { return nil }
+func (*subscriptionStore) DeleteCertificatesBySubscription(context.Context, int64) error {
+	return nil
+}
 
 type subscriptionJournal struct{ status plan.OperationStatus }
 
@@ -166,6 +177,19 @@ func TestSubscriptionService_CreateCreatesSystemAndDatabaseState(t *testing.T) {
 	}
 	if journal.status != plan.OperationDone {
 		t.Errorf("journal status = %s, want done", journal.status)
+	}
+}
+
+func TestSubscriptionService_SetStatusArchivesSubscription(t *testing.T) {
+	fs := &subscriptionFS{directories: map[string]bool{}}
+	users := &subscriptionUsers{}
+	store := &subscriptionStore{values: map[string]domain.Subscription{"acme": {ID: 1, Name: "acme", Status: "active"}}}
+	journal := &subscriptionJournal{}
+	if _, err := newSubscriptionService(fs, users, store, journal).SetStatus(context.Background(), "acme", "archived"); err != nil {
+		t.Fatalf("SetStatus() error = %v", err)
+	}
+	if got := store.values["acme"].Status; got != "archived" {
+		t.Errorf("status = %q, want archived", got)
 	}
 }
 

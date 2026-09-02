@@ -167,6 +167,11 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   `backup inspect` a `backup restore --dry-run` nyní záměrně vyhledávají
   ověřený archiv přímo podle ID, takže fungují i poté, co zdrojový SQLite
   subscription záznam již neexistuje.
+  Lifecycle nyní obsahuje také žurnálovaný `subscription archive <name>`;
+  permanentní delete před odstraněním subscription vyčistí navázané vhost
+  záznamy a soubory, databázové identity a certificate metadata, aby byly
+  cizí klíče konzistentní a clean restore neměl konflikt se starým MariaDB
+  stavem.
   Souborový payload se nyní umí rozbalit explicitním allowlisted `tar` během
   restore do stagingu; test zajišťuje absenci shellu a úklid při selhání.
   Staging lze povýšit jen atomickým `FileMover` přesunem do dosud neexistujícího
