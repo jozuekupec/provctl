@@ -32,6 +32,14 @@ func (store backupStore) BackupByID(_ context.Context, _ int64, id int64) (domai
 	}
 	return domain.Backup{}, context.Canceled
 }
+func (store backupStore) BackupByIDAny(_ context.Context, id int64) (domain.Backup, error) {
+	for _, backup := range store.backups {
+		if backup.ID == id {
+			return backup, nil
+		}
+	}
+	return domain.Backup{}, context.Canceled
+}
 func (backupStore) CreateBackup(context.Context, domain.Backup) (int64, error)      { return 1, nil }
 func (backupStore) FinishBackup(context.Context, int64, int64, string) error        { return nil }
 func (backupStore) ListDatabases(context.Context, int64) ([]domain.Database, error) { return nil, nil }
@@ -72,6 +80,28 @@ func TestBackupService_InspectReadsMatchingManifest(t *testing.T) {
 	}
 	if metadata.FormatVersion != 1 || metadata.Subscription.Name != "acme" {
 		t.Errorf("metadata = %#v", metadata)
+	}
+}
+
+func TestBackupService_InspectDoesNotRequireSourceSubscription(t *testing.T) {
+	manifest := []byte(`{"format_version":1,"created_at":"2026-01-01T00:00:00Z","subscription":{"name":"acme"}}`)
+	service := BackupService{
+		Store: backupStore{backups: []domain.Backup{{ID: 4, Path: "/backups/acme/2026-01-01"}}},
+		FS: &fake.FS{ReadFileFunc: func(path string) ([]byte, error) {
+			switch path {
+			case "/backups/acme/2026-01-01/metadata.json":
+				return manifest, nil
+			case "/backups/acme/2026-01-01/SHA256SUMS":
+				return []byte(fmt.Sprintf("%x  metadata.json\n", sha256.Sum256(manifest))), nil
+			default:
+				t.Fatalf("path = %q", path)
+			}
+			return nil, nil
+		}},
+		Config: config.Config{Paths: config.Paths{Backups: "/backups"}},
+	}
+	if _, err := service.Inspect(context.Background(), "acme", 4); err != nil {
+		t.Fatalf("Inspect() error = %v", err)
 	}
 }
 

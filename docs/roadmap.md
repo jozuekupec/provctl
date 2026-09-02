@@ -164,6 +164,9 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   uvolněnou vazbou na zdroj; migrační test ověřuje upgrade z v1 i následné
   dohledání archivu. Tím je odstraněna překážka skutečného clean-server
   round-tripu.
+  `backup inspect` a `backup restore --dry-run` nyní záměrně vyhledávají
+  ověřený archiv přímo podle ID, takže fungují i poté, co zdrojový SQLite
+  subscription záznam již neexistuje.
   Souborový payload se nyní umí rozbalit explicitním allowlisted `tar` během
   restore do stagingu; test zajišťuje absenci shellu a úklid při selhání.
   Staging lze povýšit jen atomickým `FileMover` přesunem do dosud neexistujícího

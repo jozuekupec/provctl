@@ -22,6 +22,7 @@ type BackupStore interface {
 	SubscriptionByName(context.Context, string) (domain.Subscription, error)
 	ListBackups(context.Context, int64) ([]domain.Backup, error)
 	BackupByID(context.Context, int64, int64) (domain.Backup, error)
+	BackupByIDAny(context.Context, int64) (domain.Backup, error)
 	CreateBackup(context.Context, domain.Backup) (int64, error)
 	FinishBackup(context.Context, int64, int64, string) error
 	ListDatabases(context.Context, int64) ([]domain.Database, error)
@@ -198,11 +199,7 @@ func (service BackupService) Inspect(ctx context.Context, name string, id int64)
 	if err := domain.ValidateSubscriptionName(name); err != nil {
 		return domain.BackupMetadata{}, err
 	}
-	subscription, err := service.Store.SubscriptionByName(ctx, name)
-	if err != nil {
-		return domain.BackupMetadata{}, err
-	}
-	backup, err := service.Store.BackupByID(ctx, subscription.ID, id)
+	backup, err := service.Store.BackupByIDAny(ctx, id)
 	if err != nil {
 		return domain.BackupMetadata{}, err
 	}
