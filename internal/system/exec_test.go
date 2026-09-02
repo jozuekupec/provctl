@@ -3,6 +3,7 @@ package system
 import (
 	"context"
 	"errors"
+	"os"
 	"testing"
 )
 
@@ -37,5 +38,16 @@ func TestExecCommander_RunToFileRejectsUnallowlistedBinary(t *testing.T) {
 	_, err := (ExecCommander{}).RunToFile(context.Background(), t.TempDir()+"/output", 0o600, "/bin/sh")
 	if !errors.Is(err, ErrBinaryNotAllowed) {
 		t.Fatalf("RunToFile() error = %v, want ErrBinaryNotAllowed", err)
+	}
+}
+
+func TestExecCommander_RunWithFileRejectsUnallowlistedBinary(t *testing.T) {
+	path := t.TempDir() + "/input"
+	if err := os.WriteFile(path, []byte("input"), 0o600); err != nil {
+		t.Fatalf("write input: %v", err)
+	}
+	_, err := (ExecCommander{}).RunWithFile(context.Background(), path, "/bin/sh")
+	if !errors.Is(err, ErrBinaryNotAllowed) {
+		t.Fatalf("RunWithFile() error = %v, want ErrBinaryNotAllowed", err)
 	}
 }

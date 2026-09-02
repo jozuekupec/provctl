@@ -48,6 +48,18 @@ func (ExecCommander) RunToFile(ctx context.Context, path string, mode os.FileMod
 	return result, err
 }
 
+func (ExecCommander) RunWithFile(ctx context.Context, path string, name string, args ...string) (Result, error) {
+	if !IsAllowedBinary(name) {
+		return Result{}, fmt.Errorf("%w: %s", ErrBinaryNotAllowed, name)
+	}
+	file, err := os.Open(path)
+	if err != nil {
+		return Result{}, fmt.Errorf("open command input %q: %w", path, err)
+	}
+	defer file.Close()
+	return run(ctx, file, name, args...)
+}
+
 func run(ctx context.Context, stdin io.Reader, name string, args ...string) (Result, error) {
 	if !IsAllowedBinary(name) {
 		return Result{}, fmt.Errorf("%w: %s", ErrBinaryNotAllowed, name)

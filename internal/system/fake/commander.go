@@ -38,6 +38,10 @@ func (fake *Commander) RunToFile(ctx context.Context, _ string, _ os.FileMode, n
 	return fake.record(ctx, name, args, false)
 }
 
+func (fake *Commander) RunWithFile(ctx context.Context, _ string, name string, args ...string) (system.Result, error) {
+	return fake.record(ctx, name, args, true)
+}
+
 func (fake *Commander) record(ctx context.Context, name string, args []string, hasStdin bool) (system.Result, error) {
 	if err := ctx.Err(); err != nil {
 		return system.Result{}, err

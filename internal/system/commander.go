@@ -22,6 +22,12 @@ type OutputFileCommander interface {
 	RunToFile(ctx context.Context, path string, mode os.FileMode, name string, args ...string) (Result, error)
 }
 
+// InputFileCommander streams a caller-selected file to a command's stdin.
+type InputFileCommander interface {
+	Commander
+	RunWithFile(ctx context.Context, path string, name string, args ...string) (Result, error)
+}
+
 type Result struct {
 	ExitCode int
 	Stdout   string
