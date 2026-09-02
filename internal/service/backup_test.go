@@ -32,6 +32,36 @@ type backupStore struct {
 	backups      []domain.Backup
 }
 
+type restoredDatabaseStore struct {
+	backupStore
+	restored  domain.Subscription
+	databases []domain.Database
+}
+
+func (store *restoredDatabaseStore) SubscriptionByName(context.Context, string) (domain.Subscription, error) {
+	return store.restored, nil
+}
+func (store *restoredDatabaseStore) CreateDatabase(_ context.Context, database domain.Database) error {
+	store.databases = append(store.databases, database)
+	return nil
+}
+func (store *restoredDatabaseStore) DeleteDatabase(_ context.Context, _ int64, name string) error {
+	for index, database := range store.databases {
+		if database.Name == name {
+			store.databases = append(store.databases[:index], store.databases[index+1:]...)
+		}
+	}
+	return nil
+}
+
+type restoringMariaDB struct{ queries []string }
+
+func (database *restoringMariaDB) Execute(_ context.Context, query string) error {
+	database.queries = append(database.queries, query)
+	return nil
+}
+func (*restoringMariaDB) UserNameLimit(context.Context) (int, error) { return 64, nil }
+
 func (store backupStore) SubscriptionExists(_ context.Context, name string) (bool, error) {
 	return store.subscription.Name == name, nil
 }
@@ -74,6 +104,8 @@ func (backupStore) ListSSHKeys(context.Context, int64) ([]domain.SSHKey, error) 
 func (backupStore) ListCertificates(context.Context, int64) ([]domain.Certificate, error) {
 	return nil, nil
 }
+func (backupStore) CreateDatabase(context.Context, domain.Database) error         { return nil }
+func (backupStore) DeleteDatabase(context.Context, int64, string) error           { return nil }
 func (backupStore) CreateSubscription(context.Context, domain.Subscription) error { return nil }
 func (backupStore) DeleteSubscription(context.Context, string) error              { return nil }
 func (backupStore) SetSubscriptionStatus(context.Context, int64, string) error    { return nil }
@@ -167,11 +199,14 @@ func TestBackupService_RestoreFilesExtractsThenPromotesAndRecords(t *testing.T) 
 		StatFunc:      func(string) (os.FileInfo, error) { return nil, os.ErrNotExist },
 		MkdirAllFunc:  func(string, os.FileMode) error { return nil },
 		RemoveAllFunc: func(string) error { return nil },
+		ChownFunc:     func(string, int, int) error { return nil },
+		ChmodFunc:     func(string, os.FileMode) error { return nil },
 	}}
 	usersCreated := false
 	users := &fake.Users{
-		CreateFunc: func(context.Context, system.CreateUserOptions) error { usersCreated = true; return nil },
-		DeleteFunc: func(context.Context, string, bool) error { return nil },
+		CreateFunc:       func(context.Context, system.CreateUserOptions) error { usersCreated = true; return nil },
+		LockPasswordFunc: func(context.Context, string) error { return nil },
+		DeleteFunc:       func(context.Context, string, bool) error { return nil },
 	}
 	journal := &subscriptionJournal{}
 	commands := &fake.Commander{}
@@ -183,7 +218,7 @@ func TestBackupService_RestoreFilesExtractsThenPromotesAndRecords(t *testing.T) 
 		Executor: plan.Executor{Journal: journal, Locker: subscriptionLocker{}},
 	}
 	subscription := domain.Subscription{Name: "acme", UnixUser: "acme", UnixUID: 5000, Home: "/vhosts/acme"}
-	if _, err := service.restoreFiles(context.Background(), "/backups/acme/one", subscription, "/vhosts/.restore-acme"); err != nil {
+	if _, err := service.restoreFiles(context.Background(), "/backups/acme/one", subscription, "/vhosts/.restore-acme", nil, nil); err != nil {
 		t.Fatal(err)
 	}
 	if !usersCreated || journal.status != plan.OperationDone {
@@ -192,7 +227,7 @@ func TestBackupService_RestoreFilesExtractsThenPromotesAndRecords(t *testing.T) 
 	if len(fs.moves) != 1 || fs.moves[0] != [2]string{"/vhosts/.restore-acme", "/vhosts/acme"} {
 		t.Errorf("moves = %#v", fs.moves)
 	}
-	if len(commands.Calls) != 1 || commands.Calls[0].Name != "/usr/bin/tar" {
+	if len(commands.Calls) != 2 || commands.Calls[0].Name != "/usr/bin/tar" || commands.Calls[1].Name != "/usr/bin/chown" {
 		t.Errorf("commands = %#v", commands.Calls)
 	}
 }
@@ -212,5 +247,42 @@ func TestBackupService_NextRestoreUIDSkipsReservedUID(t *testing.T) {
 	uid, err := service.nextRestoreUID(context.Background(), "acme")
 	if err != nil || uid != 5001 {
 		t.Fatalf("nextRestoreUID() = %d, %v", uid, err)
+	}
+}
+
+func TestBackupService_RestoreFilesImportsDatabaseWithNewCredentials(t *testing.T) {
+	fs := &restoreFS{FS: &fake.FS{
+		StatFunc:      func(string) (os.FileInfo, error) { return nil, os.ErrNotExist },
+		MkdirAllFunc:  func(string, os.FileMode) error { return nil },
+		RemoveFunc:    func(string) error { return nil },
+		RemoveAllFunc: func(string) error { return nil },
+		ChownFunc:     func(string, int, int) error { return nil },
+		ChmodFunc:     func(string, os.FileMode) error { return nil },
+	}}
+	store := &restoredDatabaseStore{restored: domain.Subscription{ID: 8, Name: "acme"}}
+	users := &fake.Users{
+		CreateFunc:       func(context.Context, system.CreateUserOptions) error { return nil },
+		LockPasswordFunc: func(context.Context, string) error { return nil },
+		DeleteFunc:       func(context.Context, string, bool) error { return nil },
+	}
+	commands, mariadb := &fake.Commander{}, &restoringMariaDB{}
+	service := BackupService{
+		Store: store, FS: fs, Commands: commands, Users: users, MariaDB: mariadb,
+		Executor: plan.Executor{Journal: &subscriptionJournal{}, Locker: subscriptionLocker{}},
+		Config:   config.Config{MariaDB: config.MariaDB{Enabled: true}},
+	}
+	subscription := domain.Subscription{Name: "acme", UnixUser: "acme", UnixUID: 5000, Home: "/vhosts/acme"}
+	database := domain.Database{Name: "acme_main", User: "acme_main", Host: "localhost"}
+	if _, err := service.restoreFiles(context.Background(), "/backups/acme/one", subscription, "/vhosts/.restore-acme", []domain.Database{database}, map[string]string{database.Name: "FreshPassword234567890123"}); err != nil {
+		t.Fatal(err)
+	}
+	if len(store.databases) != 1 || store.databases[0].SubscriptionID != 8 {
+		t.Fatalf("restored database metadata = %#v", store.databases)
+	}
+	if len(mariadb.queries) != 1 || !strings.Contains(mariadb.queries[0], "CREATE DATABASE `acme_main`") {
+		t.Errorf("MariaDB queries = %#v", mariadb.queries)
+	}
+	if len(commands.Calls) != 4 || commands.Calls[2].Name != "/usr/bin/zstd" || commands.Calls[3].Name != "/usr/bin/mysql" || !commands.Calls[3].HasStdin {
+		t.Errorf("commands = %#v", commands.Calls)
 	}
 }

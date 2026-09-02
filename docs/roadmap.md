@@ -187,11 +187,14 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   restore do stagingu; test zajišťuje absenci shellu a úklid při selhání.
   Staging lze povýšit jen atomickým `FileMover` přesunem do dosud neexistujícího
   home; test kryje odmítnutí existujícího cíle.
-  Databázová část restore má otestovaný helper pro vytvoření identity s novým
-  heslem; výsledné SQL je určené pouze pro existující MariaDB stdin seam.
-  Pro databázový dump je
-  připraven rozšířený allowlisted command seam pro bezpečné streamování stdout
-  do nového souboru bez `sh -c`; je krytý jednotkovým testem.
+  Databázová část clean-server restore nyní pro každý dump vytvoří novou
+  MariaDB identitu s čerstvým heslem, bezpečně rozbalí `.sql.zst` do dočasného
+  souboru `0600` a importuje jej výhradně přes stdin `mysql`; do SQLite zapíše
+  nový subscription ID. Hesla se zobrazí pouze po úspěchu celé operace, jsou
+  řazená deterministicky a nikde se neukládají. Nový test ověřuje vytvoření,
+  dekompresi, stdin import i metadata bez shellu; `make test` prošel. Zbývá
+  obnova websites, PHP-FPM, cronu a SSH artefaktů, nový lifecycle certifikátů
+  a bezpečný scénář přepisu pomocí `--force`.
 - [~] **M8 — TUI:** návrh je zaznamenán v [tui-design.md](tui-design.md) a
   cíleně přebírá konzistentní Bubble Tea vzor z projektu `depo`: hodnotový
   model, `Deps`, samostatné routing/render/keys/theme a I/O jen přes `tea.Cmd`.

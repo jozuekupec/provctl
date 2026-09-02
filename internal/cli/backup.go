@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"fmt"
+	"sort"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -51,11 +52,31 @@ func newBackupRestoreCommand() *cobra.Command {
 		defer runtime.Close()
 		ctx, cancel := context.WithTimeout(context.Background(), time.Duration(cfg.Limits.LockTimeoutSeconds)*time.Second)
 		defer cancel()
-		operationID, err := runtime.Service.Restore(ctx, args[0], id, force)
+		result, err := runtime.Service.Restore(ctx, args[0], id, force)
 		if err != nil {
 			return err
 		}
-		_, err = fmt.Fprintf(command.OutOrStdout(), "Restored subscription %q (operation %d).\n", args[0], operationID)
+		if _, err := fmt.Fprintf(command.OutOrStdout(), "Restored subscription %q (operation %d).\n", args[0], result.OperationID); err != nil {
+			return err
+		}
+		if len(result.DatabasePasswords) == 0 {
+			return nil
+		}
+		if _, err := fmt.Fprintln(command.OutOrStdout(), "Database passwords (save these now):"); err != nil {
+			return err
+		}
+		names := make([]string, 0, len(result.DatabasePasswords))
+		for name := range result.DatabasePasswords {
+			names = append(names, name)
+		}
+		sort.Strings(names)
+		for _, name := range names {
+			password := result.DatabasePasswords[name]
+			if _, err := fmt.Fprintf(command.OutOrStdout(), "%s: %s\n", name, password); err != nil {
+				return err
+			}
+		}
+		_, err = fmt.Fprintln(command.OutOrStdout(), "WARNING: database passwords were generated again; update application configuration files.")
 		return err
 	}}
 	command.Flags().StringVar(&configPath, "config", meta.ConfigFile, "path to config.toml")

@@ -38,6 +38,8 @@ type BackupStore interface {
 	ListCronJobs(context.Context, int64) ([]domain.CronJob, error)
 	ListSSHKeys(context.Context, int64) ([]domain.SSHKey, error)
 	ListCertificates(context.Context, int64) ([]domain.Certificate, error)
+	CreateDatabase(context.Context, domain.Database) error
+	DeleteDatabase(context.Context, int64, string) error
 }
 
 type BackupService struct {
@@ -46,6 +48,7 @@ type BackupService struct {
 	Config    config.Config
 	Commands  system.Commander
 	Users     system.Users
+	MariaDB   MariaDBExecutor
 	Executor  plan.Executor
 	Locker    system.Locker
 	LockerFor func(string) system.Locker
@@ -54,42 +57,76 @@ type BackupService struct {
 // Restore restores a verified file archive onto a clean server. Existing
 // subscriptions are deliberately refused until overwrite recovery can first
 // make a new backup of their current state.
-func (service BackupService) Restore(ctx context.Context, name string, id int64, force bool) (int64, error) {
+type RestoreResult struct {
+	OperationID       int64
+	DatabasePasswords map[string]string
+}
+
+func (service BackupService) Restore(ctx context.Context, name string, id int64, force bool) (RestoreResult, error) {
 	metadata, err := service.PrepareRestore(ctx, name, id)
 	if err != nil {
-		return 0, err
+		return RestoreResult{}, err
 	}
 	if force {
-		return 0, fmt.Errorf("restore --force is not available until current-state backup is implemented")
+		return RestoreResult{}, fmt.Errorf("restore --force is not available until current-state backup is implemented")
 	}
 	if service.Users == nil || service.Executor.Journal == nil || service.Executor.Locker == nil {
-		return 0, fmt.Errorf("restore user manager and executor are required")
+		return RestoreResult{}, fmt.Errorf("restore user manager and executor are required")
+	}
+	if len(metadata.Databases) > 0 && service.MariaDB == nil {
+		return RestoreResult{}, fmt.Errorf("restore MariaDB executor is required for database payloads")
+	}
+	if len(metadata.Databases) > 0 && !service.Config.MariaDB.Enabled {
+		return RestoreResult{}, fmt.Errorf("MariaDB is disabled in configuration")
 	}
 	exists, err := service.Store.SubscriptionExists(ctx, name)
 	if err != nil {
-		return 0, fmt.Errorf("check restore subscription: %w", err)
+		return RestoreResult{}, fmt.Errorf("check restore subscription: %w", err)
 	}
 	if exists {
-		return 0, fmt.Errorf("subscription %q already exists; restore requires --force after a current-state backup", name)
+		return RestoreResult{}, fmt.Errorf("subscription %q already exists; restore requires --force after a current-state backup", name)
 	}
 	target := filepath.Join(service.Config.Paths.VHosts, name)
 	if _, err := service.FS.Stat(target); err == nil {
-		return 0, fmt.Errorf("restore target %q already exists", target)
+		return RestoreResult{}, fmt.Errorf("restore target %q already exists", target)
 	} else if !os.IsNotExist(err) {
-		return 0, fmt.Errorf("inspect restore target: %w", err)
+		return RestoreResult{}, fmt.Errorf("inspect restore target: %w", err)
 	}
 	uid, err := service.nextRestoreUID(ctx, name)
 	if err != nil {
-		return 0, fmt.Errorf("choose restore UID: %w", err)
+		return RestoreResult{}, fmt.Errorf("choose restore UID: %w", err)
 	}
 	subscription := metadata.Subscription
 	subscription.ID, subscription.Name, subscription.UnixUser, subscription.UnixUID, subscription.Home = 0, name, name, uid, target
 	backup, err := service.Store.BackupByIDAny(ctx, id)
 	if err != nil {
-		return 0, err
+		return RestoreResult{}, err
 	}
 	staging := filepath.Join(service.Config.Paths.VHosts, ".restore-"+name+"-"+strconv.FormatInt(time.Now().UTC().UnixNano(), 10))
-	return service.restoreFiles(ctx, backup.Path, subscription, staging)
+	passwords, err := service.restoreDatabasePasswords(metadata.Databases)
+	if err != nil {
+		return RestoreResult{}, err
+	}
+	operationID, err := service.restoreFiles(ctx, backup.Path, subscription, staging, metadata.Databases, passwords)
+	if err != nil {
+		return RestoreResult{OperationID: operationID}, err
+	}
+	return RestoreResult{OperationID: operationID, DatabasePasswords: passwords}, nil
+}
+
+func (service BackupService) restoreDatabasePasswords(databases []domain.Database) (map[string]string, error) {
+	passwords := make(map[string]string, len(databases))
+	for _, database := range databases {
+		if err := domain.ValidateDatabaseName(database.Name); err != nil {
+			return nil, fmt.Errorf("validate backup database %q: %w", database.Name, err)
+		}
+		password, err := GenerateDatabasePassword(24)
+		if err != nil {
+			return nil, err
+		}
+		passwords[database.Name] = password
+	}
+	return passwords, nil
 }
 
 func (service BackupService) nextRestoreUID(ctx context.Context, name string) (int, error) {
@@ -116,23 +153,106 @@ func (service BackupService) nextRestoreUID(ctx context.Context, name string) (i
 	return 0, fmt.Errorf("no free UID in configured range")
 }
 
-func (service BackupService) restoreFiles(ctx context.Context, archivePath string, subscription domain.Subscription, staging string) (int64, error) {
+func (service BackupService) restoreFiles(ctx context.Context, archivePath string, subscription domain.Subscription, staging string, databases []domain.Database, passwords map[string]string) (int64, error) {
 	archive := filepath.Join(archivePath, "files.tar.zst")
 	steps := []plan.Step{
 		{Name: "extract backup archive", Preview: "extract " + archive + " to staging", Do: func(ctx context.Context) error {
 			return service.extractArchive(ctx, archive, staging)
 		}, Undo: func(context.Context) error { return service.FS.RemoveAll(staging) }},
-		{Name: "create Unix user", Preview: fmt.Sprintf("create user %s with UID %d", subscription.UnixUser, subscription.UnixUID), Do: func(ctx context.Context) error {
-			return service.Users.Create(ctx, system.CreateUserOptions{Name: subscription.UnixUser, UID: subscription.UnixUID, Home: subscription.Home, Shell: meta.NoLoginShell, UserGroup: true, NoCreateHome: true})
+		{Name: "create locked Unix user", Preview: fmt.Sprintf("create locked user %s with UID %d", subscription.UnixUser, subscription.UnixUID), Do: func(ctx context.Context) error {
+			if err := service.Users.Create(ctx, system.CreateUserOptions{Name: subscription.UnixUser, UID: subscription.UnixUID, Home: subscription.Home, Shell: meta.NoLoginShell, UserGroup: true, NoCreateHome: true}); err != nil {
+				return err
+			}
+			if err := service.Users.LockPassword(ctx, subscription.UnixUser); err != nil {
+				_ = service.Users.Delete(ctx, subscription.UnixUser, false)
+				return err
+			}
+			return nil
 		}, Undo: func(ctx context.Context) error { return service.Users.Delete(ctx, subscription.UnixUser, false) }},
 		{Name: "promote restored files", Preview: "atomically move staged files to " + subscription.Home, Do: func(context.Context) error {
 			return service.promoteStaging(staging, subscription.Home)
 		}, Undo: func(context.Context) error { return service.FS.RemoveAll(subscription.Home) }},
+		{Name: "restore file ownership", Preview: fmt.Sprintf("chown restored files to %d:%d", subscription.UnixUID, subscription.UnixUID), Do: func(ctx context.Context) error {
+			_, err := service.Commands.Run(ctx, "/usr/bin/chown", "-R", "--", fmt.Sprintf("%d:%d", subscription.UnixUID, subscription.UnixUID), subscription.Home)
+			return err
+		}},
+		{Name: "create restored runtime directories", Preview: "create private restore runtime directories", Do: func(context.Context) error {
+			for _, directory := range []string{filepath.Join(subscription.Home, "tmp"), filepath.Join(subscription.Home, "tmp", "sessions")} {
+				if err := service.FS.MkdirAll(directory, 0o700); err != nil {
+					return err
+				}
+				if err := service.FS.Chown(directory, subscription.UnixUID, subscription.UnixUID); err != nil {
+					return err
+				}
+				if err := service.FS.Chmod(directory, 0o700); err != nil {
+					return err
+				}
+			}
+			return nil
+		}},
 		{Name: "record restored subscription", Preview: "insert subscription into SQLite", Do: func(ctx context.Context) error {
 			return service.Store.CreateSubscription(ctx, subscription)
 		}, Undo: func(ctx context.Context) error { return service.Store.DeleteSubscription(ctx, subscription.Name) }},
 	}
+	for _, database := range databases {
+		database := database
+		password := passwords[database.Name]
+		steps = append(steps, service.restoreDatabaseSteps(archivePath, subscription, database, password)...)
+	}
 	return service.Executor.Run(ctx, plan.Plan{Action: "backup.restore", Target: subscription.Name, Steps: steps})
+}
+
+func (service BackupService) restoreDatabaseSteps(archivePath string, subscription domain.Subscription, database domain.Database, password string) []plan.Step {
+	dump := filepath.Join(archivePath, "db", database.Name+".sql.zst")
+	raw := filepath.Join(subscription.Home, "tmp", ".restore-"+database.Name+".sql")
+	return []plan.Step{{Name: "create restored MariaDB database", Preview: "create database " + database.Name + " with a new password", Do: func(ctx context.Context) error {
+		query, err := RestoreDatabaseSQL(database, password)
+		if err != nil {
+			return err
+		}
+		return service.MariaDB.Execute(ctx, query)
+	}, Undo: func(ctx context.Context) error {
+		query, err := DropSQL(database.Name, database.User)
+		if err != nil {
+			return err
+		}
+		return service.MariaDB.Execute(ctx, query)
+	}}, {Name: "import restored MariaDB database", Preview: "import database dump " + database.Name, Do: func(ctx context.Context) error {
+		defer service.FS.Remove(raw)
+		output, ok := service.Commands.(system.OutputFileCommander)
+		if !ok {
+			return fmt.Errorf("restore commander cannot write decompressed database dumps")
+		}
+		input, ok := service.Commands.(system.InputFileCommander)
+		if !ok {
+			return fmt.Errorf("restore commander cannot read database dumps")
+		}
+		if _, err := output.RunToFile(ctx, raw, 0o600, "/usr/bin/zstd", "-q", "-d", "-c", dump); err != nil {
+			return fmt.Errorf("decompress database dump %q: %w", database.Name, err)
+		}
+		arguments := []string{}
+		if service.Config.MariaDB.DefaultsFile != "" {
+			arguments = append(arguments, "--defaults-extra-file="+service.Config.MariaDB.DefaultsFile)
+		}
+		arguments = append(arguments, database.Name)
+		if _, err := input.RunWithFile(ctx, raw, "/usr/bin/mysql", arguments...); err != nil {
+			return fmt.Errorf("import database %q: %w", database.Name, err)
+		}
+		return nil
+	}}, {Name: "record restored MariaDB database", Preview: "insert database " + database.Name + " into SQLite", Do: func(ctx context.Context) error {
+		restored, err := service.Store.SubscriptionByName(ctx, subscription.Name)
+		if err != nil {
+			return err
+		}
+		database.ID, database.SubscriptionID = 0, restored.ID
+		return service.Store.CreateDatabase(ctx, database)
+	}, Undo: func(ctx context.Context) error {
+		restored, err := service.Store.SubscriptionByName(ctx, subscription.Name)
+		if err != nil {
+			return err
+		}
+		return service.Store.DeleteDatabase(ctx, restored.ID, database.Name)
+	}}}
 }
 
 func (service BackupService) Create(ctx context.Context, name string) (backupID int64, returnErr error) {
@@ -197,7 +317,7 @@ func (service BackupService) Create(ctx context.Context, name string) (backupID 
 		}
 		for _, database := range databases {
 			raw := filepath.Join(directory, "db", database.Name+".sql")
-			args := []string{"--single-transaction", "--quick", "--routines", "--triggers", "--events"}
+			args := []string{"--single-transaction", "--quick", "--routines", "--triggers", "--events", "--no-create-db"}
 			if service.Config.MariaDB.DefaultsFile != "" {
 				args = append(args, "--defaults-extra-file="+service.Config.MariaDB.DefaultsFile)
 			}
@@ -407,7 +527,7 @@ func NewProductionBackupRuntime(ctx context.Context, cfg config.Config) (*Backup
 		return nil, err
 	}
 	commander := system.ExecCommander{}
-	return &BackupRuntime{Service: BackupService{Store: repository, FS: system.OSFS{}, Commands: commander, Users: system.CommandUsers{Commander: commander}, Executor: productionExecutor(repository), LockerFor: func(name string) system.Locker {
+	return &BackupRuntime{Service: BackupService{Store: repository, FS: system.OSFS{}, Commands: commander, Users: system.CommandUsers{Commander: commander}, MariaDB: MariaDB{Commands: commander, Config: cfg.MariaDB}, Executor: productionExecutor(repository), LockerFor: func(name string) system.Locker {
 		return system.FileLocker{Path: filepath.Join("/run", "provctl-"+name+".lock")}
 	}, Config: cfg}, repository: repository}, nil
 }
