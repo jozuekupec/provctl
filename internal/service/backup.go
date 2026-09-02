@@ -7,19 +7,27 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
 	"provctl/internal/config"
 	"provctl/internal/domain"
 	"provctl/internal/meta"
+	"provctl/internal/plan"
 	"provctl/internal/repository/sqlite"
 	"provctl/internal/system"
 )
 
 // BackupStore provides the read-only state needed before archive operations.
 type BackupStore interface {
+	SubscriptionExists(context.Context, string) (bool, error)
+	SubscriptionUIDExists(context.Context, int) (bool, error)
+	ListSubscriptions(context.Context) ([]domain.Subscription, error)
 	SubscriptionByName(context.Context, string) (domain.Subscription, error)
+	CreateSubscription(context.Context, domain.Subscription) error
+	DeleteSubscription(context.Context, string) error
+	SetSubscriptionStatus(context.Context, int64, string) error
 	ListBackups(context.Context, int64) ([]domain.Backup, error)
 	BackupByID(context.Context, int64, int64) (domain.Backup, error)
 	BackupByIDAny(context.Context, int64) (domain.Backup, error)
@@ -37,8 +45,94 @@ type BackupService struct {
 	FS        system.FS
 	Config    config.Config
 	Commands  system.Commander
+	Users     system.Users
+	Executor  plan.Executor
 	Locker    system.Locker
 	LockerFor func(string) system.Locker
+}
+
+// Restore restores a verified file archive onto a clean server. Existing
+// subscriptions are deliberately refused until overwrite recovery can first
+// make a new backup of their current state.
+func (service BackupService) Restore(ctx context.Context, name string, id int64, force bool) (int64, error) {
+	metadata, err := service.PrepareRestore(ctx, name, id)
+	if err != nil {
+		return 0, err
+	}
+	if force {
+		return 0, fmt.Errorf("restore --force is not available until current-state backup is implemented")
+	}
+	if service.Users == nil || service.Executor.Journal == nil || service.Executor.Locker == nil {
+		return 0, fmt.Errorf("restore user manager and executor are required")
+	}
+	exists, err := service.Store.SubscriptionExists(ctx, name)
+	if err != nil {
+		return 0, fmt.Errorf("check restore subscription: %w", err)
+	}
+	if exists {
+		return 0, fmt.Errorf("subscription %q already exists; restore requires --force after a current-state backup", name)
+	}
+	target := filepath.Join(service.Config.Paths.VHosts, name)
+	if _, err := service.FS.Stat(target); err == nil {
+		return 0, fmt.Errorf("restore target %q already exists", target)
+	} else if !os.IsNotExist(err) {
+		return 0, fmt.Errorf("inspect restore target: %w", err)
+	}
+	uid, err := service.nextRestoreUID(ctx, name)
+	if err != nil {
+		return 0, fmt.Errorf("choose restore UID: %w", err)
+	}
+	subscription := metadata.Subscription
+	subscription.ID, subscription.Name, subscription.UnixUser, subscription.UnixUID, subscription.Home = 0, name, name, uid, target
+	backup, err := service.Store.BackupByIDAny(ctx, id)
+	if err != nil {
+		return 0, err
+	}
+	staging := filepath.Join(service.Config.Paths.VHosts, ".restore-"+name+"-"+strconv.FormatInt(time.Now().UTC().UnixNano(), 10))
+	return service.restoreFiles(ctx, backup.Path, subscription, staging)
+}
+
+func (service BackupService) nextRestoreUID(ctx context.Context, name string) (int, error) {
+	if _, err := service.Users.Lookup(name); err == nil {
+		return 0, fmt.Errorf("unix user %q already exists", name)
+	} else if !isUnknownUser(err) {
+		return 0, fmt.Errorf("look up unix user %q: %w", name, err)
+	}
+	for uid := service.Config.Users.UIDMin; uid <= service.Config.Users.UIDMax; uid++ {
+		reserved, err := service.Store.SubscriptionUIDExists(ctx, uid)
+		if err != nil {
+			return 0, fmt.Errorf("check subscription UID %d: %w", uid, err)
+		}
+		if reserved {
+			continue
+		}
+		if _, err := service.Users.LookupID(strconv.Itoa(uid)); err == nil {
+			continue
+		} else if !isUnknownUser(err) {
+			return 0, fmt.Errorf("look up UID %d: %w", uid, err)
+		}
+		return uid, nil
+	}
+	return 0, fmt.Errorf("no free UID in configured range")
+}
+
+func (service BackupService) restoreFiles(ctx context.Context, archivePath string, subscription domain.Subscription, staging string) (int64, error) {
+	archive := filepath.Join(archivePath, "files.tar.zst")
+	steps := []plan.Step{
+		{Name: "extract backup archive", Preview: "extract " + archive + " to staging", Do: func(ctx context.Context) error {
+			return service.extractArchive(ctx, archive, staging)
+		}, Undo: func(context.Context) error { return service.FS.RemoveAll(staging) }},
+		{Name: "create Unix user", Preview: fmt.Sprintf("create user %s with UID %d", subscription.UnixUser, subscription.UnixUID), Do: func(ctx context.Context) error {
+			return service.Users.Create(ctx, system.CreateUserOptions{Name: subscription.UnixUser, UID: subscription.UnixUID, Home: subscription.Home, Shell: meta.NoLoginShell, UserGroup: true, NoCreateHome: true})
+		}, Undo: func(ctx context.Context) error { return service.Users.Delete(ctx, subscription.UnixUser, false) }},
+		{Name: "promote restored files", Preview: "atomically move staged files to " + subscription.Home, Do: func(context.Context) error {
+			return service.promoteStaging(staging, subscription.Home)
+		}, Undo: func(context.Context) error { return service.FS.RemoveAll(subscription.Home) }},
+		{Name: "record restored subscription", Preview: "insert subscription into SQLite", Do: func(ctx context.Context) error {
+			return service.Store.CreateSubscription(ctx, subscription)
+		}, Undo: func(ctx context.Context) error { return service.Store.DeleteSubscription(ctx, subscription.Name) }},
+	}
+	return service.Executor.Run(ctx, plan.Plan{Action: "backup.restore", Target: subscription.Name, Steps: steps})
 }
 
 func (service BackupService) Create(ctx context.Context, name string) (backupID int64, returnErr error) {
@@ -312,7 +406,8 @@ func NewProductionBackupRuntime(ctx context.Context, cfg config.Config) (*Backup
 	if err != nil {
 		return nil, err
 	}
-	return &BackupRuntime{Service: BackupService{Store: repository, FS: system.OSFS{}, Commands: system.ExecCommander{}, LockerFor: func(name string) system.Locker {
+	commander := system.ExecCommander{}
+	return &BackupRuntime{Service: BackupService{Store: repository, FS: system.OSFS{}, Commands: commander, Users: system.CommandUsers{Commander: commander}, Executor: productionExecutor(repository), LockerFor: func(name string) system.Locker {
 		return system.FileLocker{Path: filepath.Join("/run", "provctl-"+name+".lock")}
 	}, Config: cfg}, repository: repository}, nil
 }

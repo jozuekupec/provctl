@@ -5,17 +5,42 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"os"
+	"os/user"
+	"strconv"
 	"strings"
 	"testing"
 
 	"provctl/internal/config"
 	"provctl/internal/domain"
+	"provctl/internal/plan"
+	"provctl/internal/system"
 	"provctl/internal/system/fake"
 )
+
+type restoreFS struct {
+	*fake.FS
+	moves [][2]string
+}
+
+func (fs *restoreFS) Rename(oldPath, newPath string) error {
+	fs.moves = append(fs.moves, [2]string{oldPath, newPath})
+	return nil
+}
 
 type backupStore struct {
 	subscription domain.Subscription
 	backups      []domain.Backup
+}
+
+func (store backupStore) SubscriptionExists(_ context.Context, name string) (bool, error) {
+	return store.subscription.Name == name, nil
+}
+func (backupStore) SubscriptionUIDExists(context.Context, int) (bool, error) { return false, nil }
+func (store backupStore) ListSubscriptions(context.Context) ([]domain.Subscription, error) {
+	if store.subscription.Name == "" {
+		return nil, nil
+	}
+	return []domain.Subscription{store.subscription}, nil
 }
 
 func (store backupStore) SubscriptionByName(context.Context, string) (domain.Subscription, error) {
@@ -49,6 +74,9 @@ func (backupStore) ListSSHKeys(context.Context, int64) ([]domain.SSHKey, error) 
 func (backupStore) ListCertificates(context.Context, int64) ([]domain.Certificate, error) {
 	return nil, nil
 }
+func (backupStore) CreateSubscription(context.Context, domain.Subscription) error { return nil }
+func (backupStore) DeleteSubscription(context.Context, string) error              { return nil }
+func (backupStore) SetSubscriptionStatus(context.Context, int64, string) error    { return nil }
 
 func TestBackupService_ListForSubscriptionRejectsInvalidName(t *testing.T) {
 	_, err := (BackupService{Store: backupStore{}}).ListForSubscription(context.Background(), "BAD")
@@ -131,5 +159,58 @@ func TestBackupService_PromoteStagingRejectsExistingTarget(t *testing.T) {
 	err := service.promoteStaging("/vhosts/.restore-acme", "/vhosts/acme")
 	if err == nil || !strings.Contains(err.Error(), "already exists") {
 		t.Fatalf("promoteStaging() error = %v", err)
+	}
+}
+
+func TestBackupService_RestoreFilesExtractsThenPromotesAndRecords(t *testing.T) {
+	fs := &restoreFS{FS: &fake.FS{
+		StatFunc:      func(string) (os.FileInfo, error) { return nil, os.ErrNotExist },
+		MkdirAllFunc:  func(string, os.FileMode) error { return nil },
+		RemoveAllFunc: func(string) error { return nil },
+	}}
+	usersCreated := false
+	users := &fake.Users{
+		CreateFunc: func(context.Context, system.CreateUserOptions) error { usersCreated = true; return nil },
+		DeleteFunc: func(context.Context, string, bool) error { return nil },
+	}
+	journal := &subscriptionJournal{}
+	commands := &fake.Commander{}
+	service := BackupService{
+		Store:    backupStore{},
+		FS:       fs,
+		Commands: commands,
+		Users:    users,
+		Executor: plan.Executor{Journal: journal, Locker: subscriptionLocker{}},
+	}
+	subscription := domain.Subscription{Name: "acme", UnixUser: "acme", UnixUID: 5000, Home: "/vhosts/acme"}
+	if _, err := service.restoreFiles(context.Background(), "/backups/acme/one", subscription, "/vhosts/.restore-acme"); err != nil {
+		t.Fatal(err)
+	}
+	if !usersCreated || journal.status != plan.OperationDone {
+		t.Errorf("usersCreated=%t status=%s", usersCreated, journal.status)
+	}
+	if len(fs.moves) != 1 || fs.moves[0] != [2]string{"/vhosts/.restore-acme", "/vhosts/acme"} {
+		t.Errorf("moves = %#v", fs.moves)
+	}
+	if len(commands.Calls) != 1 || commands.Calls[0].Name != "/usr/bin/tar" {
+		t.Errorf("commands = %#v", commands.Calls)
+	}
+}
+
+func TestBackupService_NextRestoreUIDSkipsReservedUID(t *testing.T) {
+	users := &fake.Users{
+		LookupFunc: func(string) (*user.User, error) { return nil, user.UnknownUserError("acme") },
+		LookupIDFunc: func(id string) (*user.User, error) {
+			if id == "5000" {
+				return &user.User{Uid: id}, nil
+			}
+			value, _ := strconv.Atoi(id)
+			return nil, user.UnknownUserIdError(value)
+		},
+	}
+	service := BackupService{Store: backupStore{}, Users: users, Config: config.Config{Users: config.Users{UIDMin: 5000, UIDMax: 5001}}}
+	uid, err := service.nextRestoreUID(context.Background(), "acme")
+	if err != nil || uid != 5001 {
+		t.Fatalf("nextRestoreUID() = %d, %v", uid, err)
 	}
 }

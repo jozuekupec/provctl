@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -20,11 +21,8 @@ func newBackupCommand() *cobra.Command {
 
 func newBackupRestoreCommand() *cobra.Command {
 	var configPath string
-	var dryRun bool
+	var dryRun, force bool
 	command := &cobra.Command{Use: "restore <subscription> <id>", Short: "validate and restore a subscription backup", Args: cobra.ExactArgs(2), RunE: func(command *cobra.Command, args []string) error {
-		if !dryRun {
-			return fmt.Errorf("restore is not yet enabled; rerun with --dry-run to validate the archive")
-		}
 		cfg, err := config.Load(configPath)
 		if err != nil {
 			return fmt.Errorf("load configuration: %w", err)
@@ -33,20 +31,36 @@ func newBackupRestoreCommand() *cobra.Command {
 		if _, err := fmt.Sscan(args[1], &id); err != nil {
 			return fmt.Errorf("parse backup ID: %w", err)
 		}
-		runtime, err := service.NewReadOnlyBackupRuntime(context.Background(), cfg)
+		if dryRun {
+			runtime, err := service.NewReadOnlyBackupRuntime(context.Background(), cfg)
+			if err != nil {
+				return fmt.Errorf("open backup state: %w", err)
+			}
+			defer runtime.Close()
+			metadata, err := runtime.Service.PrepareRestore(context.Background(), args[0], id)
+			if err != nil {
+				return err
+			}
+			_, err = fmt.Fprintf(command.OutOrStdout(), "Validated backup for subscription %q from %s; no changes made.\n", metadata.Subscription.Name, metadata.CreatedAt.UTC().Format("2006-01-02T15:04:05Z"))
+			return err
+		}
+		runtime, err := service.NewProductionBackupRuntime(context.Background(), cfg)
 		if err != nil {
 			return fmt.Errorf("open backup state: %w", err)
 		}
 		defer runtime.Close()
-		metadata, err := runtime.Service.PrepareRestore(context.Background(), args[0], id)
+		ctx, cancel := context.WithTimeout(context.Background(), time.Duration(cfg.Limits.LockTimeoutSeconds)*time.Second)
+		defer cancel()
+		operationID, err := runtime.Service.Restore(ctx, args[0], id, force)
 		if err != nil {
 			return err
 		}
-		_, err = fmt.Fprintf(command.OutOrStdout(), "Validated backup for subscription %q from %s; no changes made.\n", metadata.Subscription.Name, metadata.CreatedAt.UTC().Format("2006-01-02T15:04:05Z"))
+		_, err = fmt.Fprintf(command.OutOrStdout(), "Restored subscription %q (operation %d).\n", args[0], operationID)
 		return err
 	}}
 	command.Flags().StringVar(&configPath, "config", meta.ConfigFile, "path to config.toml")
 	command.Flags().BoolVar(&dryRun, "dry-run", false, "validate the backup without restoring")
+	command.Flags().BoolVar(&force, "force", false, "replace an existing subscription after making a current-state backup")
 	return command
 }
 

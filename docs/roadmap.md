@@ -172,6 +172,13 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   záznamy a soubory, databázové identity a certificate metadata, aby byly
   cizí klíče konzistentní a clean restore neměl konflikt se starým MariaDB
   stavem.
+  Clean-server `backup restore <subscription> <id>` nyní provádí ověřenou
+  souborovou obnovu jako jednu žurnálovanou operaci: najde volné UID, vytvoří
+  locknutý Unix účet, rozbalí archiv do stagingu na stejném filesystému a
+  atomicky jej povýší do nového home před zápisem subscription do SQLite.
+  Přepis existující subscription a následná obnova databází či runtime
+  artefaktů zatím zůstávají záměrně odmítnuté, dokud nejsou pokryté stejnou
+  rollback a round-trip garancí.
   Souborový payload se nyní umí rozbalit explicitním allowlisted `tar` během
   restore do stagingu; test zajišťuje absenci shellu a úklid při selhání.
   Staging lze povýšit jen atomickým `FileMover` přesunem do dosud neexistujícího
