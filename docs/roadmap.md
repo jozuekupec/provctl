@@ -148,6 +148,9 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   součty a dokončuje či označí selhání evidence; kvóta počtu záloh se
   kontroluje před systémovou změnou. Zálohu doplňují konzistentní databázové
   dumpy (`mysqldump` → zstd) bez shellu, zahrnuté v metadatech i checksumách.
+  Manifest nyní zaznamenává celý obnovitelný stav subscription — websites,
+  databáze, cron jobs a SSH keys — a certificate lineage pouze jako referenci
+  pro následné nové vydání; certifikáty se nearchivují ani neobnovují.
   Stále zbývá restore.
   `backup restore <subscription> <id> --dry-run` nyní bezpečně ověří
   manifest, identitu subscription a SHA256SUMS bez jakékoli změny systému;
