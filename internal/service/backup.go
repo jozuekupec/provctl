@@ -25,6 +25,10 @@ type BackupStore interface {
 	CreateBackup(context.Context, domain.Backup) (int64, error)
 	FinishBackup(context.Context, int64, int64, string) error
 	ListDatabases(context.Context, int64) ([]domain.Database, error)
+	ListWebsites(context.Context, int64) ([]domain.Website, error)
+	ListCronJobs(context.Context, int64) ([]domain.CronJob, error)
+	ListSSHKeys(context.Context, int64) ([]domain.SSHKey, error)
+	ListCertificates(context.Context, int64) ([]domain.Certificate, error)
 }
 
 type BackupService struct {
@@ -116,7 +120,23 @@ func (service BackupService) Create(ctx context.Context, name string) (backupID 
 			checksums = append(checksums, filepath.Join("db", database.Name+".sql.zst"))
 		}
 	}
-	metadata, err := json.MarshalIndent(domain.BackupMetadata{FormatVersion: 1, ProvctlVersion: meta.Version, CreatedAt: started, Subscription: subscription, Databases: databases}, "", "  ")
+	websites, err := service.Store.ListWebsites(ctx, subscription.ID)
+	if err != nil {
+		return backupID, fmt.Errorf("list websites: %w", err)
+	}
+	cronJobs, err := service.Store.ListCronJobs(ctx, subscription.ID)
+	if err != nil {
+		return backupID, fmt.Errorf("list cron jobs: %w", err)
+	}
+	sshKeys, err := service.Store.ListSSHKeys(ctx, subscription.ID)
+	if err != nil {
+		return backupID, fmt.Errorf("list SSH keys: %w", err)
+	}
+	certificates, err := service.Store.ListCertificates(ctx, subscription.ID)
+	if err != nil {
+		return backupID, fmt.Errorf("list certificates: %w", err)
+	}
+	metadata, err := json.MarshalIndent(domain.BackupMetadata{FormatVersion: 1, ProvctlVersion: meta.Version, CreatedAt: started, Subscription: subscription, Websites: websites, Databases: databases, CronJobs: cronJobs, SSHKeys: sshKeys, Certificates: certificates}, "", "  ")
 	if err != nil {
 		return backupID, fmt.Errorf("encode backup metadata: %w", err)
 	}

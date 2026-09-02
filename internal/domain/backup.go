@@ -16,9 +16,13 @@ type Backup struct {
 
 // BackupMetadata is the non-secret manifest stored in metadata.json.
 type BackupMetadata struct {
-	FormatVersion  int          `json:"format_version"`
-	ProvctlVersion string       `json:"provctl_version"`
-	CreatedAt      time.Time    `json:"created_at"`
-	Subscription   Subscription `json:"subscription"`
-	Databases      []Database   `json:"databases"`
+	FormatVersion  int           `json:"format_version"`
+	ProvctlVersion string        `json:"provctl_version"`
+	CreatedAt      time.Time     `json:"created_at"`
+	Subscription   Subscription  `json:"subscription"`
+	Websites       []Website     `json:"websites"`
+	Databases      []Database    `json:"databases"`
+	CronJobs       []CronJob     `json:"cron_jobs"`
+	SSHKeys        []SSHKey      `json:"ssh_keys"`
+	Certificates   []Certificate `json:"certificates"`
 }

@@ -45,4 +45,11 @@ func TestRepository_CertificateRoundTrip(t *testing.T) {
 	if certificate.NotAfter != updated || certificate.LastCheckedAt.IsZero() {
 		t.Errorf("certificate after update = %#v", certificate)
 	}
+	certificates, err := repository.ListCertificates(context.Background(), subscription.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(certificates) != 1 || certificates[0].Lineage != certificate.Lineage {
+		t.Errorf("ListCertificates() = %#v", certificates)
+	}
 }

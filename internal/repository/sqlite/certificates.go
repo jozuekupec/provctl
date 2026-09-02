@@ -27,6 +27,43 @@ func (repository *Repository) CreateCertificate(ctx context.Context, certificate
 	return id, nil
 }
 
+// ListCertificates returns the persisted certificate metadata for one subscription.
+// Archive restore deliberately does not reinstate these certificates, but records
+// them in the backup manifest so the operator can reissue the expected lineages.
+func (repository *Repository) ListCertificates(ctx context.Context, subscriptionID int64) ([]domain.Certificate, error) {
+	rows, err := repository.DB.QueryContext(ctx, `SELECT id, subscription_id, lineage, primary_domain, sans, COALESCE(issuer, ''), COALESCE(not_before, ''), COALESCE(not_after, ''), COALESCE(last_checked_at, '') FROM certificates WHERE subscription_id = ? ORDER BY lineage`, subscriptionID)
+	if err != nil {
+		return nil, fmt.Errorf("list certificates: %w", err)
+	}
+	defer rows.Close()
+	var certificates []domain.Certificate
+	for rows.Next() {
+		var certificate domain.Certificate
+		var sans, notBefore, notAfter, checked string
+		if err := rows.Scan(&certificate.ID, &certificate.SubscriptionID, &certificate.Lineage, &certificate.PrimaryDomain, &sans, &certificate.Issuer, &notBefore, &notAfter, &checked); err != nil {
+			return nil, fmt.Errorf("scan certificate: %w", err)
+		}
+		if err := json.Unmarshal([]byte(sans), &certificate.SANs); err != nil {
+			return nil, fmt.Errorf("decode certificate SANs: %w", err)
+		}
+		var parseErr error
+		if certificate.NotBefore, parseErr = parseNullableTime(notBefore); parseErr != nil {
+			return nil, parseErr
+		}
+		if certificate.NotAfter, parseErr = parseNullableTime(notAfter); parseErr != nil {
+			return nil, parseErr
+		}
+		if certificate.LastCheckedAt, parseErr = parseNullableTime(checked); parseErr != nil {
+			return nil, parseErr
+		}
+		certificates = append(certificates, certificate)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate certificates: %w", err)
+	}
+	return certificates, nil
+}
+
 func (repository *Repository) CertificateByLineage(ctx context.Context, lineage string) (domain.Certificate, error) {
 	row := repository.DB.QueryRowContext(ctx, `SELECT id, subscription_id, lineage, primary_domain, sans, COALESCE(issuer, ''), COALESCE(not_before, ''), COALESCE(not_after, ''), COALESCE(last_checked_at, '') FROM certificates WHERE lineage = ?`, lineage)
 	return scanCertificate(row)

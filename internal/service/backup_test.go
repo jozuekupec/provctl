@@ -35,6 +35,12 @@ func (store backupStore) BackupByID(_ context.Context, _ int64, id int64) (domai
 func (backupStore) CreateBackup(context.Context, domain.Backup) (int64, error)      { return 1, nil }
 func (backupStore) FinishBackup(context.Context, int64, int64, string) error        { return nil }
 func (backupStore) ListDatabases(context.Context, int64) ([]domain.Database, error) { return nil, nil }
+func (backupStore) ListWebsites(context.Context, int64) ([]domain.Website, error)   { return nil, nil }
+func (backupStore) ListCronJobs(context.Context, int64) ([]domain.CronJob, error)   { return nil, nil }
+func (backupStore) ListSSHKeys(context.Context, int64) ([]domain.SSHKey, error)     { return nil, nil }
+func (backupStore) ListCertificates(context.Context, int64) ([]domain.Certificate, error) {
+	return nil, nil
+}
 
 func TestBackupService_ListForSubscriptionRejectsInvalidName(t *testing.T) {
 	_, err := (BackupService{Store: backupStore{}}).ListForSubscription(context.Background(), "BAD")
