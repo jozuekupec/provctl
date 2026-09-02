@@ -2,6 +2,7 @@ package sqlite
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"time"
 
@@ -82,9 +83,13 @@ type backupScanner interface{ Scan(...any) error }
 
 func scanBackup(scanner backupScanner) (domain.Backup, error) {
 	var backup domain.Backup
+	var subscriptionID sql.NullInt64
 	var startedAt, finishedAt string
-	if err := scanner.Scan(&backup.ID, &backup.SubscriptionID, &backup.Path, &backup.SizeBytes, &backup.Status, &startedAt, &finishedAt); err != nil {
+	if err := scanner.Scan(&backup.ID, &subscriptionID, &backup.Path, &backup.SizeBytes, &backup.Status, &startedAt, &finishedAt); err != nil {
 		return domain.Backup{}, fmt.Errorf("scan backup: %w", err)
+	}
+	if subscriptionID.Valid {
+		backup.SubscriptionID = subscriptionID.Int64
 	}
 	var err error
 	if backup.StartedAt, err = time.Parse(time.RFC3339, startedAt); err != nil {

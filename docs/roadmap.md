@@ -160,6 +160,10 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   implementace.
   Evidence backupu umí archiv vyhledat samostatně podle ID, takže clean-server
   restore nebude falešně závislý na existenci původního subscription záznamu.
+  SQLite schema v2 nyní při smazání subscription zachová backup záznam s
+  uvolněnou vazbou na zdroj; migrační test ověřuje upgrade z v1 i následné
+  dohledání archivu. Tím je odstraněna překážka skutečného clean-server
+  round-tripu.
   Souborový payload se nyní umí rozbalit explicitním allowlisted `tar` během
   restore do stagingu; test zajišťuje absenci shellu a úklid při selhání.
   Staging lze povýšit jen atomickým `FileMover` přesunem do dosud neexistujícího
