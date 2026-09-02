@@ -117,6 +117,10 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   directory, strukturu Aliasu pro skutečný Certbot webroot a proxy nezávislý
   self-check. Převzetí existujících webů a jejich certifikátů patří do
   samostatného M10 `subscription adopt`.
+  Prioritní revize pro model „jeden certifikát na projekt“ je zaznamenána v
+  [ssl-project-issuance-review.md](ssl-project-issuance-review.md). Před
+  automatickým vydáváním při `website create` vyžaduje rozhodnutí o DNS
+  readiness; současný bezpečný tok zůstává explicitní `ssl enable`.
 - [~] **M7 — provoz:** první read-only část `health` je dostupná jako
   `provctl health [<subscription> [<domain>]]` v textu i přes `--json`.
   Kontroluje aktivní Apache, `apachectl configtest`, read-only SQLite spojení,
