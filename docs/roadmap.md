@@ -202,6 +202,11 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   posledních 100 řádků access, resp. error logu přes read-only service seam a
   zobrazí je v Output panelu; website detail nyní vypisuje také SSL, force
   HTTPS a HSTS stav.
+  Srovnání dostupných referencí `examples/branchctl`, `examples/dbctl` a
+  aktuálního `depo` je uloženo v [tui-pattern-comparison.md](tui-pattern-comparison.md);
+  závěr konkrétně určuje další společné základy (key binding source, themed
+  panely, minimální rozměr, async operation slots) bez přenášení nesouvisejících
+  vault a deployment funkcí.
 - [ ] **M9 — distribuce:** nfpm, maintainer skripty, CI, APT repozitář a
   package testy (`lintian`, `piuparts`, upgrade/purge).
 - [ ] **M10 — migrace:** `subscription adopt` pro existující weby.
