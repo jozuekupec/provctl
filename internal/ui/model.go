@@ -14,6 +14,7 @@ type Deps struct {
 	LoadSubscriptions     func(context.Context) ([]domain.Subscription, error)
 	LoadWebsites          func(context.Context, int64) ([]domain.Website, error)
 	LoadDatabases         func(context.Context, string) ([]domain.Database, error)
+	ReadWebsiteLogs       func(context.Context, string, string, bool, int) (string, error)
 	SetWebsiteEnabled     func(context.Context, string, string, bool) (int64, error)
 	SetSubscriptionStatus func(context.Context, string, string) (int64, error)
 	RunHealth             func(context.Context, string, string) ([]service.Check, error)
@@ -43,6 +44,10 @@ type subscriptionChangedMsg struct {
 type healthLoadedMsg struct {
 	checks []service.Check
 	err    error
+}
+type websiteLogsLoadedMsg struct {
+	contents string
+	err      error
 }
 
 type focus int
@@ -129,6 +134,16 @@ func (m appModel) loadDatabases() tea.Msg {
 	subscription := m.items[clamp(m.cursor, len(m.items))]
 	items, err := m.deps.LoadDatabases(context.Background(), subscription.Name)
 	return databasesLoadedMsg{items: items, err: err}
+}
+
+func (m appModel) loadWebsiteLogs(errorLog bool) tea.Msg {
+	if m.deps.ReadWebsiteLogs == nil || len(m.items) == 0 || len(m.websites) == 0 {
+		return websiteLogsLoadedMsg{err: context.Canceled}
+	}
+	subscription := m.items[clamp(m.cursor, len(m.items))]
+	website := m.websites[clamp(m.websiteCursor, len(m.websites))]
+	contents, err := m.deps.ReadWebsiteLogs(context.Background(), subscription.Name, website.PrimaryDomain, errorLog, 100)
+	return websiteLogsLoadedMsg{contents: contents, err: err}
 }
 
 func New(deps Deps) appModel {

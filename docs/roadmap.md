@@ -186,7 +186,10 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   read-only kontroly posílá do Output panelu; modelový test ověřuje scope i
   zobrazení výsledku. Klávesa `b` nyní přes service seam načte databáze
   vybrané subscription a zobrazí jejich jména v Detailu; tok je krytý
-  modelovým testem.
+  modelovým testem. Pro vybraný website klávesy `l` a `L` asynchronně načtou
+  posledních 100 řádků access, resp. error logu přes read-only service seam a
+  zobrazí je v Output panelu; website detail nyní vypisuje také SSL, force
+  HTTPS a HSTS stav.
 - [ ] **M9 — distribuce:** nfpm, maintainer skripty, CI, APT repozitář a
   package testy (`lintian`, `piuparts`, upgrade/purge).
 - [ ] **M10 — migrace:** `subscription adopt` pro existující weby.

@@ -124,3 +124,20 @@ func TestModel_LoadDatabasesShowsDetail(t *testing.T) {
 		t.Errorf("detail = %q", m.detail())
 	}
 }
+
+func TestModel_LoadWebsiteLogsWritesOutput(t *testing.T) {
+	m := New(Deps{ReadWebsiteLogs: func(_ context.Context, subscription, domain string, errorLog bool, lines int) (string, error) {
+		if subscription != "acme" || domain != "example.test" || errorLog || lines != 100 {
+			t.Fatalf("log request = %q %q %t %d", subscription, domain, errorLog, lines)
+		}
+		return "first\nsecond\n", nil
+	}})
+	m.items = []domain.Subscription{{Name: "acme"}}
+	m.websites, m.showWebsites = []domain.Website{{PrimaryDomain: "example.test"}}, true
+	updated, command := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("l")})
+	updated, _ = updated.(appModel).Update(command())
+	m = updated.(appModel)
+	if m.focus != focusOutput || strings.Join(m.output.lines, "\n") != "first\nsecond" {
+		t.Errorf("output = %#v", m.output)
+	}
+}

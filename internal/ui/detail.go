@@ -8,7 +8,7 @@ import (
 func (m appModel) detail() string {
 	if m.showWebsites && len(m.websites) > 0 {
 		website := m.websites[clamp(m.websiteCursor, len(m.websites))]
-		return fmt.Sprintf("Domain: %s\nType: %s\nEnabled: %t\nDocument root: %s", website.PrimaryDomain, website.Type, website.Enabled, website.DocumentRoot)
+		return fmt.Sprintf("Domain: %s\nType: %s\nEnabled: %t\nDocument root: %s\nSSL: %t\nForce HTTPS: %t\nHSTS: %t", website.PrimaryDomain, website.Type, website.Enabled, website.DocumentRoot, website.SSLEnabled, website.ForceHTTPS, website.HSTS)
 	}
 	if len(m.items) == 0 {
 		return "No selection."

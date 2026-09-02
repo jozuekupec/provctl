@@ -2,6 +2,7 @@ package ui
 
 import (
 	"fmt"
+	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"provctl/internal/domain"
@@ -50,6 +51,16 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "b":
 			m.status = "loading databases…"
 			return m, m.loadDatabases
+		case "l":
+			if m.showWebsites && len(m.websites) > 0 {
+				m.status = "loading access log…"
+				return m, func() tea.Msg { return m.loadWebsiteLogs(false) }
+			}
+		case "L":
+			if m.showWebsites && len(m.websites) > 0 {
+				m.status = "loading error log…"
+				return m, func() tea.Msg { return m.loadWebsiteLogs(true) }
+			}
 		case "enter":
 			m.showWebsites, m.focus, m.status = true, focusWebsites, "loading websites…"
 			return m, m.loadWebsites
@@ -92,7 +103,7 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.status = "website load failed: " + msg.err.Error()
 			return m, nil
 		}
-		m.websites, m.websiteCursor, m.status = append([]domain.Website(nil), msg.items...), 0, "esc subscriptions • d detail • o output • q quit"
+		m.websites, m.websiteCursor, m.status = append([]domain.Website(nil), msg.items...), 0, "e toggle • l access log • L error log • esc subscriptions • d detail • o output • q quit"
 		m.output = m.output.append("websites loaded")
 	case databasesLoadedMsg:
 		if msg.err != nil {
@@ -126,6 +137,17 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.output = m.output.append(string(check.Status) + " " + check.Name + ": " + check.Detail)
 		}
 		m.focus, m.status = focusOutput, "health checks completed"
+	case websiteLogsLoadedMsg:
+		if msg.err != nil {
+			m.status = "log load failed: " + msg.err.Error()
+			return m, nil
+		}
+		m.output, m.focus, m.status = outputState{}, focusOutput, "website log loaded"
+		for _, line := range strings.Split(strings.TrimSuffix(msg.contents, "\n"), "\n") {
+			if line != "" {
+				m.output = m.output.append(line)
+			}
+		}
 	}
 	return m, nil
 }
