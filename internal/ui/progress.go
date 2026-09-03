@@ -27,12 +27,14 @@ type progressState struct {
 	steps  []progressStep
 	active bool
 	ch     chan tea.Msg
+	cancel context.CancelFunc
 }
 
 type progressStartMsg struct {
-	title string
-	steps []progressStep
-	ch    chan tea.Msg
+	title  string
+	steps  []progressStep
+	ch     chan tea.Msg
+	cancel context.CancelFunc
 }
 
 type progressStepMsg struct {
@@ -54,10 +56,10 @@ func steppedCmd(title string, labels []string, work func(context.Context) tea.Ms
 	ch := make(chan tea.Msg, len(steps)*2+2)
 	return func() tea.Msg {
 		go func() {
-			ch <- progressStartMsg{title: title, steps: steps, ch: ch}
-			ch <- progressStepMsg{index: 0, state: stepRunning}
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 			defer cancel()
+			ch <- progressStartMsg{title: title, steps: steps, ch: ch, cancel: cancel}
+			ch <- progressStepMsg{index: 0, state: stepRunning}
 			result := work(ctx)
 			if operationFailed(result) {
 				ch <- progressStepMsg{index: 0, state: stepFailed}

@@ -243,8 +243,14 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   skutečných UI kroků („apply generated configuration/state“) s omezeným
   contextem; nevydává se za vnitřní systémový plán, který služba neposkytuje.
   Modelové testy ověřují detail, minimum, čtyři panely a celý progress stream;
-  `make test` prošel. Zbývá generační guard a cancel pro čtecí dotazy a živé
-  terminálové ověření v `pv`.
+  `make test` prošel. Porovnání s `branchctl`, `depo` a `dbctl` vedlo k
+  převzetí malého `opSlot` vzoru: každé čtení nyní používá 15sekundový,
+  zrušitelný context a generační guard, takže opožděná odpověď nemůže přepsat
+  nový výběr. Změna subscription ruší a vymaže závislé weby, databáze, health
+  a logy; Output trvale zachová i chyby čtení. Potvrzená mutace okamžitě
+  zahodí confirmation snapshot, během běhu ignoruje další akční klávesy a
+  `Esc` ruší její context. Testy pokrývají stale odpověď, nahrazený refresh,
+  změnu subscription i duplicitní `y`. Zbývá živé terminálové ověření v `pv`.
 - [ ] **M9 — distribuce:** nfpm, maintainer skripty, CI, APT repozitář a
   package testy (`lintian`, `piuparts`, upgrade/purge).
 - [ ] **M10 — migrace:** `subscription adopt` pro existující weby.

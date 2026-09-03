@@ -5,14 +5,31 @@ import tea "github.com/charmbracelet/bubbletea"
 // handleKey routes a key by the current interaction mode. Keeping this apart
 // from Update makes the value-model message router easy to audit and test.
 func (m appModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if m.progress.active {
+		switch msg.String() {
+		case "esc":
+			if m.progress.cancel != nil {
+				m.progress.cancel()
+			}
+			m.status = "cancelling change…"
+		case "q", "ctrl+c":
+			if m.progress.cancel != nil {
+				m.progress.cancel()
+			}
+			return m, tea.Quit
+		}
+		return m, nil
+	}
 	if m.confirm.action != "" {
 		switch msg.String() {
 		case "y":
 			m.status = "applying change…"
-			if m.confirm.action == "active" || m.confirm.action == "suspended" {
-				return m, m.changeSubscriptionCmd()
+			confirm := m.confirm
+			m.confirm = confirmState{}
+			if confirm.action == "active" || confirm.action == "suspended" {
+				return m, m.changeSubscriptionCmd(confirm)
 			}
-			return m, m.changeWebsiteCmd()
+			return m, m.changeWebsiteCmd(confirm)
 		case "esc", "n", "q":
 			m.confirm, m.status = confirmState{}, "cancelled"
 			return m, nil
@@ -24,46 +41,68 @@ func (m appModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, tea.Quit
 	case "j", "down":
 		if m.focus == focusWebsites {
-			m.websiteCursor = clamp(m.websiteCursor+1, len(m.websites))
+			next := clamp(m.websiteCursor+1, len(m.websites))
+			if next != m.websiteCursor {
+				m.websiteCursor = next
+				m.logsLoad.invalidate()
+			}
 		} else if m.focus == focusDetail {
 			m.detailScroll++
 		} else if m.focus == focusOutput {
 			m.outputScroll++
 		} else {
-			m.cursor = clamp(m.cursor+1, len(m.items))
+			next := clamp(m.cursor+1, len(m.items))
+			if next != m.cursor {
+				m.cursor = next
+				m = m.clearSelectionDetails()
+			}
 		}
 	case "k", "up":
 		if m.focus == focusWebsites {
-			m.websiteCursor = clamp(m.websiteCursor-1, len(m.websites))
+			next := clamp(m.websiteCursor-1, len(m.websites))
+			if next != m.websiteCursor {
+				m.websiteCursor = next
+				m.logsLoad.invalidate()
+			}
 		} else if m.focus == focusDetail {
 			m.detailScroll = max(0, m.detailScroll-1)
 		} else if m.focus == focusOutput {
 			m.outputScroll = max(0, m.outputScroll-1)
 		} else {
-			m.cursor = clamp(m.cursor-1, len(m.items))
+			next := clamp(m.cursor-1, len(m.items))
+			if next != m.cursor {
+				m.cursor = next
+				m = m.clearSelectionDetails()
+			}
 		}
 	case "r":
 		m.status = "loading subscriptions…"
-		return m, m.loadSubscriptions
+		m, command := m.startSubscriptions()
+		return m, command
 	case "h":
 		m.status = "running health checks…"
-		return m, m.loadHealth
+		m, command := m.startHealth()
+		return m, command
 	case "b":
 		m.status = "loading databases…"
-		return m, m.loadDatabases
+		m, command := m.startDatabases()
+		return m, command
 	case "l":
 		if m.showWebsites && len(m.websites) > 0 {
 			m.status = "loading access log…"
-			return m, func() tea.Msg { return m.loadWebsiteLogs(false) }
+			m, command := m.startWebsiteLogs(false)
+			return m, command
 		}
 	case "L":
 		if m.showWebsites && len(m.websites) > 0 {
 			m.status = "loading error log…"
-			return m, func() tea.Msg { return m.loadWebsiteLogs(true) }
+			m, command := m.startWebsiteLogs(true)
+			return m, command
 		}
 	case "enter":
 		m.showWebsites, m.focus, m.status = true, focusWebsites, "loading websites…"
-		return m, m.loadWebsites
+		m, command := m.startWebsites()
+		return m, command
 	case "d":
 		m.focus = focusDetail
 	case "o":
@@ -89,7 +128,8 @@ func (m appModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "tab":
 		m.focus = (m.focus + 1) % 4
 	case "esc":
-		m.showWebsites, m.focus = false, focusSubscriptions
+		m = m.clearSelectionDetails()
+		m.focus = focusSubscriptions
 	}
 	return m, nil
 }

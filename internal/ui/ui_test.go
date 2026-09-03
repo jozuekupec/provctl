@@ -32,10 +32,49 @@ func TestModel_LoadWebsitesForSelectedSubscription(t *testing.T) {
 		return []domain.Website{{PrimaryDomain: "example.test", Type: domain.WebsiteStatic, Enabled: true}}, nil
 	}})
 	m.items = []domain.Subscription{{ID: 7, Name: "acme"}}
-	loaded := m.loadWebsites().(websitesLoadedMsg)
+	loaded := m.loadWebsites(context.Background(), 0).(websitesLoadedMsg)
 	updated, _ := m.Update(loaded)
 	if got := updated.(appModel).websites[0].PrimaryDomain; got != "example.test" {
 		t.Errorf("domain = %q", got)
+	}
+}
+
+func TestModel_IgnoresStaleWebsiteResponse(t *testing.T) {
+	m := New(Deps{})
+	m.items = []domain.Subscription{{ID: 1, Name: "acme"}, {ID: 2, Name: "beta"}}
+	m.websitesLoad.generation = 1
+	m.cursor = 1
+	m = m.clearSelectionDetails()
+	updated, _ := m.Update(websitesLoadedMsg{generation: 1, items: []domain.Website{{PrimaryDomain: "acme.test"}}})
+	if got := updated.(appModel).websites; len(got) != 0 {
+		t.Fatalf("stale websites = %#v, want none", got)
+	}
+}
+
+func TestModel_SwitchingSubscriptionClearsDependentData(t *testing.T) {
+	m := New(Deps{})
+	m.items = []domain.Subscription{{ID: 1, Name: "acme"}, {ID: 2, Name: "beta"}}
+	m.websites = []domain.Website{{PrimaryDomain: "acme.test"}}
+	m.databases = []domain.Database{{Name: "acme_main"}}
+	m.showWebsites, m.focus = true, focusSubscriptions
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyDown})
+	m = updated.(appModel)
+	if m.cursor != 1 || m.showWebsites || len(m.websites) != 0 || len(m.databases) != 0 {
+		t.Fatalf("selection state = %#v", m)
+	}
+}
+
+func TestModel_RefreshCancelsPreviousRead(t *testing.T) {
+	m := New(Deps{LoadSubscriptions: func(context.Context) ([]domain.Subscription, error) { return nil, nil }})
+	first, firstCommand := m.startSubscriptions()
+	second, secondCommand := first.startSubscriptions()
+	firstMessage := firstCommand().(subscriptionsLoadedMsg)
+	secondMessage := secondCommand().(subscriptionsLoadedMsg)
+	if !second.subscriptions.stale(firstMessage.generation) {
+		t.Fatal("first request is not stale")
+	}
+	if second.subscriptions.stale(secondMessage.generation) {
+		t.Fatal("second request is unexpectedly stale")
 	}
 }
 
@@ -109,6 +148,28 @@ func TestModel_ConfirmSubscriptionSuspendCallsDependency(t *testing.T) {
 	if !called {
 		t.Fatal("SetSubscriptionStatus was not called")
 	}
+}
+
+func TestModel_ConfirmationCannotStartDuplicateMutation(t *testing.T) {
+	m := New(Deps{SetSubscriptionStatus: func(context.Context, string, string) (int64, error) { return 1, nil }})
+	m.items = []domain.Subscription{{Name: "acme", Status: "active"}}
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("s")})
+	m = updated.(appModel)
+	updated, command := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("y")})
+	m = updated.(appModel)
+	if m.confirm.action != "" {
+		t.Fatalf("confirmation = %#v, want cleared", m.confirm)
+	}
+	updated, next := m.Update(command())
+	m = updated.(appModel)
+	if !m.progress.active || m.confirm.action != "" {
+		t.Fatalf("progress/confirmation = %#v/%#v", m.progress, m.confirm)
+	}
+	updated, duplicate := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("y")})
+	if duplicate != nil || updated.(appModel).progress.active != m.progress.active {
+		t.Fatal("duplicate confirmation was accepted during progress")
+	}
+	_ = next
 }
 
 func runProgress(t *testing.T, model appModel, command tea.Cmd) appModel {
