@@ -1,0 +1,20 @@
+#!/bin/sh
+set -e
+
+case "$1" in
+  configure)
+    install -d -m 0755 -o root -g root /etc/provctl
+    install -d -m 0700 -o root -g root /var/lib/provctl
+    install -d -m 0755 -o root -g root /var/lib/provctl-acme-challenge
+    install -d -m 0750 -o root -g adm /var/log/provctl
+
+    /usr/bin/provctl migrate --quiet || {
+      echo "provctl: database migration failed; run 'provctl migrate' manually" >&2
+    }
+
+    echo "provctl installed. Run 'provctl doctor' to verify the environment,"
+    echo "then 'provctl bootstrap' to set up Apache integration."
+    ;;
+esac
+
+exit 0

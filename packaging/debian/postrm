@@ -1,0 +1,11 @@
+#!/bin/sh
+set -e
+
+case "$1" in
+  purge)
+    rm -rf /etc/provctl /var/lib/provctl
+    echo "provctl purged. Hosting data under /var/www/vhosts and logs under /var/log/provctl were preserved."
+    ;;
+esac
+
+exit 0

@@ -209,7 +209,7 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   runtime závislosti `zstd` a pro cron artefakty balíček `cron`; oba jsou
   uvedeny v cookbooku. Zbývá nový lifecycle certifikátů a bezpečný scénář
   přepisu pomocí `--force`.
-- [~] **M8 — TUI:** návrh je zaznamenán v [tui-design.md](tui-design.md) a
+- [x] **M8 — TUI:** návrh je zaznamenán v [tui-design.md](tui-design.md) a
   cíleně přebírá konzistentní Bubble Tea vzor z projektu `depo`: hodnotový
   model, `Deps`, samostatné routing/render/keys/theme a I/O jen přes `tea.Cmd`.
   První read-only subscriptions obrazovka je funkční (`provctl` bez argumentů):
@@ -250,9 +250,21 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   a logy; Output trvale zachová i chyby čtení. Potvrzená mutace okamžitě
   zahodí confirmation snapshot, během běhu ignoruje další akční klávesy a
   `Esc` ruší její context. Testy pokrývají stale odpověď, nahrazený refresh,
-  změnu subscription i duplicitní `y`. Zbývá živé terminálové ověření v `pv`.
-- [ ] **M9 — distribuce:** nfpm, maintainer skripty, CI, APT repozitář a
-  package testy (`lintian`, `piuparts`, upgrade/purge).
+  změnu subscription i duplicitní `y`; `make test` znovu prošel. V `pv` byla
+  binárka nasazena, bootstrap provedl skutečná data a TUI zahájilo terminálový
+  handshake v pseudoterminálu; kontejner byl následně obnoven na `clean`.
+  **Follow-up:** před vydáním má člověk provést krátkou vizuální kontrolu přes
+  skutečný interaktivní terminál; automatizační Incus TTY zde nepřenáší obraz
+  Bubble Tea, pouze handshake sekvence.
+- [~] **M9 — distribuce:** je přidána deklarace `packaging/nfpm.yaml` pro
+  jediný `provctl` `.deb`, config je `noreplace`, šablony jsou běžný obsah a
+  balíček deklaruje pouze potřebné Debian závislosti. `scripts/build-deb.sh`
+  staví CGO-free binárku s verzí vloženou přes `-ldflags` a předává ji nfpm.
+  Maintainer skripty vytvoří pouze cesty vlastněné provctl, spustí explicitní
+  `provctl migrate --quiet` a při remove/purge ponechají `/var/www/vhosts` i
+  `/var/log/provctl`; nový příkaz `migrate` je krytý CLI testem. Zbývá provést
+  skutečný build a instalaci po zpřístupnění `nfpm`, pak `lintian`, `piuparts`,
+  upgrade/purge ověření, release workflow a stateless APT repozitář.
 - [ ] **M10 — migrace:** `subscription adopt` pro existující weby.
 
 ## Pravidla ověřování

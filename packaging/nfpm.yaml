@@ -1,0 +1,52 @@
+name: provctl
+arch: ${ARCH}
+platform: linux
+version: ${VERSION}
+section: admin
+priority: optional
+maintainer: Jozue Kupec <jozuekupec80@gmail.com>
+description: |
+  Minimal hosting control-plane for Debian with Apache, PHP-FPM, MariaDB, and SSL.
+homepage: https://github.com/jozuekupec/provctl
+license: MIT
+
+depends:
+  - adduser
+  - apache2
+recommends:
+  - certbot
+  - logrotate
+  - mariadb-client
+suggests:
+  - php-fpm
+
+contents:
+  - src: ./dist/provctl_${ARCH}
+    dst: /usr/bin/provctl
+    file_info:
+      mode: 0755
+  - src: ./templates/
+    dst: /usr/share/provctl/templates/
+  - src: ./packaging/config.toml.default
+    dst: /etc/provctl/config.toml
+    type: config|noreplace
+  - src: ./packaging/logrotate.provctl
+    dst: /etc/logrotate.d/provctl
+    type: config|noreplace
+  - dst: /var/lib/provctl
+    type: dir
+    file_info:
+      mode: 0700
+  - dst: /var/lib/provctl-acme-challenge
+    type: dir
+    file_info:
+      mode: 0755
+  - dst: /var/log/provctl
+    type: dir
+    file_info:
+      mode: 0750
+
+scripts:
+  postinstall: ./packaging/debian/postinst
+  preremove: ./packaging/debian/prerm
+  postremove: ./packaging/debian/postrm
