@@ -62,6 +62,56 @@ func (database *restoringMariaDB) Execute(_ context.Context, query string) error
 }
 func (*restoringMariaDB) UserNameLimit(context.Context) (int, error) { return 64, nil }
 
+type restoringApache struct{ contents []byte }
+
+func (apache *restoringApache) Apply(_ context.Context, _ string, contents []byte) (func(context.Context) error, error) {
+	apache.contents = contents
+	return func(context.Context) error { return nil }, nil
+}
+func (apache *restoringApache) ApplyVHost(ctx context.Context, path string, contents []byte, _ string) (func(context.Context) error, error) {
+	return apache.Apply(ctx, path, contents)
+}
+func (apache *restoringApache) SetVHostEnabled(context.Context, string, string, bool) (func(context.Context) error, error) {
+	return func(context.Context) error { return nil }, nil
+}
+func (apache *restoringApache) RemoveVHost(context.Context, string, string) (func(context.Context) error, error) {
+	return func(context.Context) error { return nil }, nil
+}
+
+type restoredArtifactsStore struct {
+	backupStore
+	restored domain.Subscription
+	website  domain.Website
+	aliases  []string
+	cronJobs []domain.CronJob
+	sshKeys  []domain.SSHKey
+	access   string
+}
+
+func (store *restoredArtifactsStore) SubscriptionByName(context.Context, string) (domain.Subscription, error) {
+	return store.restored, nil
+}
+func (store *restoredArtifactsStore) CreateWebsite(_ context.Context, website domain.Website) (int64, error) {
+	store.website = website
+	return 7, nil
+}
+func (store *restoredArtifactsStore) AddWebsiteAlias(_ context.Context, _ int64, alias string) error {
+	store.aliases = append(store.aliases, alias)
+	return nil
+}
+func (store *restoredArtifactsStore) CreateCronJob(_ context.Context, job domain.CronJob) (int64, error) {
+	store.cronJobs = append(store.cronJobs, job)
+	return int64(len(store.cronJobs)), nil
+}
+func (store *restoredArtifactsStore) CreateSSHKey(_ context.Context, key domain.SSHKey) (int64, error) {
+	store.sshKeys = append(store.sshKeys, key)
+	return int64(len(store.sshKeys)), nil
+}
+func (store *restoredArtifactsStore) UpdateSSHAccess(_ context.Context, _ int64, access string) error {
+	store.access = access
+	return nil
+}
+
 func (store backupStore) SubscriptionExists(_ context.Context, name string) (bool, error) {
 	return store.subscription.Name == name, nil
 }
@@ -106,6 +156,14 @@ func (backupStore) ListCertificates(context.Context, int64) ([]domain.Certificat
 }
 func (backupStore) CreateDatabase(context.Context, domain.Database) error         { return nil }
 func (backupStore) DeleteDatabase(context.Context, int64, string) error           { return nil }
+func (backupStore) CreateWebsite(context.Context, domain.Website) (int64, error)  { return 1, nil }
+func (backupStore) AddWebsiteAlias(context.Context, int64, string) error          { return nil }
+func (backupStore) DeleteWebsite(context.Context, int64) error                    { return nil }
+func (backupStore) CreateCronJob(context.Context, domain.CronJob) (int64, error)  { return 1, nil }
+func (backupStore) DeleteCronJob(context.Context, int64, int64) error             { return nil }
+func (backupStore) CreateSSHKey(context.Context, domain.SSHKey) (int64, error)    { return 1, nil }
+func (backupStore) DeleteSSHKey(context.Context, int64, string) error             { return nil }
+func (backupStore) UpdateSSHAccess(context.Context, int64, string) error          { return nil }
 func (backupStore) CreateSubscription(context.Context, domain.Subscription) error { return nil }
 func (backupStore) DeleteSubscription(context.Context, string) error              { return nil }
 func (backupStore) SetSubscriptionStatus(context.Context, int64, string) error    { return nil }
@@ -218,7 +276,7 @@ func TestBackupService_RestoreFilesExtractsThenPromotesAndRecords(t *testing.T) 
 		Executor: plan.Executor{Journal: journal, Locker: subscriptionLocker{}},
 	}
 	subscription := domain.Subscription{Name: "acme", UnixUser: "acme", UnixUID: 5000, Home: "/vhosts/acme"}
-	if _, err := service.restoreFiles(context.Background(), "/backups/acme/one", subscription, "/vhosts/.restore-acme", nil, nil); err != nil {
+	if _, err := service.restoreFiles(context.Background(), "/backups/acme/one", subscription, "/vhosts/.restore-acme", nil, nil, nil, nil, nil); err != nil {
 		t.Fatal(err)
 	}
 	if !usersCreated || journal.status != plan.OperationDone {
@@ -273,7 +331,7 @@ func TestBackupService_RestoreFilesImportsDatabaseWithNewCredentials(t *testing.
 	}
 	subscription := domain.Subscription{Name: "acme", UnixUser: "acme", UnixUID: 5000, Home: "/vhosts/acme"}
 	database := domain.Database{Name: "acme_main", User: "acme_main", Host: "localhost"}
-	if _, err := service.restoreFiles(context.Background(), "/backups/acme/one", subscription, "/vhosts/.restore-acme", []domain.Database{database}, map[string]string{database.Name: "FreshPassword234567890123"}); err != nil {
+	if _, err := service.restoreFiles(context.Background(), "/backups/acme/one", subscription, "/vhosts/.restore-acme", []domain.Database{database}, nil, nil, nil, map[string]string{database.Name: "FreshPassword234567890123"}); err != nil {
 		t.Fatal(err)
 	}
 	if len(store.databases) != 1 || store.databases[0].SubscriptionID != 8 {
@@ -284,5 +342,40 @@ func TestBackupService_RestoreFilesImportsDatabaseWithNewCredentials(t *testing.
 	}
 	if len(commands.Calls) != 4 || commands.Calls[2].Name != "/usr/bin/zstd" || commands.Calls[3].Name != "/usr/bin/mysql" || !commands.Calls[3].HasStdin {
 		t.Errorf("commands = %#v", commands.Calls)
+	}
+}
+
+func TestBackupService_RestoreFilesRestoresArtifactsWithoutTLS(t *testing.T) {
+	fs := &restoreFS{FS: &fake.FS{
+		StatFunc:     func(string) (os.FileInfo, error) { return nil, os.ErrNotExist },
+		MkdirAllFunc: func(string, os.FileMode) error { return nil }, RemoveAllFunc: func(string) error { return nil },
+		RemoveFunc: func(string) error { return nil }, ChownFunc: func(string, int, int) error { return nil }, ChmodFunc: func(string, os.FileMode) error { return nil },
+		ReadFileFunc: func(string) ([]byte, error) { return nil, os.ErrNotExist }, WriteFileFunc: func(string, []byte, os.FileMode) error { return nil },
+	}}
+	store := &restoredArtifactsStore{restored: domain.Subscription{ID: 8, Name: "acme"}}
+	users := &fake.Users{CreateFunc: func(context.Context, system.CreateUserOptions) error { return nil }, LockPasswordFunc: func(context.Context, string) error { return nil }, DeleteFunc: func(context.Context, string, bool) error { return nil }}
+	apache, commands := &restoringApache{}, &fake.Commander{}
+	service := BackupService{Store: store, FS: fs, Commands: commands, Users: users, Apache: apache, Executor: plan.Executor{Journal: &subscriptionJournal{}, Locker: subscriptionLocker{}}, Config: config.Config{Paths: config.Paths{ACMEChallenge: "/acme"}, Apache: config.Apache{SitesAvailable: "/sites", SitesEnabled: "/enabled"}}}
+	subscription := domain.Subscription{Name: "acme", UnixUser: "acme", UnixUID: 5000, Home: "/vhosts/acme"}
+	website := domain.Website{Type: domain.WebsiteStatic, PrimaryDomain: "example.test", Aliases: []string{"www.example.test"}, DocumentRoot: "/vhosts/acme/sites/example.test/public", Enabled: true, SSLEnabled: true, ForceHTTPS: true, HSTS: true}
+	cron := domain.CronJob{Schedule: "@daily", Command: "true", Enabled: true}
+	key := domain.SSHKey{Fingerprint: "SHA256:test", PublicKey: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAITest key"}
+	if _, err := service.restoreFiles(context.Background(), "/backups/acme/one", subscription, "/vhosts/.restore-acme", nil, []domain.Website{website}, []domain.CronJob{cron}, []domain.SSHKey{key}, nil); err != nil {
+		t.Fatal(err)
+	}
+	if store.website.SubscriptionID != 8 || store.website.SSLEnabled || store.website.ForceHTTPS || store.website.HSTS {
+		t.Errorf("restored website = %#v", store.website)
+	}
+	if len(store.aliases) != 1 || store.aliases[0] != "www.example.test" {
+		t.Errorf("aliases = %#v", store.aliases)
+	}
+	if len(store.cronJobs) != 1 || store.cronJobs[0].SubscriptionID != 8 {
+		t.Errorf("cron jobs = %#v", store.cronJobs)
+	}
+	if len(store.sshKeys) != 1 || store.sshKeys[0].SubscriptionID != 8 || store.access != "key" {
+		t.Errorf("SSH restoration = %#v, access=%q", store.sshKeys, store.access)
+	}
+	if strings.Contains(string(apache.contents), "SSLCertificateFile") || strings.Contains(string(apache.contents), "Redirect permanent") {
+		t.Errorf("restored vhost retained TLS: %s", apache.contents)
 	}
 }

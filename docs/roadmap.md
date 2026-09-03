@@ -191,10 +191,13 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   MariaDB identitu s čerstvým heslem, bezpečně rozbalí `.sql.zst` do dočasného
   souboru `0600` a importuje jej výhradně přes stdin `mysql`; do SQLite zapíše
   nový subscription ID. Hesla se zobrazí pouze po úspěchu celé operace, jsou
-  řazená deterministicky a nikde se neukládají. Nový test ověřuje vytvoření,
-  dekompresi, stdin import i metadata bez shellu; `make test` prošel. Zbývá
-  obnova websites, PHP-FPM, cronu a SSH artefaktů, nový lifecycle certifikátů
-  a bezpečný scénář přepisu pomocí `--force`.
+  řazená deterministicky a nikde se neukládají. Obnova nyní vytvoří a ověří
+  také PHP-FPM pool podle uložené verze, obnoví enabled i disabled vhosty,
+  cron a veřejné SSH klíče. TLS se záměrně nepřenáší: obnovené vhosty jsou
+  HTTP-only bez redirectu a certifikáty je nutné znovu vydat. Jednotkový test
+  ověřuje nové SQLite vazby, aliases, cron, SSH přístup i odstranění TLS.
+  Zbývá integrační round-trip v `pv`, nový lifecycle certifikátů a bezpečný
+  scénář přepisu pomocí `--force`.
 - [~] **M8 — TUI:** návrh je zaznamenán v [tui-design.md](tui-design.md) a
   cíleně přebírá konzistentní Bubble Tea vzor z projektu `depo`: hodnotový
   model, `Deps`, samostatné routing/render/keys/theme a I/O jen přes `tea.Cmd`.

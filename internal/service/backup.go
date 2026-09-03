@@ -15,6 +15,7 @@ import (
 	"provctl/internal/domain"
 	"provctl/internal/meta"
 	"provctl/internal/plan"
+	"provctl/internal/render"
 	"provctl/internal/repository/sqlite"
 	"provctl/internal/system"
 )
@@ -40,18 +41,29 @@ type BackupStore interface {
 	ListCertificates(context.Context, int64) ([]domain.Certificate, error)
 	CreateDatabase(context.Context, domain.Database) error
 	DeleteDatabase(context.Context, int64, string) error
+	CreateWebsite(context.Context, domain.Website) (int64, error)
+	AddWebsiteAlias(context.Context, int64, string) error
+	DeleteWebsite(context.Context, int64) error
+	CreateCronJob(context.Context, domain.CronJob) (int64, error)
+	DeleteCronJob(context.Context, int64, int64) error
+	CreateSSHKey(context.Context, domain.SSHKey) (int64, error)
+	DeleteSSHKey(context.Context, int64, string) error
+	UpdateSSHAccess(context.Context, int64, string) error
 }
 
 type BackupService struct {
-	Store     BackupStore
-	FS        system.FS
-	Config    config.Config
-	Commands  system.Commander
-	Users     system.Users
-	MariaDB   MariaDBExecutor
-	Executor  plan.Executor
-	Locker    system.Locker
-	LockerFor func(string) system.Locker
+	Store      BackupStore
+	FS         system.FS
+	Config     config.Config
+	Commands   system.Commander
+	Users      system.Users
+	MariaDB    MariaDBExecutor
+	Apache     ApacheVHostApplier
+	PHPFPM     PHPFPMPoolApplier
+	PHPVersion PHPFPMVersion
+	Executor   plan.Executor
+	Locker     system.Locker
+	LockerFor  func(string) system.Locker
 }
 
 // Restore restores a verified file archive onto a clean server. Existing
@@ -107,7 +119,7 @@ func (service BackupService) Restore(ctx context.Context, name string, id int64,
 	if err != nil {
 		return RestoreResult{}, err
 	}
-	operationID, err := service.restoreFiles(ctx, backup.Path, subscription, staging, metadata.Databases, passwords)
+	operationID, err := service.restoreFiles(ctx, backup.Path, subscription, staging, metadata.Databases, metadata.Websites, metadata.CronJobs, metadata.SSHKeys, passwords)
 	if err != nil {
 		return RestoreResult{OperationID: operationID}, err
 	}
@@ -153,7 +165,19 @@ func (service BackupService) nextRestoreUID(ctx context.Context, name string) (i
 	return 0, fmt.Errorf("no free UID in configured range")
 }
 
-func (service BackupService) restoreFiles(ctx context.Context, archivePath string, subscription domain.Subscription, staging string, databases []domain.Database, passwords map[string]string) (int64, error) {
+func (service BackupService) restoreFiles(ctx context.Context, archivePath string, subscription domain.Subscription, staging string, databases []domain.Database, websites []domain.Website, cronJobs []domain.CronJob, sshKeys []domain.SSHKey, passwords map[string]string) (int64, error) {
+	if len(websites) > 0 && service.Apache == nil {
+		return 0, fmt.Errorf("restore Apache vhost applier is required for websites")
+	}
+	if len(cronJobs) > 0 && service.Commands == nil {
+		return 0, fmt.Errorf("restore commander is required for cron jobs")
+	}
+	if len(sshKeys) > 0 && service.FS == nil {
+		return 0, fmt.Errorf("restore filesystem is required for SSH keys")
+	}
+	if restoredPHPVersion(websites) != "" && service.PHPFPM == nil {
+		return 0, fmt.Errorf("restore PHP-FPM pool applier is required for PHP websites")
+	}
 	archive := filepath.Join(archivePath, "files.tar.zst")
 	steps := []plan.Step{
 		{Name: "extract backup archive", Preview: "extract " + archive + " to staging", Do: func(ctx context.Context) error {
@@ -199,7 +223,175 @@ func (service BackupService) restoreFiles(ctx context.Context, archivePath strin
 		password := passwords[database.Name]
 		steps = append(steps, service.restoreDatabaseSteps(archivePath, subscription, database, password)...)
 	}
+	if version := restoredPHPVersion(websites); version != "" {
+		steps = append(steps, service.restorePHPFPMSteps(subscription, version)...)
+	}
+	for _, website := range websites {
+		steps = append(steps, service.restoreWebsiteSteps(subscription, website)...)
+	}
+	if len(cronJobs) > 0 {
+		steps = append(steps, service.restoreCronSteps(subscription, cronJobs)...)
+	}
+	if len(sshKeys) > 0 {
+		steps = append(steps, service.restoreSSHSteps(subscription, sshKeys)...)
+	}
 	return service.Executor.Run(ctx, plan.Plan{Action: "backup.restore", Target: subscription.Name, Steps: steps})
+}
+
+func restoredPHPVersion(websites []domain.Website) string {
+	for _, website := range websites {
+		if website.Type == domain.WebsitePHPFPM {
+			return website.PHPVersion
+		}
+	}
+	return ""
+}
+
+func (service BackupService) restorePHPFPMSteps(subscription domain.Subscription, version string) []plan.Step {
+	websites := WebsiteService{FS: service.FS}
+	poolVersion := PHPFPMVersion{Version: version, Binary: filepath.Join("/usr/sbin", "php-fpm"+version), Service: "php" + version + "-fpm.service"}
+	poolPath := filepath.Join("/etc/php", version, "fpm", "pool.d", meta.FilePrefix+subscription.Name+".conf")
+	socket := filepath.Join("/run/php", meta.FilePrefix+subscription.Name+".sock")
+	logDir := filepath.Join(meta.LogDir, subscription.Name)
+	errorLog := filepath.Join(logDir, "php-fpm-error.log")
+	contents, renderErr := render.RenderPHPFPMPool(render.PHPFPMPool{Name: subscription.Name, Home: subscription.Home, Socket: socket, MaxChildren: subscription.PHPMaxChildren, MemoryLimit: subscription.PHPMemoryLimit, UploadMax: subscription.PHPUploadMax, MaxExecTime: subscription.PHPMaxExecTime, PhpErrorLog: errorLog})
+	var undoPool func(context.Context) error
+	return []plan.Step{{Name: "create restored PHP-FPM log directory", Preview: "create " + logDir, Do: websites.createOwnedDirectory(logDir, 0, subscription.UnixUID, 0o750), Undo: func(context.Context) error { return service.FS.Remove(logDir) }}, {Name: "create restored PHP-FPM error log", Preview: "create " + errorLog, Do: websites.createPHPErrorLog(errorLog, subscription.UnixUID), Undo: func(context.Context) error { return service.FS.Remove(errorLog) }}, {Name: "install restored PHP-FPM pool", Preview: "write and validate " + poolPath, Do: func(ctx context.Context) error {
+		if renderErr != nil {
+			return renderErr
+		}
+		var err error
+		undoPool, err = service.PHPFPM.ApplyPool(ctx, poolVersion, poolPath, contents, socket)
+		return err
+	}, Undo: func(ctx context.Context) error {
+		if undoPool == nil {
+			return nil
+		}
+		return undoPool(ctx)
+	}}}
+}
+
+func (service BackupService) restoreWebsiteSteps(subscription domain.Subscription, website domain.Website) []plan.Step {
+	website.ID, website.SubscriptionID = 0, 0
+	// Certificate private keys are intentionally not archived. Reissue TLS after
+	// restore; an HTTP-only vhost keeps Apache valid until then.
+	website.SSLEnabled, website.ForceHTTPS, website.HSTS = false, false, false
+	vhostPath := filepath.Join(service.Config.Apache.SitesAvailable, meta.FilePrefix+subscription.Name+"-"+website.PrimaryDomain+".conf")
+	enabledPath := filepath.Join(service.Config.Apache.SitesEnabled, filepath.Base(vhostPath))
+	contents, renderErr := (WebsiteService{Config: service.Config}).RenderVHost(subscription.Name, website)
+	var undoApache func(context.Context) error
+	return []plan.Step{{Name: "install restored HTTP-only Apache vhost", Preview: "write " + vhostPath, Do: func(ctx context.Context) error {
+		if renderErr != nil {
+			return renderErr
+		}
+		var err error
+		if website.Enabled {
+			undoApache, err = service.Apache.ApplyVHost(ctx, vhostPath, contents, enabledPath)
+		} else {
+			undoApache, err = service.Apache.Apply(ctx, vhostPath, contents)
+		}
+		return err
+	}, Undo: func(ctx context.Context) error {
+		if undoApache == nil {
+			return nil
+		}
+		return undoApache(ctx)
+	}}, {Name: "record restored website", Preview: "insert website and domains into SQLite", Do: func(ctx context.Context) error {
+		restored, err := service.Store.SubscriptionByName(ctx, subscription.Name)
+		if err != nil {
+			return err
+		}
+		website.SubscriptionID = restored.ID
+		website.ID, err = service.Store.CreateWebsite(ctx, website)
+		if err != nil {
+			return err
+		}
+		for _, alias := range website.Aliases {
+			if err := service.Store.AddWebsiteAlias(ctx, website.ID, alias); err != nil {
+				_ = service.Store.DeleteWebsite(ctx, website.ID)
+				return err
+			}
+		}
+		return nil
+	}, Undo: func(ctx context.Context) error { return service.Store.DeleteWebsite(ctx, website.ID) }}}
+}
+
+func (service BackupService) restoreCronSteps(subscription domain.Subscription, jobs []domain.CronJob) []plan.Step {
+	var undo func(context.Context) error
+	return []plan.Step{{Name: "restore generated crontab", Preview: "write crontab for " + subscription.UnixUser, Do: func(ctx context.Context) error {
+		var err error
+		undo, err = (CronService{Commands: service.Commands}).writeCrontab(ctx, subscription, jobs)
+		return err
+	}, Undo: func(ctx context.Context) error {
+		if undo == nil {
+			return nil
+		}
+		return undo(ctx)
+	}}, {Name: "record restored cron jobs", Preview: "insert cron jobs into SQLite", Do: func(ctx context.Context) error {
+		restored, err := service.Store.SubscriptionByName(ctx, subscription.Name)
+		if err != nil {
+			return err
+		}
+		for index := range jobs {
+			jobs[index].ID, jobs[index].SubscriptionID = 0, restored.ID
+			id, err := service.Store.CreateCronJob(ctx, jobs[index])
+			if err != nil {
+				return err
+			}
+			jobs[index].ID = id
+		}
+		return nil
+	}, Undo: func(ctx context.Context) error {
+		restored, err := service.Store.SubscriptionByName(ctx, subscription.Name)
+		if err != nil {
+			return err
+		}
+		for _, job := range jobs {
+			if job.ID != 0 {
+				if err := service.Store.DeleteCronJob(ctx, restored.ID, job.ID); err != nil {
+					return err
+				}
+			}
+		}
+		return nil
+	}}}
+}
+
+func (service BackupService) restoreSSHSteps(subscription domain.Subscription, keys []domain.SSHKey) []plan.Step {
+	var undo func(context.Context) error
+	return []plan.Step{{Name: "restore authorized SSH keys", Preview: "write authorized_keys for " + subscription.UnixUser, Do: func(context.Context) error {
+		var err error
+		undo, err = (SSHService{FS: service.FS}).writeAuthorizedKeys(subscription, keys)
+		return err
+	}, Undo: func(ctx context.Context) error {
+		if undo == nil {
+			return nil
+		}
+		return undo(ctx)
+	}}, {Name: "record restored SSH keys", Preview: "insert SSH keys into SQLite", Do: func(ctx context.Context) error {
+		restored, err := service.Store.SubscriptionByName(ctx, subscription.Name)
+		if err != nil {
+			return err
+		}
+		for index := range keys {
+			keys[index].ID, keys[index].SubscriptionID = 0, restored.ID
+			if _, err := service.Store.CreateSSHKey(ctx, keys[index]); err != nil {
+				return err
+			}
+		}
+		return service.Store.UpdateSSHAccess(ctx, restored.ID, "key")
+	}, Undo: func(ctx context.Context) error {
+		restored, err := service.Store.SubscriptionByName(ctx, subscription.Name)
+		if err != nil {
+			return err
+		}
+		for _, key := range keys {
+			if err := service.Store.DeleteSSHKey(ctx, restored.ID, key.Fingerprint); err != nil {
+				return err
+			}
+		}
+		return service.Store.UpdateSSHAccess(ctx, restored.ID, "none")
+	}}}
 }
 
 func (service BackupService) restoreDatabaseSteps(archivePath string, subscription domain.Subscription, database domain.Database, password string) []plan.Step {
@@ -527,7 +719,8 @@ func NewProductionBackupRuntime(ctx context.Context, cfg config.Config) (*Backup
 		return nil, err
 	}
 	commander := system.ExecCommander{}
-	return &BackupRuntime{Service: BackupService{Store: repository, FS: system.OSFS{}, Commands: commander, Users: system.CommandUsers{Commander: commander}, MariaDB: MariaDB{Commands: commander, Config: cfg.MariaDB}, Executor: productionExecutor(repository), LockerFor: func(name string) system.Locker {
+	systemd := system.CommandSystemd{Commander: commander}
+	return &BackupRuntime{Service: BackupService{Store: repository, FS: system.OSFS{}, Commands: commander, Users: system.CommandUsers{Commander: commander}, MariaDB: MariaDB{Commands: commander, Config: cfg.MariaDB}, Apache: Apache{FS: system.OSFS{}, Commands: commander, Systemd: systemd, Service: cfg.Apache.Service}, PHPFPM: PHPFPM{FS: system.OSFS{}, Commands: commander, Systemd: systemd}, Executor: productionExecutor(repository), LockerFor: func(name string) system.Locker {
 		return system.FileLocker{Path: filepath.Join("/run", "provctl-"+name+".lock")}
 	}, Config: cfg}, repository: repository}, nil
 }
