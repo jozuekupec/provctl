@@ -58,6 +58,7 @@ type SubscriptionService struct {
 	Store      SubscriptionStore
 	Executor   plan.Executor
 	MariaDB    MariaDBExecutor
+	PHPFPM     PHPFPMPoolApplier
 	PHPVersion string
 	Config     config.Config
 }
@@ -93,6 +94,7 @@ func NewProductionSubscriptionRuntime(ctx context.Context, cfg config.Config) (*
 			Store:      repository,
 			Executor:   productionExecutor(repository),
 			MariaDB:    MariaDB{Commands: commander, Config: cfg.MariaDB},
+			PHPFPM:     PHPFPM{FS: system.OSFS{}, Commands: commander, Systemd: system.CommandSystemd{Commander: commander}},
 			PHPVersion: version.Version,
 			Config:     cfg,
 		},
@@ -354,6 +356,16 @@ func (service SubscriptionService) deletePlan(subscription domain.Subscription, 
 		plan.Step{Name: "delete certificate metadata", Preview: "delete certificate metadata from SQLite", Do: func(ctx context.Context) error {
 			return service.Store.DeleteCertificatesBySubscription(ctx, subscription.ID)
 		}},
+	)
+	if service.PHPFPM != nil && subscription.PHPVersion != "" {
+		version := PHPFPMVersion{Version: subscription.PHPVersion, Binary: filepath.Join("/usr/sbin", "php-fpm"+subscription.PHPVersion), Service: "php" + subscription.PHPVersion + "-fpm.service"}
+		poolPath := filepath.Join("/etc/php", subscription.PHPVersion, "fpm", "pool.d", meta.FilePrefix+subscription.Name+".conf")
+		steps = append(steps, plan.Step{Name: "remove PHP-FPM pool", Preview: "remove " + poolPath, Do: func(ctx context.Context) error {
+			_, err := service.PHPFPM.RemovePool(ctx, version, poolPath)
+			return err
+		}})
+	}
+	steps = append(steps,
 		plan.Step{Name: "remove subscription home", Preview: fmt.Sprintf("remove recursively %s", subscription.Home), Do: func(context.Context) error { return service.FS.RemoveAll(subscription.Home) }},
 		plan.Step{Name: "delete Unix user", Preview: fmt.Sprintf("/usr/sbin/userdel %s", subscription.UnixUser), Do: func(ctx context.Context) error { return service.Users.Delete(ctx, subscription.UnixUser, false) }},
 		plan.Step{Name: "delete subscription record", Preview: "delete subscription record from SQLite", Do: func(ctx context.Context) error { return service.Store.DeleteSubscription(ctx, subscription.Name) }},
