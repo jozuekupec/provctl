@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -31,13 +32,17 @@ type certificateNetwork struct {
 	addresses map[string][]string
 	serverIPs []string
 	status    int
+	requests  *[]string
 }
 
 func (network certificateNetwork) LookupHost(_ context.Context, host string) ([]string, error) {
 	return network.addresses[host], nil
 }
 func (network certificateNetwork) ServerIPs() ([]string, error) { return network.serverIPs, nil }
-func (network certificateNetwork) Get(context.Context, string) (int, error) {
+func (network certificateNetwork) Get(_ context.Context, target string) (int, error) {
+	if network.requests != nil {
+		*network.requests = append(*network.requests, target)
+	}
 	return network.status, nil
 }
 
@@ -123,5 +128,18 @@ func TestSSLService_selfCheck_RequiresApacheNotFound(t *testing.T) {
 	service.Network = certificateNetwork{status: 301}
 	if err := service.selfCheck(context.Background(), "example.test"); err == nil {
 		t.Fatal("selfCheck() error = nil")
+	}
+}
+
+func TestSSLService_EnableChecksEveryCertificateNameBeforeIssuance(t *testing.T) {
+	requests := []string{}
+	service := SSLService{Network: certificateNetwork{status: 404, requests: &requests}}
+	for _, name := range []string{"example.test", "www.example.test"} {
+		if err := service.selfCheck(context.Background(), name); err != nil {
+			t.Fatalf("selfCheck(%q) error = %v", name, err)
+		}
+	}
+	if len(requests) != 2 || !strings.HasPrefix(requests[0], "http://example.test/") || !strings.HasPrefix(requests[1], "http://www.example.test/") {
+		t.Errorf("self-check requests = %#v", requests)
 	}
 }

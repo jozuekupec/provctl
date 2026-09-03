@@ -147,9 +147,11 @@ func (service SSLService) Enable(ctx context.Context, subscriptionName, primaryD
 	if err != nil {
 		return err
 	}
-	if err := service.selfCheck(ctx, primaryDomain); err != nil {
-		_ = undoHTTP(ctx)
-		return err
+	for _, name := range append([]string{website.PrimaryDomain}, website.Aliases...) {
+		if err := service.selfCheck(ctx, name); err != nil {
+			_ = undoHTTP(ctx)
+			return err
+		}
 	}
 	lineage := meta.FilePrefix + subscriptionName + "-" + primaryDomain
 	args := []string{"certonly", "--webroot", "-w", service.Config.Paths.ACMEChallenge, "-d", primaryDomain}

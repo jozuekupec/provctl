@@ -120,7 +120,9 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   Prioritní revize pro model „jeden certifikát na projekt“ je zaznamenána v
   [ssl-project-issuance-review.md](ssl-project-issuance-review.md). Před
   automatickým vydáváním při `website create` vyžaduje rozhodnutí o DNS
-  readiness; současný bezpečný tok zůstává explicitní `ssl enable`.
+  readiness; současný bezpečný tok zůstává explicitní `ssl enable`. Preflight
+  nyní provádí HTTP ACME self-check pro každý požadovaný SAN hostname, nejen
+  pro primární doménu; nefunkční alias proto Certbot nikdy nedostane.
 - [~] **M7 — provoz:** první read-only část `health` je dostupná jako
   `provctl health [<subscription> [<domain>]]` v textu i přes `--json`.
   Kontroluje aktivní Apache, `apachectl configtest`, read-only SQLite spojení,
