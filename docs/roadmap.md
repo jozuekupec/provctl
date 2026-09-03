@@ -198,8 +198,13 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   cron a veřejné SSH klíče. TLS se záměrně nepřenáší: obnovené vhosty jsou
   HTTP-only bez redirectu a certifikáty je nutné znovu vydat. Jednotkový test
   ověřuje nové SQLite vazby, aliases, cron, SSH přístup i odstranění TLS.
-  Zbývá integrační round-trip v `pv`, nový lifecycle certifikátů a bezpečný
-  scénář přepisu pomocí `--force`.
+  E2 round-trip nyní prošel v `pv`: po archivaci a permanentním smazání byly
+  ověřeny marker soubor, PHP odpověď, databázový řádek, generovaný crontab,
+  `authorized_keys`, vlastnictví a `reconcile --dry-run`. Test přitom odhalil
+  a opravil pořadí mazání PHP-FPM poolu před `userdel`. Pro zálohy patří mezi
+  runtime závislosti `zstd` a pro cron artefakty balíček `cron`; oba jsou
+  uvedeny v cookbooku. Zbývá nový lifecycle certifikátů a bezpečný scénář
+  přepisu pomocí `--force`.
 - [~] **M8 — TUI:** návrh je zaznamenán v [tui-design.md](tui-design.md) a
   cíleně přebírá konzistentní Bubble Tea vzor z projektu `depo`: hodnotový
   model, `Deps`, samostatné routing/render/keys/theme a I/O jen přes `tea.Cmd`.

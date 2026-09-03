@@ -266,7 +266,7 @@ Pokud ne, funguje stejně `lxd` (snap) nebo přejdi na E4 (VM). Docker se pro to
 ```bash
 incus launch images:debian/13 pv --ephemeral=false
 incus exec pv -- apt update
-incus exec pv -- apt install -y ca-certificates curl
+incus exec pv -- apt install -y ca-certificates curl cron zstd
 
 # zlatý stav = čistý Debian 13 PŘED instalací provctl
 incus snapshot create pv clean
@@ -275,7 +275,7 @@ incus snapshot create pv clean
 Reset před každým testem (sekundy):
 
 ```bash
-incus restore pv clean
+incus snapshot restore pv clean
 ```
 
 Helper skript `scripts/e2.sh`:
@@ -285,7 +285,7 @@ Helper skript `scripts/e2.sh`:
 set -e
 CT=pv
 case "$1" in
-  reset) incus restore $CT clean ;;
+  reset) incus snapshot restore $CT clean ;;
   push)  incus file push "$2" $CT/root/ ;;
   sh)    shift; incus exec $CT -- sh -c "$*" ;;
 esac

@@ -59,7 +59,7 @@ newgrp incus-admin
 incus launch images:debian/13 pv
 incus exec pv -- bash -lc '
   apt update &&
-  apt install -y apache2 php-fpm mariadb-server certbot
+  apt install -y apache2 php-fpm mariadb-server certbot cron zstd
 '
 incus snapshot create pv clean
 
