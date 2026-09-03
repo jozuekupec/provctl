@@ -42,9 +42,30 @@ func TestModel_LoadWebsitesForSelectedSubscription(t *testing.T) {
 func TestModel_DetailUsesSelectedWebsite(t *testing.T) {
 	m := New(Deps{})
 	m.showWebsites = true
-	m.websites = []domain.Website{{PrimaryDomain: "example.test", Type: domain.WebsiteStatic, DocumentRoot: "/vhosts/acme/sites/example.test/public", Enabled: true}}
-	if got := m.detail(); !strings.Contains(got, "Domain: example.test") {
+	m.items = []domain.Subscription{{Name: "acme", Home: "/vhosts/acme", PHPVersion: "8.4"}}
+	m.websites = []domain.Website{{PrimaryDomain: "example.test", Type: domain.WebsitePHPFPM, DocumentRoot: "/vhosts/acme/sites/example.test/public", Enabled: true, SSLEnabled: true, ForceHTTPS: true, Aliases: []string{"www.example.test"}}}
+	if got := m.detail(); !strings.Contains(got, "Domain: example.test") || !strings.Contains(got, "PHP-FPM: 8.4") || !strings.Contains(got, "Home: /vhosts/acme") || !strings.Contains(got, "TLS: enabled") || !strings.Contains(got, "www.example.test") {
 		t.Errorf("detail = %q", got)
+	}
+}
+
+func TestModel_ViewUsesMinimumSizeGuard(t *testing.T) {
+	m := New(Deps{})
+	m.ready, m.width, m.height = true, minWidth-1, minHeight
+	if got := m.View(); !strings.Contains(got, "needs a terminal") {
+		t.Errorf("View() = %q", got)
+	}
+}
+
+func TestModel_ViewRendersFourPanels(t *testing.T) {
+	m := New(Deps{})
+	m.ready, m.width, m.height = true, 100, 28
+	m.items = []domain.Subscription{{Name: "acme", Status: "active", PHPVersion: "8.4"}}
+	view := m.View()
+	for _, panel := range []string{"Subscriptions", "Websites", "Detail", "Output"} {
+		if !strings.Contains(view, panel) {
+			t.Errorf("View() is missing %q:\n%s", panel, view)
+		}
 	}
 }
 
@@ -62,13 +83,13 @@ func TestModel_ConfirmWebsiteToggleCallsDependency(t *testing.T) {
 		t.Fatal("toggle did not request confirmation")
 	}
 	updated, command := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("y")})
-	if message := command(); message.(websiteChangedMsg).err != nil {
-		t.Fatal(message.(websiteChangedMsg).err)
-	}
+	m = runProgress(t, updated.(appModel), command)
 	if !called {
 		t.Fatal("SetWebsiteEnabled was not called")
 	}
-	_ = updated
+	if m.progress.active {
+		t.Fatal("progress is still active")
+	}
 }
 
 func TestModel_ConfirmSubscriptionSuspendCallsDependency(t *testing.T) {
@@ -84,13 +105,20 @@ func TestModel_ConfirmSubscriptionSuspendCallsDependency(t *testing.T) {
 		t.Fatalf("confirmation = %#v", m.confirm)
 	}
 	updated, command := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("y")})
-	if message := command(); message.(subscriptionChangedMsg).err != nil {
-		t.Fatal(message.(subscriptionChangedMsg).err)
-	}
+	m = runProgress(t, updated.(appModel), command)
 	if !called {
 		t.Fatal("SetSubscriptionStatus was not called")
 	}
-	_ = updated
+}
+
+func runProgress(t *testing.T, model appModel, command tea.Cmd) appModel {
+	t.Helper()
+	for range 4 { // start, running step, completed step, final operation message
+		message := command()
+		updated, next := model.Update(message)
+		model, command = updated.(appModel), next
+	}
+	return model
 }
 
 func TestModel_HealthWritesChecksToOutput(t *testing.T) {

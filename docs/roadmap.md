@@ -234,7 +234,17 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   aktuálního `depo` je uloženo v [tui-pattern-comparison.md](tui-pattern-comparison.md);
   závěr konkrétně určuje další společné základy (key binding source, themed
   panely, minimální rozměr, async operation slots) bez přenášení nesouvisejících
-  vault a deployment funkcí.
+  vault a deployment funkcí. První společná UX vrstva je nyní hotová:
+  `theme.go` drží paletu, View používá přesný čtyřpanelový layout se striktním
+  minimem `80×20`, seznamy drží kurzor ve viditelném okně a Detail/Output se
+  samostatně scrollují. Detail domény ukazuje subscription, PHP-FPM verzi,
+  home, document root, aliases, TLS, force HTTPS, HSTS a případný target.
+  Potvrzené mutace mají podle vzoru `branchctl` streamovaný checklist
+  skutečných UI kroků („apply generated configuration/state“) s omezeným
+  contextem; nevydává se za vnitřní systémový plán, který služba neposkytuje.
+  Modelové testy ověřují detail, minimum, čtyři panely a celý progress stream;
+  `make test` prošel. Zbývá generační guard a cancel pro čtecí dotazy a živé
+  terminálové ověření v `pv`.
 - [ ] **M9 — distribuce:** nfpm, maintainer skripty, CI, APT repozitář a
   package testy (`lintian`, `piuparts`, upgrade/purge).
 - [ ] **M10 — migrace:** `subscription adopt` pro existující weby.

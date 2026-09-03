@@ -10,9 +10,9 @@ func (m appModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		case "y":
 			m.status = "applying change…"
 			if m.confirm.action == "active" || m.confirm.action == "suspended" {
-				return m, m.changeSubscription
+				return m, m.changeSubscriptionCmd()
 			}
-			return m, m.changeWebsite
+			return m, m.changeWebsiteCmd()
 		case "esc", "n", "q":
 			m.confirm, m.status = confirmState{}, "cancelled"
 			return m, nil
@@ -25,12 +25,20 @@ func (m appModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "j", "down":
 		if m.focus == focusWebsites {
 			m.websiteCursor = clamp(m.websiteCursor+1, len(m.websites))
+		} else if m.focus == focusDetail {
+			m.detailScroll++
+		} else if m.focus == focusOutput {
+			m.outputScroll++
 		} else {
 			m.cursor = clamp(m.cursor+1, len(m.items))
 		}
 	case "k", "up":
 		if m.focus == focusWebsites {
 			m.websiteCursor = clamp(m.websiteCursor-1, len(m.websites))
+		} else if m.focus == focusDetail {
+			m.detailScroll = max(0, m.detailScroll-1)
+		} else if m.focus == focusOutput {
+			m.outputScroll = max(0, m.outputScroll-1)
 		} else {
 			m.cursor = clamp(m.cursor-1, len(m.items))
 		}

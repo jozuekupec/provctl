@@ -89,25 +89,36 @@ type appModel struct {
 	output        outputState
 	status        string
 	confirm       confirmState
+	progress      progressState
+	detailScroll  int
+	outputScroll  int
 }
 
-func (m appModel) changeWebsite() tea.Msg {
+func (m appModel) changeWebsite(ctx context.Context) tea.Msg {
 	if m.deps.SetWebsiteEnabled == nil || len(m.items) == 0 || len(m.websites) == 0 {
 		return websiteChangedMsg{err: context.Canceled}
 	}
 	website := m.websites[clamp(m.websiteCursor, len(m.websites))]
 	subscription := m.items[clamp(m.cursor, len(m.items))]
-	_, err := m.deps.SetWebsiteEnabled(context.Background(), subscription.Name, website.PrimaryDomain, m.confirm.enabled)
+	_, err := m.deps.SetWebsiteEnabled(ctx, subscription.Name, website.PrimaryDomain, m.confirm.enabled)
 	return websiteChangedMsg{err: err, enabled: m.confirm.enabled, domain: website.PrimaryDomain}
 }
 
-func (m appModel) changeSubscription() tea.Msg {
+func (m appModel) changeWebsiteCmd() tea.Cmd {
+	return steppedCmd("Update website", []string{"apply generated configuration"}, func(ctx context.Context) tea.Msg { return m.changeWebsite(ctx) })
+}
+
+func (m appModel) changeSubscription(ctx context.Context) tea.Msg {
 	if m.deps.SetSubscriptionStatus == nil || len(m.items) == 0 {
 		return subscriptionChangedMsg{err: context.Canceled}
 	}
 	subscription := m.items[clamp(m.cursor, len(m.items))]
-	_, err := m.deps.SetSubscriptionStatus(context.Background(), subscription.Name, m.confirm.action)
+	_, err := m.deps.SetSubscriptionStatus(ctx, subscription.Name, m.confirm.action)
 	return subscriptionChangedMsg{err: err, name: subscription.Name, status: m.confirm.action}
+}
+
+func (m appModel) changeSubscriptionCmd() tea.Cmd {
+	return steppedCmd("Update subscription", []string{"apply subscription state"}, func(ctx context.Context) tea.Msg { return m.changeSubscription(ctx) })
 }
 
 func (m appModel) loadHealth() tea.Msg {

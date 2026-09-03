@@ -14,6 +14,15 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width, m.height, m.ready = msg.Width, msg.Height, true
 	case tea.KeyMsg:
 		return m.handleKey(msg)
+	case progressStartMsg:
+		m.progress = progressState{title: msg.title, steps: append([]progressStep(nil), msg.steps...), active: true, ch: msg.ch}
+		m.focus, m.status = focusOutput, "applying change…"
+		return m, waitProgress(msg.ch)
+	case progressStepMsg:
+		if msg.index >= 0 && msg.index < len(m.progress.steps) {
+			m.progress.steps[msg.index].state = msg.state
+		}
+		return m, waitProgress(m.progress.ch)
 	case subscriptionsLoadedMsg:
 		if msg.err != nil {
 			m.status = "load failed: " + msg.err.Error()
@@ -35,6 +44,7 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.databases, m.focus, m.status = append([]domain.Database(nil), msg.items...), focusDetail, "databases loaded"
 	case websiteChangedMsg:
+		m.progress.active = false
 		if msg.err != nil {
 			m.status = "website change failed: " + msg.err.Error()
 			return m, nil
@@ -44,6 +54,7 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.output = m.output.append("website " + msg.domain + " enabled=" + fmt.Sprint(msg.enabled))
 		return m, m.loadWebsites
 	case subscriptionChangedMsg:
+		m.progress.active = false
 		if msg.err != nil {
 			m.status = "subscription change failed: " + msg.err.Error()
 			return m, nil
