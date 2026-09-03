@@ -123,6 +123,10 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   readiness; současný bezpečný tok zůstává explicitní `ssl enable`. Preflight
   nyní provádí HTTP ACME self-check pro každý požadovaný SAN hostname, nejen
   pro primární doménu; nefunkční alias proto Certbot nikdy nedostane.
+  **Follow-up E3:** po migraci na stabilní project lineage a po atomickém SAN
+  reconcile aliasů zopakovat v `pv` Pebble issuance, alias add/remove,
+  `certbot renew --dry-run`, deploy hook a Apache reload. Současný `clean`
+  snapshot Pebble neobsahuje; test se proto neprovádí při běžném E2 round-tripu.
 - [~] **M7 — provoz:** první read-only část `health` je dostupná jako
   `provctl health [<subscription> [<domain>]]` v textu i přes `--json`.
   Kontroluje aktivní Apache, `apachectl configtest`, read-only SQLite spojení,
