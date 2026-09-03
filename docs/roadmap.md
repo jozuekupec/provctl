@@ -262,8 +262,10 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   staví CGO-free binárku s verzí vloženou přes `-ldflags` a předává ji nfpm.
   Maintainer skripty vytvoří pouze cesty vlastněné provctl, spustí explicitní
   `provctl migrate --quiet` a při remove/purge ponechají `/var/www/vhosts` i
-  `/var/log/provctl`; nový příkaz `migrate` je krytý CLI testem. Zbývá provést
-  skutečný build a instalaci po zpřístupnění `nfpm`, pak `lintian`, `piuparts`,
+  `/var/log/provctl`; nový příkaz `migrate` je krytý CLI testem. `templates/embed.go`
+  se do balíčku nekopíruje. CI na každý push instaluje nfpm a lintian, sestaví
+  amd64 `.deb`, zkontroluje obsah i control metadata a uloží jej jako artefakt.
+  Zbývá provést stejný build lokálně po zpřístupnění `nfpm`, pak `piuparts`,
   upgrade/purge ověření, release workflow a stateless APT repozitář.
 - [ ] **M10 — migrace:** `subscription adopt` pro existující weby.
 

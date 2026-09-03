@@ -25,8 +25,12 @@ contents:
     dst: /usr/bin/provctl
     file_info:
       mode: 0755
-  - src: ./templates/
-    dst: /usr/share/provctl/templates/
+  - src: ./templates/apache/
+    dst: /usr/share/provctl/templates/apache/
+  - src: ./templates/bootstrap/
+    dst: /usr/share/provctl/templates/bootstrap/
+  - src: ./templates/fpm/
+    dst: /usr/share/provctl/templates/fpm/
   - src: ./packaging/config.toml.default
     dst: /etc/provctl/config.toml
     type: config|noreplace
