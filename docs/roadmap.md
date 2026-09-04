@@ -267,7 +267,12 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   amd64 `.deb`, zkontroluje obsah i control metadata a uloží jej jako artefakt.
   Zbývá provést stejný build lokálně po zpřístupnění `nfpm`, pak `piuparts`,
   upgrade/purge ověření, release workflow a stateless APT repozitář.
-- [ ] **M10 — migrace:** `subscription adopt` pro existující weby.
+- [~] **M10 — migrace:** návrh bezpečného `subscription adopt` je v
+  [subscription-adopt-design.md](subscription-adopt-design.md). Určuje jednu
+  žurnálovanou operaci, přesný cíl document rootu, defaultní atomický přesun,
+  volitelnou kopii, rollback hranice a povinné převzetí renewal lineage.
+  Implementace nyní vyžaduje samostatné filesystem/Certbot seams; nesmí být
+  složena z oddělených `subscription create` a `website create` operací.
 
 ## Pravidla ověřování
 
