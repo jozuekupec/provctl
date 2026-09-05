@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 
 	"provctl/internal/domain"
 	"provctl/internal/service"
@@ -105,6 +106,30 @@ func TestModel_ViewRendersFourPanels(t *testing.T) {
 		if !strings.Contains(view, panel) {
 			t.Errorf("View() is missing %q:\n%s", panel, view)
 		}
+	}
+}
+
+func TestModel_TruncatePreservesUnicodeAndANSI(t *testing.T) {
+	value := selectedStyle.Render("žluťoučký")
+	got := truncate(value, 5)
+	if width := lipgloss.Width(got); width != 5 {
+		t.Errorf("truncate width = %d, want 5; %q", width, got)
+	}
+	if !strings.Contains(got, "…") {
+		t.Errorf("truncate result = %q, want ellipsis", got)
+	}
+}
+
+func TestModel_RefreshDropsDependentDataWhenSelectionDisappears(t *testing.T) {
+	m := New(Deps{})
+	m.items = []domain.Subscription{{ID: 1, Name: "acme"}}
+	m.websites = []domain.Website{{PrimaryDomain: "acme.test"}}
+	m.databases = []domain.Database{{Name: "acme_main"}}
+	m.showWebsites = true
+	updated, _ := m.Update(subscriptionsLoadedMsg{items: []domain.Subscription{{ID: 2, Name: "beta"}}})
+	m = updated.(appModel)
+	if m.showWebsites || len(m.websites) != 0 || len(m.databases) != 0 {
+		t.Fatalf("dependent state after refresh = %#v", m)
 	}
 }
 
@@ -226,7 +251,7 @@ func TestModel_LoadWebsiteLogsWritesOutput(t *testing.T) {
 	updated, command := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("l")})
 	updated, _ = updated.(appModel).Update(command())
 	m = updated.(appModel)
-	if m.focus != focusOutput || strings.Join(m.output.lines, "\n") != "first\nsecond" {
+	if m.focus != focusOutput || strings.Join(m.output.lines, "\n") != "website log loaded\nfirst\nsecond" {
 		t.Errorf("output = %#v", m.output)
 	}
 }

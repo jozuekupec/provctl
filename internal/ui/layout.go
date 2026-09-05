@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
 )
 
 type layout struct {
@@ -25,9 +26,11 @@ func panel(title, body string, width, height int, active bool) string {
 		return ""
 	}
 	border := panelBorderStyle
+	borderShape := lipgloss.RoundedBorder()
 	titleStyle := panelTitleStyle
 	if active {
 		border, titleStyle = panelFocusBorder, panelActiveStyle
+		borderShape = lipgloss.ThickBorder()
 	}
 	textWidth, textHeight := width-4, height-2
 	lines := strings.Split(body, "\n")
@@ -41,17 +44,14 @@ func panel(title, body string, width, height int, active bool) string {
 		lines = append(lines, "")
 	}
 	contents := strings.Join(lines, "\n")
-	return lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(border.GetForeground()).Padding(0, 1).Width(width - 2).Height(height - 2).Render(titleStyle.Render(title) + "\n" + contents)
+	return lipgloss.NewStyle().Border(borderShape).BorderForeground(border.GetForeground()).Padding(0, 1).Width(width - 2).Height(height - 2).Render(titleStyle.Render(title) + "\n" + contents)
 }
 
 func truncate(value string, width int) string {
 	if width <= 0 || lipgloss.Width(value) <= width {
 		return value
 	}
-	if width == 1 {
-		return "…"
-	}
-	return lipgloss.NewStyle().MaxWidth(width).Render(value[:max(0, len(value)-1)]) + "…"
+	return ansi.Truncate(value, width, "…")
 }
 
 func listWindow(cursor, count, rows int) (int, int) {

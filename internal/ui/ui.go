@@ -33,7 +33,12 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.output = m.output.append(m.status)
 			return m, nil
 		}
-		m.items, m.cursor, m.status = append([]domain.Subscription(nil), msg.items...), clamp(m.cursor, len(msg.items)), "r refresh • enter websites • d detail • o output • q quit"
+		selectedID := m.selectedSubscriptionID()
+		m.items, m.cursor = append([]domain.Subscription(nil), msg.items...), clamp(m.cursor, len(msg.items))
+		if m.selectedSubscriptionID() != selectedID {
+			m = m.clearSelectionDetails()
+		}
+		m.status = "r refresh • enter websites • d detail • o output • q quit"
 		m.output = m.output.append("subscriptions refreshed")
 	case websitesLoadedMsg:
 		if m.websitesLoad.stale(msg.generation) {
@@ -105,7 +110,8 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.output = m.output.append(m.status)
 			return m, nil
 		}
-		m.output, m.focus, m.status = outputState{}, focusOutput, "website log loaded"
+		m.focus, m.status = focusOutput, "website log loaded"
+		m.output = m.output.append("website log loaded")
 		for _, line := range strings.Split(strings.TrimSuffix(msg.contents, "\n"), "\n") {
 			if line != "" {
 				m.output = m.output.append(line)

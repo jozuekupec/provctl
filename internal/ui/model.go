@@ -219,6 +219,13 @@ func (m appModel) clearSelectionDetails() appModel {
 	return m
 }
 
+func (m appModel) selectedSubscriptionID() int64 {
+	if len(m.items) == 0 {
+		return 0
+	}
+	return m.items[clamp(m.cursor, len(m.items))].ID
+}
+
 func clamp(cursor, length int) int {
 	if length == 0 || cursor < 0 {
 		return 0

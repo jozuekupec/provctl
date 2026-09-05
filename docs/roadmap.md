@@ -262,7 +262,11 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   handshake v pseudoterminálu; kontejner byl následně obnoven na `clean`.
   **Follow-up:** před vydáním má člověk provést krátkou vizuální kontrolu přes
   skutečný interaktivní terminál; automatizační Incus TTY zde nepřenáší obraz
-  Bubble Tea, pouze handshake sekvence.
+  Bubble Tea, pouze handshake sekvence. Následná nezávislá revize vůči
+  `branchctl`, `dbctl` a `depo` vedla ještě k ANSI-safe ořezu (včetně Unicode),
+  rozlišitelnému rámečku aktivního panelu, zachování historie Outputu při čtení
+  logů a zahození závislých dat, když refresh nahradí vybranou subscription;
+  nové modelové testy i `make test` prošly.
 - [~] **M9 — distribuce:** je přidána deklarace `packaging/nfpm.yaml` pro
   jediný `provctl` `.deb`, config je `noreplace`, šablony jsou běžný obsah a
   balíček deklaruje pouze potřebné Debian závislosti. `scripts/build-deb.sh`
