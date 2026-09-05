@@ -22,6 +22,17 @@ func (repository *Repository) DomainExists(ctx context.Context, domain string) (
 	return true, nil
 }
 
+// WebsiteCertificateName resolves the stable Certbot lineage assigned to one
+// website without reconstructing it from its domain.
+func (repository *Repository) WebsiteCertificateName(ctx context.Context, subscriptionName, primaryDomain string) (string, error) {
+	var name string
+	err := repository.DB.QueryRowContext(ctx, `SELECT COALESCE(w.certificate_name, '') FROM websites w JOIN subscriptions s ON s.id = w.subscription_id JOIN domains d ON d.website_id = w.id AND d.is_primary = 1 WHERE s.name = ? AND d.name = ?`, subscriptionName, primaryDomain).Scan(&name)
+	if err != nil {
+		return "", fmt.Errorf("lookup website certificate name: %w", err)
+	}
+	return name, nil
+}
+
 // ListWebsites returns websites belonging to one subscription, ordered by domain.
 func (repository *Repository) ListWebsites(ctx context.Context, subscriptionID int64) ([]domain.Website, error) {
 	rows, err := repository.DB.QueryContext(ctx, `SELECT w.id, w.subscription_id, w.type, d.name, COALESCE(w.document_root, ''), COALESCE(w.target, ''), COALESCE(w.redirect_code, 0), COALESCE(w.php_version, ''), w.enabled, w.ssl_enabled, w.force_https, w.hsts, COALESCE(w.certificate_name, '') FROM websites w JOIN domains d ON d.website_id = w.id AND d.is_primary = 1 WHERE w.subscription_id = ? ORDER BY d.name`, subscriptionID)
