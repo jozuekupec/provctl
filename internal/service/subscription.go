@@ -57,6 +57,9 @@ type SubscriptionService struct {
 	Users      system.Users
 	Store      SubscriptionStore
 	Executor   plan.Executor
+	Commands   system.Commander
+	Apache     ApacheVHostApplier
+	Renewals   RenewalManager
 	MariaDB    MariaDBExecutor
 	PHPFPM     PHPFPMPoolApplier
 	PHPVersion string
@@ -93,6 +96,8 @@ func NewProductionSubscriptionRuntime(ctx context.Context, cfg config.Config) (*
 			Users:      system.CommandUsers{Commander: commander},
 			Store:      repository,
 			Executor:   productionExecutor(repository),
+			Commands:   commander,
+			Apache:     Apache{FS: system.OSFS{}, Commands: commander, Systemd: system.CommandSystemd{Commander: commander}, Service: cfg.Apache.Service},
 			MariaDB:    MariaDB{Commands: commander, Config: cfg.MariaDB},
 			PHPFPM:     PHPFPM{FS: system.OSFS{}, Commands: commander, Systemd: system.CommandSystemd{Commander: commander}},
 			PHPVersion: version.Version,
@@ -114,7 +119,9 @@ func NewReadOnlySubscriptionRuntime(ctx context.Context, cfg config.Config) (*Su
 		return nil, err
 	}
 	return &SubscriptionRuntime{
-		Service:    SubscriptionService{FS: system.OSFS{}, Users: system.CommandUsers{Commander: commander}, Store: repository, MariaDB: MariaDB{Commands: commander, Config: cfg.MariaDB}, PHPVersion: version.Version, Config: cfg},
+		Service: SubscriptionService{FS: system.OSFS{}, Users: system.CommandUsers{Commander: commander}, Store: repository, Commands: commander,
+			Apache: Apache{FS: system.OSFS{}, Commands: commander, Systemd: system.CommandSystemd{Commander: commander}, Service: cfg.Apache.Service},
+			PHPFPM: PHPFPM{FS: system.OSFS{}, Commands: commander, Systemd: system.CommandSystemd{Commander: commander}}, PHPVersion: version.Version, Config: cfg},
 		repository: repository,
 	}, nil
 }
@@ -227,35 +234,43 @@ func (service SubscriptionService) PrepareCreate(ctx context.Context, name strin
 }
 
 func (service SubscriptionService) PrepareCreateWithOptions(ctx context.Context, name string, options SubscriptionCreateOptions) (plan.Plan, error) {
-	if err := domain.ValidateSubscriptionName(name); err != nil {
+	subscription, err := service.prepareSubscription(ctx, name, options)
+	if err != nil {
 		return plan.Plan{}, err
 	}
+	return service.createPlan(subscription), nil
+}
+
+func (service SubscriptionService) prepareSubscription(ctx context.Context, name string, options SubscriptionCreateOptions) (domain.Subscription, error) {
+	if err := domain.ValidateSubscriptionName(name); err != nil {
+		return domain.Subscription{}, err
+	}
 	if options.QuotaDiskBytes < 0 || options.QuotaWebsites < 0 || options.QuotaDatabases < 0 || options.QuotaBackups < 0 {
-		return plan.Plan{}, errors.New("quotas must not be negative")
+		return domain.Subscription{}, errors.New("quotas must not be negative")
 	}
 	exists, err := service.Store.SubscriptionExists(ctx, name)
 	if err != nil {
-		return plan.Plan{}, fmt.Errorf("check subscription: %w", err)
+		return domain.Subscription{}, fmt.Errorf("check subscription: %w", err)
 	}
 	if exists {
-		return plan.Plan{}, fmt.Errorf("subscription %q already exists", name)
+		return domain.Subscription{}, fmt.Errorf("subscription %q already exists", name)
 	}
 	home := filepath.Join(service.Config.Paths.VHosts, name)
 	if _, err := service.FS.Stat(home); err == nil {
-		return plan.Plan{}, fmt.Errorf("subscription home %q already exists", home)
+		return domain.Subscription{}, fmt.Errorf("subscription home %q already exists", home)
 	} else if !errors.Is(err, os.ErrNotExist) {
-		return plan.Plan{}, fmt.Errorf("inspect subscription home: %w", err)
+		return domain.Subscription{}, fmt.Errorf("inspect subscription home: %w", err)
 	}
 	uid, err := service.nextUID(ctx, name)
 	if err != nil {
-		return plan.Plan{}, err
+		return domain.Subscription{}, err
 	}
 	phpVersion := service.PHPVersion
 	if phpVersion == "" {
 		phpVersion = service.Config.PHP.DefaultVersion
 	}
 	subscription := domain.Subscription{Name: name, UnixUser: name, UnixUID: uid, Home: home, PHPVersion: phpVersion, PHPMaxChildren: service.Config.PHP.MaxChildren, PHPMemoryLimit: service.Config.PHP.MemoryLimit, PHPUploadMax: service.Config.PHP.UploadMax, PHPMaxExecTime: service.Config.PHP.MaxExecTime, SSHAccess: "none", QuotaDiskBytes: options.QuotaDiskBytes, QuotaWebsites: options.QuotaWebsites, QuotaDatabases: options.QuotaDatabases, QuotaBackups: options.QuotaBackups}
-	return service.createPlan(subscription), nil
+	return subscription, nil
 }
 
 func (service SubscriptionService) nextUID(ctx context.Context, name string) (int, error) {

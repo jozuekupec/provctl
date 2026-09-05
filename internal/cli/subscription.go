@@ -20,12 +20,60 @@ import (
 func newSubscriptionCommand() *cobra.Command {
 	command := &cobra.Command{Use: "subscription", Short: "manage hosting subscriptions"}
 	command.AddCommand(newSubscriptionCreateCommand())
+	command.AddCommand(newSubscriptionAdoptCommand())
 	command.AddCommand(newSubscriptionListCommand())
 	command.AddCommand(newSubscriptionShowCommand())
 	command.AddCommand(newSubscriptionDeleteCommand())
 	command.AddCommand(newSubscriptionStatusCommand("suspend", "suspended"))
 	command.AddCommand(newSubscriptionStatusCommand("resume", "active"))
 	command.AddCommand(newSubscriptionStatusCommand("archive", "archived"))
+	return command
+}
+
+func newSubscriptionAdoptCommand() *cobra.Command {
+	var configPath, source, domainName string
+	var copyData, noBackup, dryRun bool
+	command := &cobra.Command{Use: "adopt <name>", Short: "adopt an existing document root as a PHP-FPM website", Args: cobra.ExactArgs(1), RunE: func(command *cobra.Command, args []string) error {
+		cfg, err := config.Load(configPath)
+		if err != nil {
+			return fmt.Errorf("load configuration: %w", err)
+		}
+		options := service.SubscriptionAdoptOptions{Source: source, Domain: domainName, Copy: copyData, Backup: !noBackup}
+		ctx := context.Background()
+		if dryRun {
+			runtime, err := service.NewReadOnlySubscriptionRuntime(ctx, cfg)
+			if err != nil {
+				return fmt.Errorf("open subscription state: %w", err)
+			}
+			defer runtime.Close()
+			operation, err := runtime.Service.PrepareAdopt(ctx, args[0], options)
+			if err != nil {
+				return err
+			}
+			return writePlan(command, operation)
+		}
+		runtime, err := service.NewProductionSubscriptionRuntime(ctx, cfg)
+		if err != nil {
+			return fmt.Errorf("open subscription state: %w", err)
+		}
+		defer runtime.Close()
+		lockCtx, cancel := context.WithTimeout(ctx, time.Duration(cfg.Limits.LockTimeoutSeconds)*time.Second)
+		defer cancel()
+		operationID, err := runtime.Service.Adopt(lockCtx, args[0], options)
+		if err != nil {
+			return err
+		}
+		_, err = fmt.Fprintf(command.OutOrStdout(), "Adopted document root for subscription %q (operation %d).\n", args[0], operationID)
+		return err
+	}}
+	command.Flags().StringVar(&configPath, "config", meta.ConfigFile, "path to config.toml")
+	command.Flags().StringVar(&source, "from", "", "existing document root to adopt")
+	command.Flags().StringVar(&domainName, "domain", "", "primary domain for the adopted website")
+	command.Flags().BoolVar(&copyData, "copy", false, "copy data instead of the default atomic move")
+	command.Flags().BoolVar(&noBackup, "no-backup", false, "skip the default legacy document-root backup")
+	command.Flags().BoolVar(&dryRun, "dry-run", false, "show the operation plan without changing the system")
+	_ = command.MarkFlagRequired("from")
+	_ = command.MarkFlagRequired("domain")
 	return command
 }
 

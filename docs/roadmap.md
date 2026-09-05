@@ -271,8 +271,16 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   [subscription-adopt-design.md](subscription-adopt-design.md). Určuje jednu
   žurnálovanou operaci, přesný cíl document rootu, defaultní atomický přesun,
   volitelnou kopii, rollback hranice a povinné převzetí renewal lineage.
-  Implementace nyní vyžaduje samostatné filesystem/Certbot seams; nesmí být
-  složena z oddělených `subscription create` a `website create` operací.
+  Implementace nyní přidává `provctl subscription adopt <name> --from <path>
+  --domain <domain>` v jednom žurnálovaném plánu: výchozí atomický přesun,
+  opt-in `--copy`, výchozí archivní záloha, PHP-FPM/Apache artefakty a zápisy
+  SQLite až po konfiguraci systému. Certbot renewal inspector je samostatný
+  seam; selhání jeho finálního dry-run označí operaci `inconsistent`. Jednotkové
+  testy pokrývají cíl, přesun, vlastnictví, SQLite pořadí a renewal selhání.
+  Převzatá lineage se v této fázi pouze přenastaví pro obnovu; její bezpečné
+  propojení s TLS vhostem čeká na sjednocení SSL lineage modelu z M6.
+  Zbývá integrační test s kopií reálného legacy webrootu a Pebble větev pro
+  skutečný Certbot renewal config.
 
 ## Pravidla ověřování
 

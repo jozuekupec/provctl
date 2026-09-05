@@ -7,13 +7,17 @@ import (
 	"os/user"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
+
+	"github.com/google/go-cmp/cmp"
 
 	"provctl/internal/config"
 	"provctl/internal/domain"
 	"provctl/internal/plan"
 	"provctl/internal/system"
+	"provctl/internal/system/fake"
 )
 
 type subscriptionFS struct {
@@ -43,6 +47,14 @@ func (fs *subscriptionFS) Chmod(string, os.FileMode) error          { return nil
 func (fs *subscriptionFS) Symlink(string, string) error             { return nil }
 func (fs *subscriptionFS) ReadDir(string) ([]os.DirEntry, error)    { return nil, nil }
 func (fs *subscriptionFS) EvalSymlinks(path string) (string, error) { return path, nil }
+func (fs *subscriptionFS) Rename(oldPath, newPath string) error {
+	if !fs.directories[oldPath] {
+		return os.ErrNotExist
+	}
+	delete(fs.directories, oldPath)
+	fs.directories[newPath] = true
+	return nil
+}
 
 type subscriptionInfo struct{}
 
@@ -81,7 +93,9 @@ func (users *subscriptionUsers) Delete(context.Context, string, bool) error {
 }
 
 type subscriptionStore struct {
-	values map[string]domain.Subscription
+	values   map[string]domain.Subscription
+	domains  map[string]bool
+	websites []domain.Website
 }
 
 func (store *subscriptionStore) SubscriptionExists(_ context.Context, name string) (bool, error) {
@@ -111,8 +125,20 @@ func (store *subscriptionStore) SubscriptionByName(_ context.Context, name strin
 	return subscription, nil
 }
 func (store *subscriptionStore) CreateSubscription(_ context.Context, subscription domain.Subscription) error {
+	if subscription.ID == 0 {
+		subscription.ID = int64(len(store.values) + 1)
+	}
 	store.values[subscription.Name] = subscription
 	return nil
+}
+func (store *subscriptionStore) DomainExists(_ context.Context, name string) (bool, error) {
+	return store.domains[name], nil
+}
+func (store *subscriptionStore) CreateWebsite(_ context.Context, website domain.Website) (int64, error) {
+	website.ID = int64(len(store.websites) + 1)
+	store.websites = append(store.websites, website)
+	store.domains[website.PrimaryDomain] = true
+	return website.ID, nil
 }
 func (store *subscriptionStore) DeleteSubscription(_ context.Context, name string) error {
 	delete(store.values, name)
@@ -146,6 +172,23 @@ func (*subscriptionJournal) Start(context.Context, plan.Snapshot) (int64, error)
 func (journal *subscriptionJournal) Update(_ context.Context, _ int64, status plan.OperationStatus, _ plan.Snapshot, _ string) error {
 	journal.status = status
 	return nil
+}
+
+type subscriptionRenewals struct {
+	lineages     []RenewalLineage
+	reconfigured []string
+	verifyErr    error
+}
+
+func (renewals *subscriptionRenewals) Find(context.Context, string) ([]RenewalLineage, error) {
+	return renewals.lineages, nil
+}
+func (renewals *subscriptionRenewals) Reconfigure(_ context.Context, lineage RenewalLineage, _ string) error {
+	renewals.reconfigured = append(renewals.reconfigured, lineage.Name)
+	return nil
+}
+func (renewals *subscriptionRenewals) Verify(context.Context, string) error {
+	return renewals.verifyErr
 }
 
 type subscriptionLocker struct{}
@@ -329,5 +372,107 @@ func TestSubscriptionService_CreateRollsBackOnFilesystemFailure(t *testing.T) {
 	}
 }
 
+func TestSubscriptionService_PrepareAdoptBuildsOnePlanWithSQLiteLast(t *testing.T) {
+	fs := &subscriptionFS{directories: map[string]bool{"/legacy/example.test": true}}
+	users := &subscriptionUsers{}
+	store := &subscriptionStore{values: map[string]domain.Subscription{}, domains: map[string]bool{}}
+	service := newSubscriptionService(fs, users, store, &subscriptionJournal{})
+	service.Commands = &fake.Commander{}
+	service.Apache = websiteApache{}
+	service.PHPFPM = websitePHPFPM{}
+	service.PHPVersion = "8.4"
+	operation, err := service.PrepareAdopt(context.Background(), "acme", SubscriptionAdoptOptions{Source: "/legacy/example.test", Domain: "example.test", Backup: true})
+	if err != nil {
+		t.Fatalf("PrepareAdopt() error = %v", err)
+	}
+	if got, want := operation.Action, "subscription.adopt"; got != want {
+		t.Errorf("action = %q, want %q", got, want)
+	}
+	if operation.Steps[len(operation.Steps)-2].Name != "record subscription" || operation.Steps[len(operation.Steps)-1].Name != "record website" {
+		t.Errorf("final steps = %q, %q, want SQLite records", operation.Steps[len(operation.Steps)-2].Name, operation.Steps[len(operation.Steps)-1].Name)
+	}
+	foundMove := false
+	for _, step := range operation.Steps {
+		if step.Name == "move legacy document root" {
+			foundMove = true
+			if !strings.Contains(step.Preview, "/vhosts/acme/sites/example.test/public") {
+				t.Errorf("move target = %q", step.Preview)
+			}
+		}
+	}
+	if !foundMove {
+		t.Error("move step is missing")
+	}
+}
+
+func TestSubscriptionService_PrepareAdoptRejectsSourceInsideVHosts(t *testing.T) {
+	fs := &subscriptionFS{directories: map[string]bool{"/vhosts/legacy": true}}
+	store := &subscriptionStore{values: map[string]domain.Subscription{}, domains: map[string]bool{}}
+	service := newSubscriptionService(fs, &subscriptionUsers{}, store, &subscriptionJournal{})
+	service.Commands, service.Apache, service.PHPFPM = &fake.Commander{}, websiteApache{}, websitePHPFPM{}
+	_, err := service.PrepareAdopt(context.Background(), "acme", SubscriptionAdoptOptions{Source: "/vhosts/legacy", Domain: "example.test"})
+	if err == nil || !strings.Contains(err.Error(), "inside vhosts root") {
+		t.Fatalf("PrepareAdopt() error = %v, want source-root rejection", err)
+	}
+}
+
+func TestSubscriptionService_AdoptMovesDataAndRecordsWebsite(t *testing.T) {
+	fs := &subscriptionFS{directories: map[string]bool{"/legacy/example.test": true}}
+	users := &subscriptionUsers{}
+	store := &subscriptionStore{values: map[string]domain.Subscription{}, domains: map[string]bool{}}
+	service := newSubscriptionService(fs, users, store, &subscriptionJournal{})
+	commands := &fake.Commander{}
+	service.Commands, service.Apache, service.PHPFPM, service.PHPVersion = commands, websiteApache{}, websitePHPFPM{}, "8.4"
+	if _, err := service.Adopt(context.Background(), "acme", SubscriptionAdoptOptions{Source: "/legacy/example.test", Domain: "example.test", Backup: false}); err != nil {
+		t.Fatalf("Adopt() error = %v", err)
+	}
+	target := "/vhosts/acme/sites/example.test/public"
+	if fs.directories["/legacy/example.test"] || !fs.directories[target] {
+		t.Errorf("document-root move state = %#v", fs.directories)
+	}
+	if !users.created || len(store.websites) != 1 || store.websites[0].SubscriptionID == 0 {
+		t.Errorf("adopted state: user=%t websites=%#v", users.created, store.websites)
+	}
+	if len(commands.Calls) != 1 || commands.Calls[0].Name != "/usr/bin/chown" {
+		t.Errorf("ownership command = %#v", commands.Calls)
+	}
+}
+
+func TestSubscriptionService_TransferDocumentRootRejectsMissingAtomicMover(t *testing.T) {
+	service := SubscriptionService{FS: &fake.FS{}, Commands: &fake.Commander{}}
+	err := service.transferDocumentRoot("/legacy", "/vhosts/acme/sites/example.test/public", false)(context.Background())
+	if err == nil || !strings.Contains(err.Error(), "atomic rename") {
+		t.Fatalf("transferDocumentRoot() error = %v, want atomic mover rejection", err)
+	}
+}
+
+func TestRenewalDomainsParsesCertbotDomains(t *testing.T) {
+	got := renewalDomains("version = 4.0\ndomains = example.test www.example.test\n")
+	if want := []string{"example.test", "www.example.test"}; !cmp.Equal(got, want) {
+		t.Errorf("renewalDomains() = %#v, want %#v", got, want)
+	}
+}
+
+func TestSubscriptionService_AdoptMarksRenewalFailureInconsistent(t *testing.T) {
+	fs := &subscriptionFS{directories: map[string]bool{"/legacy/example.test": true}}
+	journal := &subscriptionJournal{}
+	store := &subscriptionStore{values: map[string]domain.Subscription{}, domains: map[string]bool{}}
+	service := newSubscriptionService(fs, &subscriptionUsers{}, store, journal)
+	service.Commands, service.Apache, service.PHPFPM, service.PHPVersion = &fake.Commander{}, websiteApache{}, websitePHPFPM{}, "8.4"
+	renewals := &subscriptionRenewals{lineages: []RenewalLineage{{Name: "legacy", Domains: []string{"example.test"}}}, verifyErr: errors.New("renewal failed")}
+	service.Renewals = renewals
+	_, err := service.Adopt(context.Background(), "acme", SubscriptionAdoptOptions{Source: "/legacy/example.test", Domain: "example.test", Backup: false})
+	if err == nil {
+		t.Fatal("Adopt() error = nil, want renewal failure")
+	}
+	if journal.status != plan.OperationInconsistent {
+		t.Errorf("journal status = %q, want inconsistent", journal.status)
+	}
+	if !cmp.Equal(renewals.reconfigured, []string{"legacy"}) {
+		t.Errorf("reconfigured lineages = %#v", renewals.reconfigured)
+	}
+}
+
 var _ system.FS = (*subscriptionFS)(nil)
+var _ system.FileMover = (*subscriptionFS)(nil)
 var _ system.Users = (*subscriptionUsers)(nil)
