@@ -21,6 +21,7 @@ import (
 
 type CertificateStore interface {
 	UpdateCertificateNotAfter(context.Context, string, time.Time) (bool, error)
+	WebsiteCertificateName(context.Context, string, string) (string, error)
 }
 
 type SSLWebsiteStore interface {
@@ -351,7 +352,17 @@ func (service CertificateService) Status(ctx context.Context, subscription, prim
 	if err := domain.ValidateDomain(primaryDomain); err != nil {
 		return SSLStatus{}, err
 	}
-	lineage := meta.FilePrefix + subscription + "-" + primaryDomain
+	lineage := ""
+	if service.Store != nil {
+		var err error
+		lineage, err = service.Store.WebsiteCertificateName(ctx, subscription, primaryDomain)
+		if err != nil {
+			return SSLStatus{}, err
+		}
+	}
+	if lineage == "" {
+		lineage = meta.FilePrefix + subscription + "-" + primaryDomain
+	}
 	notAfter, err := service.readNotAfter(ctx, filepath.Join(service.liveDir(), lineage, "cert.pem"))
 	if err != nil {
 		return SSLStatus{}, err

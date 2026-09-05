@@ -22,6 +22,9 @@ func (store *certificateStore) UpdateCertificateNotAfter(_ context.Context, line
 	store.updated, store.notAfter = lineage, notAfter
 	return true, nil
 }
+func (*certificateStore) WebsiteCertificateName(context.Context, string, string) (string, error) {
+	return "", nil
+}
 
 type certificateSystemd struct {
 	reloaded string
