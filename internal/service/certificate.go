@@ -315,11 +315,22 @@ type SSLRuntime struct {
 	repository *sqlite.Repository
 }
 
-// NewCertificateStatusService constructs the read-only service used by the
-// CLI. It deliberately has no SQLite dependency because live files are the
-// authority for certificate status.
+// NewCertificateStatusService constructs a filesystem-only status service for
+// callers that do not have a provctl database. Production status commands use
+// NewReadOnlyCertificateRuntime so domain renames retain their stable lineage.
 func NewCertificateStatusService() CertificateService {
 	return CertificateService{FS: system.OSFS{}, Commands: system.ExecCommander{}}
+}
+
+// NewReadOnlyCertificateRuntime resolves stable website lineages from SQLite
+// while reading certificate files directly from Certbot's live directory.
+func NewReadOnlyCertificateRuntime(ctx context.Context, apacheService string) (*CertificateRuntime, error) {
+	repository, err := sqlite.OpenReadOnly(ctx, meta.DatabaseFile)
+	if err != nil {
+		return nil, err
+	}
+	commander := system.ExecCommander{}
+	return &CertificateRuntime{Service: CertificateService{Store: repository, FS: system.OSFS{}, Commands: commander, Apache: apacheService}, repository: repository}, nil
 }
 
 func NewProductionCertificateRuntime(ctx context.Context, apacheService string) (*CertificateRuntime, error) {

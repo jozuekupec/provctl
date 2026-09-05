@@ -67,11 +67,16 @@ func newSSLDisableCommand() *cobra.Command {
 func newSSLStatusCommand() *cobra.Command {
 	var configPath string
 	command := &cobra.Command{Use: "status <subscription> <domain>", Short: "show the live certificate expiry", Args: cobra.ExactArgs(2), RunE: func(command *cobra.Command, args []string) error {
-		if _, err := config.Load(configPath); err != nil {
+		cfg, err := config.Load(configPath)
+		if err != nil {
 			return fmt.Errorf("load configuration: %w", err)
 		}
-		certificate := service.NewCertificateStatusService()
-		status, err := certificate.Status(context.Background(), args[0], args[1])
+		runtime, err := service.NewReadOnlyCertificateRuntime(context.Background(), cfg.Apache.Service)
+		if err != nil {
+			return fmt.Errorf("open certificate state: %w", err)
+		}
+		defer runtime.Close()
+		status, err := runtime.Service.Status(context.Background(), args[0], args[1])
 		if err != nil {
 			return err
 		}
