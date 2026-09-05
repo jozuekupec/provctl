@@ -35,7 +35,7 @@ jobs:
         run: |
           go install github.com/goreleaser/nfpm/v2/cmd/nfpm@latest
           sudo apt-get update
-          sudo apt-get install -y lintian
+          sudo apt-get install -y lintian piuparts
       - name: Build Debian package
         env:
           VERSION: 0.0.0~ci
@@ -46,6 +46,8 @@ jobs:
           lintian --no-tag-display-limit dist/provctl_*.deb
           dpkg-deb --contents dist/provctl_*.deb
           dpkg-deb --info dist/provctl_*.deb
+      - name: Test Debian install and purge
+        run: sudo piuparts --distribution trixie --mirror http://deb.debian.org/debian dist/provctl_*.deb
       - uses: actions/upload-artifact@v4
         with:
           name: provctl-deb-amd64
