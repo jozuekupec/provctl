@@ -297,7 +297,13 @@ func (service WebsiteService) RenderVHost(subscriptionName string, website domai
 }
 
 func (service WebsiteService) renderTLSVHost(subscriptionName string, website domain.Website, logDir string) ([]byte, error) {
-	lineageDir := filepath.Join(meta.LetsEncryptLiveDir, meta.FilePrefix+subscriptionName+"-"+website.PrimaryDomain)
+	lineage := website.CertificateName
+	if lineage == "" {
+		// Legacy rows created before schema v4 retain the historical lineage
+		// until their certificate metadata has been reconciled.
+		lineage = meta.FilePrefix + subscriptionName + "-" + website.PrimaryDomain
+	}
+	lineageDir := filepath.Join(meta.LetsEncryptLiveDir, lineage)
 	certificateFile := filepath.Join(lineageDir, "fullchain.pem")
 	certificateKey := filepath.Join(lineageDir, "privkey.pem")
 	switch website.Type {
