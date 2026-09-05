@@ -279,8 +279,10 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   testy pokrývají cíl, přesun, vlastnictví, SQLite pořadí a renewal selhání.
   Převzatá lineage se v této fázi pouze přenastaví pro obnovu; její bezpečné
   propojení s TLS vhostem čeká na sjednocení SSL lineage modelu z M6.
-  Zbývá integrační test s kopií reálného legacy webrootu a Pebble větev pro
-  skutečný Certbot renewal config.
+  Incus E2 ověření s kopií legacy webrootu prošlo: uživatel, atomický přesun,
+  archivní záloha, PHP-FPM pool, Apache `configtest` a HTTP odpověď (`200`) byly
+  ověřeny a `pv` byl vrácen na `clean`. Zbývá Pebble větev pro skutečný Certbot
+  renewal config a TLS-lineage sjednocení.
 
 ## Pravidla ověřování
 
