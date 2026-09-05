@@ -157,6 +157,28 @@ func TestBootstrap_PrepareAddsMissingSystemDirectories(t *testing.T) {
 	}
 }
 
+func TestBootstrap_PrepareWithSkipOmitsOptionalArtifact(t *testing.T) {
+	fs, cfg := readyBootstrapFS(t)
+	delete(fs.entries, meta.DeployHook)
+	operation, err := bootstrapService(fs, cfg).PrepareWithSkip(context.Background(), []string{"deploy-hook"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, step := range operation.Steps {
+		if step.Name == "install Certbot deploy hook" {
+			t.Fatal("deploy hook step was not skipped")
+		}
+	}
+}
+
+func TestBootstrap_PrepareWithSkipRejectsUnknownArtifact(t *testing.T) {
+	fs, cfg := readyBootstrapFS(t)
+	_, err := bootstrapService(fs, cfg).PrepareWithSkip(context.Background(), []string{"directories"})
+	if err == nil {
+		t.Fatal("PrepareWithSkip() error = nil, want unsupported skip")
+	}
+}
+
 func TestBootstrap_PrepareRefusesExistingDirectoryWithWrongPermissions(t *testing.T) {
 	fs, cfg := readyBootstrapFS(t)
 	entry := fs.entries[meta.LogDir]

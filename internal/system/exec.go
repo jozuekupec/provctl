@@ -26,6 +26,23 @@ func (ExecCommander) RunWithStdin(ctx context.Context, stdin io.Reader, name str
 	return run(ctx, stdin, name, args...)
 }
 
+func (ExecCommander) RunWithEnv(ctx context.Context, environment []string, name string, args ...string) (Result, error) {
+	if !IsAllowedBinary(name) {
+		return Result{}, fmt.Errorf("%w: %s", ErrBinaryNotAllowed, name)
+	}
+	started := time.Now()
+	command := exec.CommandContext(ctx, name, args...)
+	command.Env = append(os.Environ(), environment...)
+	stdout, stderr := &limitedBuffer{}, &limitedBuffer{}
+	command.Stdout, command.Stderr = stdout, stderr
+	err := command.Run()
+	result := Result{Stdout: stdout.String(), Stderr: stderr.String(), Duration: time.Since(started)}
+	if exitError := new(exec.ExitError); errors.As(err, &exitError) {
+		result.ExitCode = exitError.ExitCode()
+	}
+	return result, err
+}
+
 func (ExecCommander) RunToFile(ctx context.Context, path string, mode os.FileMode, name string, args ...string) (Result, error) {
 	if !IsAllowedBinary(name) {
 		return Result{}, fmt.Errorf("%w: %s", ErrBinaryNotAllowed, name)
@@ -88,6 +105,7 @@ var allowedBinaries = map[string]struct{}{
 	"/usr/bin/zstd": {}, "/usr/bin/du": {}, "/usr/bin/openssl": {},
 	"/usr/bin/dig": {}, "/usr/bin/getent": {}, "/usr/bin/ssh-keygen": {},
 	"/usr/bin/chown": {}, "/usr/bin/cp": {},
+	"/usr/bin/apt-get": {}, "/usr/bin/dpkg-query": {}, "/usr/bin/flock": {},
 }
 
 func IsAllowedBinary(name string) bool {

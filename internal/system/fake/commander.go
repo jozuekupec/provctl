@@ -34,6 +34,10 @@ func (fake *Commander) RunWithStdin(ctx context.Context, _ io.Reader, name strin
 	return fake.record(ctx, name, args, true)
 }
 
+func (fake *Commander) RunWithEnv(ctx context.Context, _ []string, name string, args ...string) (system.Result, error) {
+	return fake.record(ctx, name, args, false)
+}
+
 func (fake *Commander) RunToFile(ctx context.Context, _ string, _ os.FileMode, name string, args ...string) (system.Result, error) {
 	return fake.record(ctx, name, args, false)
 }

@@ -53,11 +53,15 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
 
 ## Bezprostřední práce
 
-- [~] `bootstrap`: vytvoření systémových adresářů a audit logu s právy ze
+- [x] `bootstrap`: vytvoření systémových adresářů a audit logu s právy ze
   specifikace, moduly, výchozí certifikát, vhost, deploy-hook, logrotate i
-  skutečně prázdný druhý běh (`nothing to do`) jsou hotové. Chybí přepínače
-  `--yes`, `--skip`, `--install-missing` a automatické vypsání výsledku
-  `doctor`.
+  skutečně prázdný druhý běh (`nothing to do`) jsou hotové. Mutující běh nyní
+  vyžaduje potvrzení, nebo explicitní `--yes`; `--skip` přijímá jen pevně
+  pojmenované volitelné artefakty a nikdy bezpečnostní adresáře. `--install-missing`
+  kontroluje pevný allowlist oficiálních Debian balíčků, dpkg lock a spouští
+  explicitní noninteractive `apt-get`; bez něj vypíše příkaz pro ruční instalaci.
+  Po běhu se vypíše výsledný `doctor`. Offline testy pokrývají allowlist,
+  lock, apt argumenty a skip validaci; `make test` prošel.
 - [x] Unit testy bootstrapu pokrývají prázdný plán, chybějící systémové cesty,
   odmítnutí změny práv existujícího adresáře i rollback nově vytvořené cesty po
   neúspěšném Apache configtestu.

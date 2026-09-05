@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"provctl/internal/config"
 	"provctl/internal/meta"
@@ -67,7 +68,13 @@ func NewBootstrapPreview(cfg config.Config) (BootstrapService, error) {
 	return BootstrapService{FS: fs, Modules: ApacheModules{FS: fs, AvailablePath: "/etc/apache2/mods-available", EnabledPath: "/etc/apache2/mods-enabled"}, Certificate: DefaultCertificate{FS: fs, Commands: commander, Directory: meta.DefaultSSLDir, Certificate: meta.DefaultSSLCertificate, Key: meta.DefaultSSLKey}, Apache: Apache{FS: fs, Commands: commander, Systemd: systemd, Service: cfg.Apache.Service}, Config: cfg, AuditGroup: auditGroup}, nil
 }
 func (service BootstrapService) Run(ctx context.Context) (int64, bool, error) {
-	operation, err := service.Prepare(ctx)
+	return service.RunWithSkip(ctx, nil)
+}
+
+// RunWithSkip executes selected optional artifact steps. Directories are never
+// skippable because later artifacts depend on their secure ownership.
+func (service BootstrapService) RunWithSkip(ctx context.Context, skipped []string) (int64, bool, error) {
+	operation, err := service.PrepareWithSkip(ctx, skipped)
 	if err != nil {
 		return 0, false, err
 	}
@@ -76,6 +83,37 @@ func (service BootstrapService) Run(ctx context.Context) (int64, bool, error) {
 	}
 	id, err := service.Executor.Run(ctx, operation)
 	return id, false, err
+}
+
+func (service BootstrapService) PrepareWithSkip(ctx context.Context, skipped []string) (plan.Plan, error) {
+	operation, err := service.Prepare(ctx)
+	if err != nil || len(skipped) == 0 {
+		return operation, err
+	}
+	aliases := map[string]string{
+		"modules": "enable required Apache modules", "certificate": "create default TLS certificate",
+		"vhost": "install default Apache vhost", "deploy-hook": "install Certbot deploy hook",
+		"logrotate": "install audit logrotate configuration", "audit-log": "create audit log",
+	}
+	wanted := make(map[string]bool, len(skipped))
+	for _, name := range skipped {
+		step, ok := aliases[name]
+		if !ok {
+			return plan.Plan{}, fmt.Errorf("unsupported bootstrap skip %q", name)
+		}
+		wanted[step] = true
+	}
+	steps := make([]plan.Step, 0, len(operation.Steps))
+	for _, step := range operation.Steps {
+		if !wanted[step.Name] {
+			steps = append(steps, step)
+		}
+	}
+	if len(steps) == 1 && strings.HasPrefix(steps[0].Name, "validate and reload Apache") {
+		steps = nil
+	}
+	operation.Steps = steps
+	return operation, nil
 }
 func (service BootstrapService) Prepare(ctx context.Context) (plan.Plan, error) {
 	contents, err := render.RenderDefaultApacheVHost(render.DefaultApacheVHost{CertificateFile: meta.DefaultSSLCertificate, KeyFile: meta.DefaultSSLKey})

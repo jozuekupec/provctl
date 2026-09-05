@@ -14,6 +14,14 @@ type Commander interface {
 	RunWithStdin(ctx context.Context, stdin io.Reader, name string, args ...string) (Result, error)
 }
 
+// EnvCommander optionally runs an allowlisted command with an explicit,
+// caller-provided environment addition. It keeps package installation from
+// relying on a shell assignment.
+type EnvCommander interface {
+	Commander
+	RunWithEnv(context.Context, []string, string, ...string) (Result, error)
+}
+
 // OutputFileCommander streams a command's stdout into a caller-selected file.
 // It is deliberately separate from Commander so existing read-only seams stay
 // minimal; implementations must still enforce the binary allowlist.
