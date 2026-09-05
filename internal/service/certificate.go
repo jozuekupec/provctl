@@ -153,7 +153,10 @@ func (service SSLService) Enable(ctx context.Context, subscriptionName, primaryD
 			return err
 		}
 	}
-	lineage := meta.FilePrefix + subscriptionName + "-" + primaryDomain
+	lineage := website.CertificateName
+	if lineage == "" {
+		lineage = meta.FilePrefix + subscriptionName + "-" + primaryDomain
+	}
 	args := []string{"certonly", "--webroot", "-w", service.Config.Paths.ACMEChallenge, "-d", primaryDomain}
 	for _, alias := range website.Aliases {
 		args = append(args, "-d", alias)
