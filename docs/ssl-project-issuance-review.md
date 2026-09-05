@@ -69,3 +69,27 @@ Add unit tests for all SAN preflight results, alias/domain reconciliation and
 delete ordering. In `pv` with Pebble, cover initial issuance, alias addition,
 alias removal, `certbot renew --dry-run`, and deletion after Apache reload.
 Run these with Certbot staging; never consume production rate limits in tests.
+
+## Implementation cut
+
+The current repository still derives a lineage in three independent places:
+`SSLService.Enable`, `CertificateService.Status`, and `WebsiteService.RenderVHost`.
+The migration must replace all three in one change; changing only issuance would
+produce a valid certificate that Apache and status cannot find.
+
+1. Add a migration that gives each existing website a deterministic temporary
+   certificate name and stores a unique `website_id` on certificate metadata.
+   New websites receive a stable name only after their SQLite ID exists.
+2. Add one service-level lineage resolver used by rendering, issuance, status,
+   deploy hooks, aliases, deletion, and adoption. No CLI or renderer should
+   reconstruct a lineage from a domain.
+3. Change alias mutation to use a single journaled SAN reconciliation plan:
+   issue/replace the complete SAN list, verify the live files, then render the
+   vhost and commit the alias row. Failed Certbot work must remain explicit in
+   the journal as irreversible/inconsistent work.
+4. Delete the enabled vhost and reload Apache before `certbot delete`; retain
+   a clear warning when Certbot deletion fails. Subscription deletion must use
+   the same per-website operation rather than deleting certificate rows first.
+5. Only after this resolver exists may `subscription adopt` attach an existing
+   Certbot lineage to an imported website. Until then it may safely reconfigure
+   renewal, but must not claim that it serves the imported certificate.

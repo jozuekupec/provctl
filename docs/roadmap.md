@@ -131,6 +131,9 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   reconcile aliasů zopakovat v `pv` Pebble issuance, alias add/remove,
   `certbot renew --dry-run`, deploy hook a Apache reload. Současný `clean`
   snapshot Pebble neobsahuje; test se proto neprovádí při běžném E2 round-tripu.
+  Review nyní konkretizuje nutný jednotný resolver lineage pro issuance,
+  rendering, status, deploy hook, aliasy, delete a adopt; pořadí datové
+  migrace a nevratných Certbot kroků je v `ssl-project-issuance-review.md`.
 - [~] **M7 — provoz:** první read-only část `health` je dostupná jako
   `provctl health [<subscription> [<domain>]]` v textu i přes `--json`.
   Kontroluje aktivní Apache, `apachectl configtest`, read-only SQLite spojení,
