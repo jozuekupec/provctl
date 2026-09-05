@@ -29,6 +29,7 @@ type Website struct {
 	SSLEnabled     bool
 	ForceHTTPS     bool
 	HSTS           bool
+	CertificateName string
 }
 
 var domainName = regexp.MustCompile(`(?i)^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$`)

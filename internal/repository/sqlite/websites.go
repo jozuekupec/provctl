@@ -24,7 +24,7 @@ func (repository *Repository) DomainExists(ctx context.Context, domain string) (
 
 // ListWebsites returns websites belonging to one subscription, ordered by domain.
 func (repository *Repository) ListWebsites(ctx context.Context, subscriptionID int64) ([]domain.Website, error) {
-	rows, err := repository.DB.QueryContext(ctx, `SELECT w.id, w.subscription_id, w.type, d.name, COALESCE(w.document_root, ''), COALESCE(w.target, ''), COALESCE(w.redirect_code, 0), COALESCE(w.php_version, ''), w.enabled, w.ssl_enabled, w.force_https, w.hsts FROM websites w JOIN domains d ON d.website_id = w.id AND d.is_primary = 1 WHERE w.subscription_id = ? ORDER BY d.name`, subscriptionID)
+	rows, err := repository.DB.QueryContext(ctx, `SELECT w.id, w.subscription_id, w.type, d.name, COALESCE(w.document_root, ''), COALESCE(w.target, ''), COALESCE(w.redirect_code, 0), COALESCE(w.php_version, ''), w.enabled, w.ssl_enabled, w.force_https, w.hsts, COALESCE(w.certificate_name, '') FROM websites w JOIN domains d ON d.website_id = w.id AND d.is_primary = 1 WHERE w.subscription_id = ? ORDER BY d.name`, subscriptionID)
 	if err != nil {
 		return nil, fmt.Errorf("list websites: %w", err)
 	}
@@ -32,7 +32,7 @@ func (repository *Repository) ListWebsites(ctx context.Context, subscriptionID i
 	var websites []domain.Website
 	for rows.Next() {
 		var website domain.Website
-		if err := rows.Scan(&website.ID, &website.SubscriptionID, &website.Type, &website.PrimaryDomain, &website.DocumentRoot, &website.Target, &website.RedirectCode, &website.PHPVersion, &website.Enabled, &website.SSLEnabled, &website.ForceHTTPS, &website.HSTS); err != nil {
+		if err := rows.Scan(&website.ID, &website.SubscriptionID, &website.Type, &website.PrimaryDomain, &website.DocumentRoot, &website.Target, &website.RedirectCode, &website.PHPVersion, &website.Enabled, &website.SSLEnabled, &website.ForceHTTPS, &website.HSTS, &website.CertificateName); err != nil {
 			return nil, fmt.Errorf("scan website: %w", err)
 		}
 		websites = append(websites, website)
@@ -87,6 +87,10 @@ func (repository *Repository) CreateWebsite(ctx context.Context, website domain.
 	websiteID, err := result.LastInsertId()
 	if err != nil {
 		return 0, fmt.Errorf("read website ID: %w", err)
+	}
+	certificateName := "provctl-site-" + fmt.Sprint(websiteID)
+	if _, err := transaction.ExecContext(ctx, `UPDATE websites SET certificate_name = ? WHERE id = ?`, certificateName, websiteID); err != nil {
+		return 0, fmt.Errorf("set website certificate name: %w", err)
 	}
 	if _, err := transaction.ExecContext(ctx, `INSERT INTO domains (website_id, name, is_primary, created_at) VALUES (?, ?, 1, ?)`, websiteID, website.PrimaryDomain, now); err != nil {
 		return 0, fmt.Errorf("insert primary domain: %w", err)
