@@ -16,14 +16,15 @@ import (
 type certificateStore struct {
 	updated  string
 	notAfter time.Time
+	lineage  string
 }
 
 func (store *certificateStore) UpdateCertificateNotAfter(_ context.Context, lineage string, notAfter time.Time) (bool, error) {
 	store.updated, store.notAfter = lineage, notAfter
 	return true, nil
 }
-func (*certificateStore) WebsiteCertificateName(context.Context, string, string) (string, error) {
-	return "", nil
+func (store *certificateStore) WebsiteCertificateName(context.Context, string, string) (string, error) {
+	return store.lineage, nil
 }
 
 type certificateSystemd struct {
@@ -80,6 +81,29 @@ func TestCertificateService_StatusReadsLiveCertificate(t *testing.T) {
 	}
 	if got := commander.Calls[0]; got.Name != "/usr/bin/openssl" || got.Args[2] != filepath.Join(path, "cert.pem") {
 		t.Errorf("openssl call = %#v", got)
+	}
+}
+
+func TestCertificateService_StatusUsesWebsiteCertificateName(t *testing.T) {
+	live := filepath.Join(t.TempDir(), "live")
+	path := filepath.Join(live, "provctl-site-42")
+	if err := os.MkdirAll(path, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(path, "cert.pem"), []byte("certificate"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	commander := &fake.Commander{Result: system.Result{Stdout: "notAfter=Sep  1 12:00:00 2026 GMT\n"}}
+	service := CertificateService{Store: &certificateStore{lineage: "provctl-site-42"}, FS: system.OSFS{}, Commands: commander, LiveDir: live}
+	status, err := service.Status(context.Background(), "acme", "example.test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if status.Lineage != "provctl-site-42" {
+		t.Errorf("Status().Lineage = %q, want stable website lineage", status.Lineage)
+	}
+	if got := commander.Calls[0].Args[2]; got != filepath.Join(path, "cert.pem") {
+		t.Errorf("openssl certificate path = %q", got)
 	}
 }
 

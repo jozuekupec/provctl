@@ -11,6 +11,7 @@ import (
 type Certificate struct {
 	ID             int64
 	SubscriptionID int64
+	WebsiteID      int64
 	Lineage        string
 	PrimaryDomain  string
 	SANs           []string

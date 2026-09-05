@@ -23,14 +23,18 @@ func TestRepository_CertificateRoundTrip(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := time.Date(2026, 9, 1, 12, 0, 0, 0, time.UTC)
-	if _, err := repository.CreateCertificate(context.Background(), domain.Certificate{SubscriptionID: subscription.ID, Lineage: "provctl-acme-example.test", PrimaryDomain: "example.test", SANs: []string{"example.test", "www.example.test"}, NotAfter: want}); err != nil {
+	websiteID, err := repository.CreateWebsite(context.Background(), domain.Website{SubscriptionID: subscription.ID, Type: domain.WebsiteStatic, PrimaryDomain: "example.test", Enabled: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := repository.CreateCertificate(context.Background(), domain.Certificate{SubscriptionID: subscription.ID, WebsiteID: websiteID, Lineage: "provctl-acme-example.test", PrimaryDomain: "example.test", SANs: []string{"example.test", "www.example.test"}, NotAfter: want}); err != nil {
 		t.Fatal(err)
 	}
 	certificate, err := repository.CertificateByLineage(context.Background(), "provctl-acme-example.test")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if certificate.NotAfter != want || len(certificate.SANs) != 2 {
+	if certificate.WebsiteID != websiteID || certificate.NotAfter != want || len(certificate.SANs) != 2 {
 		t.Errorf("certificate = %#v", certificate)
 	}
 	updated := want.Add(24 * time.Hour)

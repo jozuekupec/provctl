@@ -194,7 +194,7 @@ func (service SSLService) Enable(ctx context.Context, subscriptionName, primaryD
 	if err := service.Store.SetWebsiteSSL(ctx, website.ID, true, forceHTTPS); err != nil {
 		return err
 	}
-	if _, err := service.Store.CreateCertificate(ctx, domain.Certificate{SubscriptionID: subscription.ID, Lineage: lineage, PrimaryDomain: primaryDomain, SANs: append([]string{primaryDomain}, website.Aliases...), NotAfter: notAfter, LastCheckedAt: time.Now().UTC()}); err != nil && !strings.Contains(err.Error(), "UNIQUE") {
+	if _, err := service.Store.CreateCertificate(ctx, domain.Certificate{SubscriptionID: subscription.ID, WebsiteID: website.ID, Lineage: lineage, PrimaryDomain: primaryDomain, SANs: append([]string{primaryDomain}, website.Aliases...), NotAfter: notAfter, LastCheckedAt: time.Now().UTC()}); err != nil && !strings.Contains(err.Error(), "UNIQUE") {
 		return err
 	}
 	if renewalCheck {

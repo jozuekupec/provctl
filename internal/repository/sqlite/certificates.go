@@ -16,7 +16,7 @@ func (repository *Repository) CreateCertificate(ctx context.Context, certificate
 	if err != nil {
 		return 0, fmt.Errorf("encode certificate SANs: %w", err)
 	}
-	result, err := repository.DB.ExecContext(ctx, `INSERT INTO certificates (subscription_id, lineage, primary_domain, sans, issuer, not_before, not_after, last_checked_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`, certificate.SubscriptionID, certificate.Lineage, certificate.PrimaryDomain, string(sans), nullable(certificate.Issuer), nullableTime(certificate.NotBefore), nullableTime(certificate.NotAfter), nullableTime(certificate.LastCheckedAt))
+	result, err := repository.DB.ExecContext(ctx, `INSERT INTO certificates (subscription_id, website_id, lineage, primary_domain, sans, issuer, not_before, not_after, last_checked_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`, certificate.SubscriptionID, nullableInt64(certificate.WebsiteID), certificate.Lineage, certificate.PrimaryDomain, string(sans), nullable(certificate.Issuer), nullableTime(certificate.NotBefore), nullableTime(certificate.NotAfter), nullableTime(certificate.LastCheckedAt))
 	if err != nil {
 		return 0, fmt.Errorf("insert certificate %q: %w", certificate.Lineage, err)
 	}
@@ -31,7 +31,7 @@ func (repository *Repository) CreateCertificate(ctx context.Context, certificate
 // Archive restore deliberately does not reinstate these certificates, but records
 // them in the backup manifest so the operator can reissue the expected lineages.
 func (repository *Repository) ListCertificates(ctx context.Context, subscriptionID int64) ([]domain.Certificate, error) {
-	rows, err := repository.DB.QueryContext(ctx, `SELECT id, subscription_id, lineage, primary_domain, sans, COALESCE(issuer, ''), COALESCE(not_before, ''), COALESCE(not_after, ''), COALESCE(last_checked_at, '') FROM certificates WHERE subscription_id = ? ORDER BY lineage`, subscriptionID)
+	rows, err := repository.DB.QueryContext(ctx, `SELECT id, subscription_id, COALESCE(website_id, 0), lineage, primary_domain, sans, COALESCE(issuer, ''), COALESCE(not_before, ''), COALESCE(not_after, ''), COALESCE(last_checked_at, '') FROM certificates WHERE subscription_id = ? ORDER BY lineage`, subscriptionID)
 	if err != nil {
 		return nil, fmt.Errorf("list certificates: %w", err)
 	}
@@ -40,7 +40,7 @@ func (repository *Repository) ListCertificates(ctx context.Context, subscription
 	for rows.Next() {
 		var certificate domain.Certificate
 		var sans, notBefore, notAfter, checked string
-		if err := rows.Scan(&certificate.ID, &certificate.SubscriptionID, &certificate.Lineage, &certificate.PrimaryDomain, &sans, &certificate.Issuer, &notBefore, &notAfter, &checked); err != nil {
+		if err := rows.Scan(&certificate.ID, &certificate.SubscriptionID, &certificate.WebsiteID, &certificate.Lineage, &certificate.PrimaryDomain, &sans, &certificate.Issuer, &notBefore, &notAfter, &checked); err != nil {
 			return nil, fmt.Errorf("scan certificate: %w", err)
 		}
 		if err := json.Unmarshal([]byte(sans), &certificate.SANs); err != nil {
@@ -74,7 +74,7 @@ func (repository *Repository) DeleteCertificatesBySubscription(ctx context.Conte
 }
 
 func (repository *Repository) CertificateByLineage(ctx context.Context, lineage string) (domain.Certificate, error) {
-	row := repository.DB.QueryRowContext(ctx, `SELECT id, subscription_id, lineage, primary_domain, sans, COALESCE(issuer, ''), COALESCE(not_before, ''), COALESCE(not_after, ''), COALESCE(last_checked_at, '') FROM certificates WHERE lineage = ?`, lineage)
+	row := repository.DB.QueryRowContext(ctx, `SELECT id, subscription_id, COALESCE(website_id, 0), lineage, primary_domain, sans, COALESCE(issuer, ''), COALESCE(not_before, ''), COALESCE(not_after, ''), COALESCE(last_checked_at, '') FROM certificates WHERE lineage = ?`, lineage)
 	return scanCertificate(row)
 }
 
@@ -93,7 +93,7 @@ func (repository *Repository) UpdateCertificateNotAfter(ctx context.Context, lin
 func scanCertificate(row *sql.Row) (domain.Certificate, error) {
 	var certificate domain.Certificate
 	var sans, notBefore, notAfter, checked string
-	if err := row.Scan(&certificate.ID, &certificate.SubscriptionID, &certificate.Lineage, &certificate.PrimaryDomain, &sans, &certificate.Issuer, &notBefore, &notAfter, &checked); err != nil {
+	if err := row.Scan(&certificate.ID, &certificate.SubscriptionID, &certificate.WebsiteID, &certificate.Lineage, &certificate.PrimaryDomain, &sans, &certificate.Issuer, &notBefore, &notAfter, &checked); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return domain.Certificate{}, fmt.Errorf("certificate not found")
 		}
