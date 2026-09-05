@@ -136,7 +136,12 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   migrace a nevratných Certbot kroků je v `ssl-project-issuance-review.md`.
   `ssl status` nyní otevírá SQLite výhradně read-only a používá stejnou
   stabilní lineage webu jako issuance a rendering; živý soubor Certbotu
-  zůstává autoritou pro datum expirace.
+  zůstává autoritou pro datum expirace. TLS website alias nyní sestavuje celý
+  výsledný SAN seznam, nejdřív aplikuje dočasný HTTP-only candidate vhost a po
+  DNS/HTTP preflightu certifikát přegeneruje s jeho stabilním názvem; až pak
+  zapíše alias a cache SAN metadata. HTTP website alias zůstává žurnálovaný
+  původní cestou. Zbývá Pebble E3 ověření obou směrů včetně skutečné podpory
+  odebrání SAN v použité verzi Certbotu.
 - [~] **M7 — provoz:** první read-only část `health` je dostupná jako
   `provctl health [<subscription> [<domain>]]` v textu i přes `--json`.
   Kontroluje aktivní Apache, `apachectl configtest`, read-only SQLite spojení,

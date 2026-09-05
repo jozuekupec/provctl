@@ -90,6 +90,24 @@ func (repository *Repository) UpdateCertificateNotAfter(ctx context.Context, lin
 	return rows == 1, nil
 }
 
+// UpdateCertificateSANs records the complete requested certificate name set.
+// The live Certbot lineage remains authoritative for the certificate itself.
+func (repository *Repository) UpdateCertificateSANs(ctx context.Context, lineage, primaryDomain string, sans []string, notAfter time.Time) (bool, error) {
+	encoded, err := json.Marshal(sans)
+	if err != nil {
+		return false, fmt.Errorf("encode certificate SANs: %w", err)
+	}
+	result, err := repository.DB.ExecContext(ctx, `UPDATE certificates SET primary_domain = ?, sans = ?, not_after = ?, last_checked_at = ? WHERE lineage = ?`, primaryDomain, string(encoded), nullableTime(notAfter), time.Now().UTC().Format(time.RFC3339), lineage)
+	if err != nil {
+		return false, fmt.Errorf("update certificate %q SANs: %w", lineage, err)
+	}
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return false, fmt.Errorf("count certificate SAN update: %w", err)
+	}
+	return rows == 1, nil
+}
+
 func scanCertificate(row *sql.Row) (domain.Certificate, error) {
 	var certificate domain.Certificate
 	var sans, notBefore, notAfter, checked string

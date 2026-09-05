@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/http"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -26,9 +27,13 @@ type CertificateStore interface {
 
 type SSLWebsiteStore interface {
 	SubscriptionByName(context.Context, string) (domain.Subscription, error)
+	DomainExists(context.Context, string) (bool, error)
 	ListWebsites(context.Context, int64) ([]domain.Website, error)
 	SetWebsiteSSL(context.Context, int64, bool, bool) error
+	AddWebsiteAlias(context.Context, int64, string) error
+	RemoveWebsiteAlias(context.Context, int64, string) error
 	CreateCertificate(context.Context, domain.Certificate) (int64, error)
+	UpdateCertificateSANs(context.Context, string, string, []string, time.Time) (bool, error)
 }
 
 // SSLNetwork isolates DNS and HTTP self-check I/O from the certificate state
@@ -158,17 +163,7 @@ func (service SSLService) Enable(ctx context.Context, subscriptionName, primaryD
 	if lineage == "" {
 		lineage = meta.FilePrefix + subscriptionName + "-" + primaryDomain
 	}
-	args := []string{"certonly", "--webroot", "-w", service.Config.Paths.ACMEChallenge, "-d", primaryDomain}
-	for _, alias := range website.Aliases {
-		args = append(args, "-d", alias)
-	}
-	args = append(args, "--non-interactive", "--agree-tos", "-m", service.Config.SSL.Email, "--cert-name", lineage)
-	if service.Config.SSL.Staging {
-		args = append(args, "--staging")
-	}
-	if service.Config.SSL.Server != "" {
-		args = append(args, "--server", service.Config.SSL.Server)
-	}
+	args := service.certbotArgs(lineage, append([]string{primaryDomain}, website.Aliases...), false)
 	result, err := service.Commands.Run(ctx, "/usr/bin/certbot", args...)
 	if err != nil {
 		_ = undoHTTP(ctx)
@@ -230,6 +225,130 @@ func (service SSLService) Disable(ctx context.Context, subscriptionName, primary
 		return err
 	}
 	return service.Store.SetWebsiteSSL(ctx, website.ID, false, false)
+}
+
+// ReconcileAliases replaces the complete SAN set of an enabled website
+// certificate. It deliberately installs a HTTP-only candidate vhost before
+// Certbot runs, so every requested name is reachable without referring to a
+// certificate that might not exist yet.
+func (service SSLService) ReconcileAliases(ctx context.Context, subscriptionName, primaryDomain, alias string, add, force bool) (returnErr error) {
+	if service.Store == nil || service.Network == nil || service.Commands == nil || service.FS == nil || service.Apache == nil {
+		return errors.New("TLS alias reconcile requires store, network, filesystem, commander, and Apache")
+	}
+	if err := domain.ValidateDomain(alias); err != nil {
+		return err
+	}
+	subscription, website, err := service.website(ctx, subscriptionName, primaryDomain)
+	if err != nil {
+		return err
+	}
+	if !website.SSLEnabled {
+		return fmt.Errorf("website %q does not have TLS enabled", primaryDomain)
+	}
+	aliases := append([]string(nil), website.Aliases...)
+	if add {
+		exists, err := service.Store.DomainExists(ctx, alias)
+		if err != nil {
+			return err
+		}
+		if exists {
+			return fmt.Errorf("domain %q is already assigned", alias)
+		}
+		aliases = append(aliases, alias)
+		sort.Strings(aliases)
+	} else {
+		filtered := aliases[:0]
+		for _, value := range aliases {
+			if value != alias {
+				filtered = append(filtered, value)
+			}
+		}
+		if len(filtered) == len(aliases) {
+			return fmt.Errorf("website alias %q not found", alias)
+		}
+		aliases = filtered
+	}
+	candidate := website
+	candidate.Aliases = aliases
+	plain := candidate
+	plain.SSLEnabled, plain.ForceHTTPS = false, false
+	contents, err := service.Websites.RenderVHost(subscriptionName, plain)
+	if err != nil {
+		return err
+	}
+	path := service.vhostPath(subscriptionName, primaryDomain)
+	undoHTTP, err := service.Apache.Apply(ctx, path, contents)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if returnErr != nil {
+			_ = undoHTTP(ctx)
+		}
+	}()
+	domains := append([]string{primaryDomain}, aliases...)
+	if err := service.validateDNS(ctx, domains); err != nil && !force {
+		return fmt.Errorf("DNS validation warning: %w; rerun with --force when this server is behind NAT", err)
+	}
+	for _, name := range domains {
+		if err := service.selfCheck(ctx, name); err != nil {
+			return err
+		}
+	}
+	lineage := website.CertificateName
+	if lineage == "" {
+		lineage = meta.FilePrefix + subscriptionName + "-" + primaryDomain
+	}
+	args := service.certbotArgs(lineage, domains, true)
+	result, err := service.Commands.Run(ctx, "/usr/bin/certbot", args...)
+	if err != nil {
+		return commandError("reconcile certificate names", result, err)
+	}
+	notAfter, err := (CertificateService{FS: service.FS, Commands: service.Commands}).readNotAfter(ctx, filepath.Join(meta.LetsEncryptLiveDir, lineage, "fullchain.pem"))
+	if err != nil {
+		return err
+	}
+	contents, err = service.Websites.RenderVHost(subscriptionName, candidate)
+	if err != nil {
+		return err
+	}
+	if _, err := service.Apache.Apply(ctx, path, contents); err != nil {
+		return err
+	}
+	if add {
+		err = service.Store.AddWebsiteAlias(ctx, website.ID, alias)
+	} else {
+		err = service.Store.RemoveWebsiteAlias(ctx, website.ID, alias)
+	}
+	if err != nil {
+		return err
+	}
+	updated, err := service.Store.UpdateCertificateSANs(ctx, lineage, primaryDomain, domains, notAfter)
+	if err != nil {
+		return err
+	}
+	if !updated {
+		_, err = service.Store.CreateCertificate(ctx, domain.Certificate{SubscriptionID: subscription.ID, WebsiteID: website.ID, Lineage: lineage, PrimaryDomain: primaryDomain, SANs: domains, NotAfter: notAfter, LastCheckedAt: time.Now().UTC()})
+	}
+	return err
+}
+
+func (service SSLService) certbotArgs(lineage string, domains []string, replaceNames bool) []string {
+	args := []string{"certonly", "--webroot", "-w", service.Config.Paths.ACMEChallenge}
+	for _, name := range domains {
+		args = append(args, "-d", name)
+	}
+	args = append(args, "--non-interactive", "--agree-tos", "-m", service.Config.SSL.Email, "--cert-name", lineage)
+	if replaceNames {
+		args = append(args, "--expand")
+	}
+	if service.Config.SSL.Staging {
+		args = append(args, "--staging")
+	}
+	if service.Config.SSL.Server != "" {
+		args = append(args, "--server", service.Config.SSL.Server)
+	}
+	return args
 }
 
 func (service SSLService) website(ctx context.Context, subscriptionName, primaryDomain string) (domain.Subscription, domain.Website, error) {

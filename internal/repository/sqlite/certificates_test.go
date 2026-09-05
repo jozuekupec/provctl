@@ -3,6 +3,7 @@ package sqlite
 import (
 	"context"
 	"path/filepath"
+	"slices"
 	"testing"
 	"time"
 
@@ -55,5 +56,15 @@ func TestRepository_CertificateRoundTrip(t *testing.T) {
 	}
 	if len(certificates) != 1 || certificates[0].Lineage != certificate.Lineage {
 		t.Errorf("ListCertificates() = %#v", certificates)
+	}
+	if updatedRecord, err := repository.UpdateCertificateSANs(context.Background(), certificate.Lineage, "example.test", []string{"example.test", "cdn.example.test"}, updated.Add(24*time.Hour)); err != nil || !updatedRecord {
+		t.Fatalf("UpdateCertificateSANs() = %t, %v", updatedRecord, err)
+	}
+	certificate, err = repository.CertificateByLineage(context.Background(), certificate.Lineage)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := []string{"example.test", "cdn.example.test"}; !slices.Equal(certificate.SANs, want) {
+		t.Errorf("certificate SANs = %#v, want %#v", certificate.SANs, want)
 	}
 }

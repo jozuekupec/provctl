@@ -36,6 +36,7 @@ func newWebsiteAliasCommand() *cobra.Command {
 	}{{"add", true}, {"remove", false}} {
 		operation := operation
 		var configPath string
+		var force bool
 		child := &cobra.Command{Use: operation.name + " <subscription> <domain> <alias>", Short: operation.name + " a website alias", Args: cobra.ExactArgs(3), RunE: func(command *cobra.Command, args []string) error {
 			cfg, err := config.Load(configPath)
 			if err != nil {
@@ -45,9 +46,32 @@ func newWebsiteAliasCommand() *cobra.Command {
 			if err != nil {
 				return fmt.Errorf("open website state: %w", err)
 			}
-			defer runtime.Close()
 			ctx, cancel := context.WithTimeout(context.Background(), time.Duration(cfg.Limits.LockTimeoutSeconds)*time.Second)
 			defer cancel()
+			websites, err := runtime.Service.ListForSubscription(ctx, args[0])
+			if err != nil {
+				_ = runtime.Close()
+				return err
+			}
+			for _, website := range websites {
+				if website.PrimaryDomain != args[1] || !website.SSLEnabled {
+					continue
+				}
+				if err := runtime.Close(); err != nil {
+					return err
+				}
+				sslRuntime, err := service.NewProductionSSLRuntime(context.Background(), cfg)
+				if err != nil {
+					return fmt.Errorf("open SSL state: %w", err)
+				}
+				defer sslRuntime.Close()
+				if err := sslRuntime.Service.ReconcileAliases(ctx, args[0], args[1], args[2], operation.add, force); err != nil {
+					return err
+				}
+				_, err = fmt.Fprintf(command.OutOrStdout(), "%s alias %q and reconciled TLS certificate for website %q.\n", map[bool]string{true: "Added", false: "Removed"}[operation.add], args[2], args[1])
+				return err
+			}
+			defer runtime.Close()
 			var operationID int64
 			if operation.add {
 				operationID, err = runtime.Service.AddAlias(ctx, args[0], args[1], args[2])
@@ -61,6 +85,7 @@ func newWebsiteAliasCommand() *cobra.Command {
 			return err
 		}}
 		child.Flags().StringVar(&configPath, "config", meta.ConfigFile, "path to config.toml")
+		child.Flags().BoolVar(&force, "force", false, "continue when DNS does not match a local server IP for TLS websites")
 		command.AddCommand(child)
 	}
 	return command
