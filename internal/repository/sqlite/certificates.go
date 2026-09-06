@@ -73,6 +73,26 @@ func (repository *Repository) DeleteCertificatesBySubscription(ctx context.Conte
 	return nil
 }
 
+func (repository *Repository) CertificateByWebsite(ctx context.Context, websiteID int64) (domain.Certificate, error) {
+	row := repository.DB.QueryRowContext(ctx, `SELECT id, subscription_id, COALESCE(website_id, 0), lineage, primary_domain, sans, COALESCE(issuer, ''), COALESCE(not_before, ''), COALESCE(not_after, ''), COALESCE(last_checked_at, '') FROM certificates WHERE website_id = ?`, websiteID)
+	return scanCertificate(row)
+}
+
+func (repository *Repository) DeleteCertificateByWebsite(ctx context.Context, websiteID int64) error {
+	result, err := repository.DB.ExecContext(ctx, `DELETE FROM certificates WHERE website_id = ?`, websiteID)
+	if err != nil {
+		return fmt.Errorf("delete certificate for website %d: %w", websiteID, err)
+	}
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("count certificate delete: %w", err)
+	}
+	if rows != 1 {
+		return fmt.Errorf("certificate for website %d not found", websiteID)
+	}
+	return nil
+}
+
 func (repository *Repository) CertificateByLineage(ctx context.Context, lineage string) (domain.Certificate, error) {
 	row := repository.DB.QueryRowContext(ctx, `SELECT id, subscription_id, COALESCE(website_id, 0), lineage, primary_domain, sans, COALESCE(issuer, ''), COALESCE(not_before, ''), COALESCE(not_after, ''), COALESCE(last_checked_at, '') FROM certificates WHERE lineage = ?`, lineage)
 	return scanCertificate(row)

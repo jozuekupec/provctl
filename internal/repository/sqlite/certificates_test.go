@@ -38,6 +38,9 @@ func TestRepository_CertificateRoundTrip(t *testing.T) {
 	if certificate.WebsiteID != websiteID || certificate.NotAfter != want || len(certificate.SANs) != 2 {
 		t.Errorf("certificate = %#v", certificate)
 	}
+	if byWebsite, err := repository.CertificateByWebsite(context.Background(), websiteID); err != nil || byWebsite.ID != certificate.ID {
+		t.Fatalf("CertificateByWebsite() = %#v, %v", byWebsite, err)
+	}
 	updated := want.Add(24 * time.Hour)
 	updatedRecord, err := repository.UpdateCertificateNotAfter(context.Background(), certificate.Lineage, updated)
 	if err != nil || !updatedRecord {

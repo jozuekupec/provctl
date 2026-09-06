@@ -22,6 +22,8 @@ type WebsiteStore interface {
 	DomainExists(context.Context, string) (bool, error)
 	CreateWebsite(context.Context, domain.Website) (int64, error)
 	DeleteWebsite(context.Context, int64) error
+	CertificateByWebsite(context.Context, int64) (domain.Certificate, error)
+	DeleteCertificateByWebsite(context.Context, int64) error
 	SetWebsiteEnabled(context.Context, int64, bool) error
 	SetWebsiteSSL(context.Context, int64, bool, bool) error
 	AddWebsiteAlias(context.Context, int64, string) error
@@ -96,13 +98,14 @@ type ApacheVHostApplier interface {
 
 // WebsiteService creates an isolated PHP-FPM website and its Apache vhost.
 type WebsiteService struct {
-	FS       system.FS
-	Store    WebsiteStore
-	Executor plan.Executor
-	Apache   ApacheVHostApplier
-	PHPFPM   PHPFPMPoolApplier
-	Version  PHPFPMVersion
-	Config   config.Config
+	FS           system.FS
+	Store        WebsiteStore
+	Executor     plan.Executor
+	Apache       ApacheVHostApplier
+	PHPFPM       PHPFPMPoolApplier
+	Version      PHPFPMVersion
+	Config       config.Config
+	Certificates CertificateRemover
 }
 
 // WebsiteRuntime owns the database connection used by a website command.
@@ -125,13 +128,14 @@ func NewProductionWebsiteRuntime(ctx context.Context, cfg config.Config) (*Websi
 	}
 	return &WebsiteRuntime{
 		Service: WebsiteService{
-			FS:       system.OSFS{},
-			Store:    repository,
-			Executor: productionExecutor(repository),
-			Apache:   Apache{FS: system.OSFS{}, Commands: commander, Systemd: systemd, Service: cfg.Apache.Service},
-			PHPFPM:   PHPFPM{FS: system.OSFS{}, Commands: commander, Systemd: systemd},
-			Version:  version,
-			Config:   cfg,
+			FS:           system.OSFS{},
+			Store:        repository,
+			Executor:     productionExecutor(repository),
+			Apache:       Apache{FS: system.OSFS{}, Commands: commander, Systemd: systemd, Service: cfg.Apache.Service},
+			PHPFPM:       PHPFPM{FS: system.OSFS{}, Commands: commander, Systemd: systemd},
+			Version:      version,
+			Config:       cfg,
+			Certificates: CertbotCertificateRemover{Commands: commander},
 		},
 		repository: repository,
 	}, nil
@@ -357,6 +361,14 @@ func (service WebsiteService) PrepareDelete(ctx context.Context, subscriptionNam
 	if website.ID == 0 {
 		return plan.Plan{}, fmt.Errorf("website %q not found in subscription %q", primaryDomain, subscriptionName)
 	}
+	certificate, certificateErr := service.Store.CertificateByWebsite(ctx, website.ID)
+	hasCertificate := certificateErr == nil
+	if certificateErr != nil && !strings.Contains(certificateErr.Error(), "not found") {
+		return plan.Plan{}, certificateErr
+	}
+	if hasCertificate && service.Certificates == nil {
+		return plan.Plan{}, fmt.Errorf("certificate remover is required to delete TLS website %q", primaryDomain)
+	}
 	vhostPath := filepath.Join(service.Config.Apache.SitesAvailable, meta.FilePrefix+subscriptionName+"-"+primaryDomain+".conf")
 	enabledPath := filepath.Join(service.Config.Apache.SitesEnabled, filepath.Base(vhostPath))
 	var undoApache func(context.Context) error
@@ -364,12 +376,23 @@ func (service WebsiteService) PrepareDelete(ctx context.Context, subscriptionNam
 		var err error
 		undoApache, err = service.Apache.RemoveVHost(ctx, vhostPath, enabledPath)
 		return err
-	}, Undo: func(ctx context.Context) error { return undoApache(ctx) }}, {Name: "remove website from SQLite", Preview: "delete website and domains from SQLite; retain site data and logs", Do: func(ctx context.Context) error {
+	}, Undo: func(ctx context.Context) error { return undoApache(ctx) }}}
+	if hasCertificate {
+		steps = append(steps,
+			plan.Step{Name: "delete Certbot certificate", Preview: "certbot delete --cert-name " + certificate.Lineage, Do: func(ctx context.Context) error {
+				return service.Certificates.Delete(ctx, certificate.Lineage)
+			}},
+			plan.Step{Name: "delete certificate metadata", Preview: "delete certificate metadata from SQLite", Do: func(ctx context.Context) error {
+				return service.Store.DeleteCertificateByWebsite(ctx, website.ID)
+			}},
+		)
+	}
+	steps = append(steps, plan.Step{Name: "remove website from SQLite", Preview: "delete website and domains from SQLite; retain site data and logs", Do: func(ctx context.Context) error {
 		return service.Store.DeleteWebsite(ctx, website.ID)
 	}, Undo: func(ctx context.Context) error {
 		_, err := service.Store.CreateWebsite(ctx, website)
 		return err
-	}}}
+	}})
 	return plan.Plan{Action: "website.delete", Target: subscriptionName + "/" + primaryDomain, Steps: steps}, nil
 }
 

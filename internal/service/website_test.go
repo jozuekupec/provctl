@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -37,15 +38,32 @@ func (store websiteStore) SubscriptionByName(context.Context, string) (domain.Su
 func (websiteStore) DomainExists(context.Context, string) (bool, error)           { return false, nil }
 func (websiteStore) CreateWebsite(context.Context, domain.Website) (int64, error) { return 1, nil }
 func (websiteStore) DeleteWebsite(context.Context, int64) error                   { return nil }
-func (websiteStore) SetWebsiteEnabled(context.Context, int64, bool) error         { return nil }
-func (websiteStore) SetWebsiteSSL(context.Context, int64, bool, bool) error       { return nil }
-func (websiteStore) AddWebsiteAlias(context.Context, int64, string) error         { return nil }
-func (websiteStore) RemoveWebsiteAlias(context.Context, int64, string) error      { return nil }
+func (websiteStore) CertificateByWebsite(context.Context, int64) (domain.Certificate, error) {
+	return domain.Certificate{}, errors.New("certificate not found")
+}
+func (websiteStore) DeleteCertificateByWebsite(context.Context, int64) error { return nil }
+func (websiteStore) SetWebsiteEnabled(context.Context, int64, bool) error    { return nil }
+func (websiteStore) SetWebsiteSSL(context.Context, int64, bool, bool) error  { return nil }
+func (websiteStore) AddWebsiteAlias(context.Context, int64, string) error    { return nil }
+func (websiteStore) RemoveWebsiteAlias(context.Context, int64, string) error { return nil }
 func (store websiteStore) ListWebsites(context.Context, int64) ([]domain.Website, error) {
 	return store.websites, nil
 }
 
 type websiteApache struct{}
+
+type certificateWebsiteStore struct{ websiteStore }
+
+func (store certificateWebsiteStore) CertificateByWebsite(context.Context, int64) (domain.Certificate, error) {
+	return domain.Certificate{ID: 9, Lineage: "provctl-site-4"}, nil
+}
+
+type certificateRemover struct{ lineage string }
+
+func (remover *certificateRemover) Delete(_ context.Context, lineage string) error {
+	remover.lineage = lineage
+	return nil
+}
 
 func (websiteApache) Apply(context.Context, string, []byte) (func(context.Context) error, error) {
 	return func(context.Context) error { return nil }, nil
@@ -176,6 +194,21 @@ func TestWebsiteService_PrepareAliasBuildsReversiblePlan(t *testing.T) {
 	}
 	if got, want := len(operation.Steps), 2; got != want {
 		t.Errorf("plan steps = %d, want %d", got, want)
+	}
+}
+
+func TestWebsiteService_PrepareDeleteDeletesCertificateAfterVHost(t *testing.T) {
+	remover := &certificateRemover{}
+	service := WebsiteService{Store: certificateWebsiteStore{websiteStore: websiteStore{subscription: domain.Subscription{ID: 1, Name: "acme"}, websites: []domain.Website{{ID: 4, SubscriptionID: 1, Type: domain.WebsiteStatic, PrimaryDomain: "example.test"}}}}, Apache: websiteApache{}, Certificates: remover, Config: config.Config{Apache: config.Apache{SitesAvailable: "/etc/apache2/sites-available", SitesEnabled: "/etc/apache2/sites-enabled"}}}
+	operation, err := service.PrepareDelete(context.Background(), "acme", "example.test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := len(operation.Steps), 4; got != want {
+		t.Fatalf("steps = %d, want %d", got, want)
+	}
+	if got, want := operation.Steps[1].Name, "delete Certbot certificate"; got != want {
+		t.Errorf("second step = %q, want %q", got, want)
 	}
 }
 

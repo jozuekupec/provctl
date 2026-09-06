@@ -103,6 +103,26 @@ type CertificateService struct {
 	Audit    audit.Writer
 }
 
+type CertificateRemover interface {
+	Delete(context.Context, string) error
+}
+
+type CertbotCertificateRemover struct{ Commands system.Commander }
+
+func (remover CertbotCertificateRemover) Delete(ctx context.Context, lineage string) error {
+	if err := domain.ValidateCertificateLineage(lineage); err != nil {
+		return err
+	}
+	if remover.Commands == nil {
+		return errors.New("certificate removal requires commander")
+	}
+	result, err := remover.Commands.Run(ctx, "/usr/bin/certbot", "delete", "--non-interactive", "--cert-name", lineage)
+	if err != nil {
+		return commandError("delete certificate", result, err)
+	}
+	return nil
+}
+
 // SSLService coordinates the documented Certbot state machine. Certbot
 // issuance is intentionally irreversible; Apache and SQLite changes remain
 // rollback-capable around it.

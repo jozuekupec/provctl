@@ -142,6 +142,9 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   zapíše alias a cache SAN metadata. HTTP website alias zůstává žurnálovaný
   původní cestou. Zbývá Pebble E3 ověření obou směrů včetně skutečné podpory
   odebrání SAN v použité verzi Certbotu.
+  Při `website delete` se nyní nejprve odstraní a reloaduje Apache vhost, pak
+  se podle per-website metadata odstraní Certbot lineage a jeho cache a až
+  nakonec SQLite web; web bez vydaného certifikátu tuto větev nepoužije.
 - [~] **M7 — provoz:** první read-only část `health` je dostupná jako
   `provctl health [<subscription> [<domain>]]` v textu i přes `--json`.
   Kontroluje aktivní Apache, `apachectl configtest`, read-only SQLite spojení,
