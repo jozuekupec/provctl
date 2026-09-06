@@ -194,6 +194,9 @@ func (service SubscriptionService) PrepareDelete(ctx context.Context, name strin
 	if err != nil {
 		return plan.Plan{}, fmt.Errorf("list subscription websites: %w", err)
 	}
+	if len(websites) > 0 && service.Apache == nil {
+		return plan.Plan{}, errors.New("Apache vhost applier is required to delete subscription websites")
+	}
 	account, err := service.Users.Lookup(subscription.UnixUser)
 	if err != nil {
 		return plan.Plan{}, fmt.Errorf("look up subscription user %q: %w", subscription.UnixUser, err)
@@ -340,15 +343,17 @@ func (service SubscriptionService) deletePlan(subscription domain.Subscription, 
 		website := website
 		available := filepath.Join(service.Config.Apache.SitesAvailable, meta.FilePrefix+subscription.Name+"-"+website.PrimaryDomain+".conf")
 		enabled := filepath.Join(service.Config.Apache.SitesEnabled, filepath.Base(available))
+		var undoVHost func(context.Context) error
 		steps = append(steps,
-			plan.Step{Name: "remove generated Apache vhost", Preview: "remove " + available, Do: func(context.Context) error {
-				if err := service.FS.Remove(enabled); err != nil && !errors.Is(err, os.ErrNotExist) {
-					return err
+			plan.Step{Name: "remove generated Apache vhost", Preview: "remove " + available, Do: func(ctx context.Context) error {
+				var err error
+				undoVHost, err = service.Apache.RemoveVHost(ctx, available, enabled)
+				return err
+			}, Undo: func(ctx context.Context) error {
+				if undoVHost == nil {
+					return nil
 				}
-				if err := service.FS.Remove(available); err != nil && !errors.Is(err, os.ErrNotExist) {
-					return err
-				}
-				return nil
+				return undoVHost(ctx)
 			}},
 			plan.Step{Name: "delete website record", Preview: "delete website " + website.PrimaryDomain + " from SQLite", Do: func(ctx context.Context) error {
 				return service.Store.DeleteWebsite(ctx, website.ID)
