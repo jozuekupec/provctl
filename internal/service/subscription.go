@@ -30,6 +30,7 @@ type SubscriptionStore interface {
 	DeleteDatabase(context.Context, int64, string) error
 	ListWebsites(context.Context, int64) ([]domain.Website, error)
 	DeleteWebsite(context.Context, int64) error
+	ListCertificates(context.Context, int64) ([]domain.Certificate, error)
 	DeleteCertificatesBySubscription(context.Context, int64) error
 }
 
@@ -197,6 +198,13 @@ func (service SubscriptionService) PrepareDelete(ctx context.Context, name strin
 	if len(websites) > 0 && service.Apache == nil {
 		return plan.Plan{}, errors.New("Apache vhost applier is required to delete subscription websites")
 	}
+	certificates, err := service.Store.ListCertificates(ctx, subscription.ID)
+	if err != nil {
+		return plan.Plan{}, fmt.Errorf("list subscription certificates: %w", err)
+	}
+	if len(certificates) > 0 && service.Commands == nil {
+		return plan.Plan{}, errors.New("commander is required to delete subscription certificates")
+	}
 	account, err := service.Users.Lookup(subscription.UnixUser)
 	if err != nil {
 		return plan.Plan{}, fmt.Errorf("look up subscription user %q: %w", subscription.UnixUser, err)
@@ -204,7 +212,7 @@ func (service SubscriptionService) PrepareDelete(ctx context.Context, name strin
 	if account.Uid != strconv.Itoa(subscription.UnixUID) || filepath.Clean(account.HomeDir) != filepath.Clean(subscription.Home) {
 		return plan.Plan{}, fmt.Errorf("unix user %q does not match stored subscription identity", subscription.UnixUser)
 	}
-	return service.deletePlan(subscription, databases, websites), nil
+	return service.deletePlan(subscription, databases, websites, certificates), nil
 }
 
 func (service SubscriptionService) validateDeletionTarget(subscription domain.Subscription) error {
@@ -337,7 +345,7 @@ func (service SubscriptionService) createPlan(subscription domain.Subscription) 
 	return plan.Plan{Action: "subscription.create", Target: subscription.Name, Steps: steps}
 }
 
-func (service SubscriptionService) deletePlan(subscription domain.Subscription, databases []domain.Database, websites []domain.Website) plan.Plan {
+func (service SubscriptionService) deletePlan(subscription domain.Subscription, databases []domain.Database, websites []domain.Website, certificates []domain.Certificate) plan.Plan {
 	steps := make([]plan.Step, 0, len(databases)*2+len(websites)*3+5)
 	for _, website := range websites {
 		website := website
@@ -371,6 +379,12 @@ func (service SubscriptionService) deletePlan(subscription domain.Subscription, 
 				return service.Store.DeleteDatabase(ctx, subscription.ID, database.Name)
 			}},
 		)
+	}
+	for _, certificate := range certificates {
+		certificate := certificate
+		steps = append(steps, plan.Step{Name: "delete Certbot certificate", Preview: "certbot delete --cert-name " + certificate.Lineage, Do: func(ctx context.Context) error {
+			return (CertbotCertificateRemover{Commands: service.Commands}).Delete(ctx, certificate.Lineage)
+		}})
 	}
 	steps = append(steps,
 		plan.Step{Name: "delete certificate metadata", Preview: "delete certificate metadata from SQLite", Do: func(ctx context.Context) error {

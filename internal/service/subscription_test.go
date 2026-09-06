@@ -162,6 +162,9 @@ func (*subscriptionStore) ListWebsites(context.Context, int64) ([]domain.Website
 	return nil, nil
 }
 func (*subscriptionStore) DeleteWebsite(context.Context, int64) error { return nil }
+func (*subscriptionStore) ListCertificates(context.Context, int64) ([]domain.Certificate, error) {
+	return nil, nil
+}
 func (*subscriptionStore) DeleteCertificatesBySubscription(context.Context, int64) error {
 	return nil
 }
