@@ -296,8 +296,9 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   `dpkg -i` včetně `postinst` a následný purge zachoval `/var/www/vhosts`.
   CI nyní spouští `lintian` i `piuparts` proti Debianu trixie; první vzdálený
   běh ještě musí potvrdit. Tag `vX.Y.Z` spouští release workflow, který vytvoří
-  `.deb` s verzí `X.Y.Z` a připojí jej ke GitHub Release. Zbývá upgrade
-  ověření a stateless APT repozitář.
+  `.deb` s verzí `X.Y.Z` a připojí jej ke GitHub Release. V `pv` úspěšně
+  proběhl upgrade `0.0.1~local → 0.0.2~local` přes `dpkg -i`; kontejner byl
+  obnoven na `clean`. Zbývá stateless APT repozitář.
 - [~] **M10 — migrace:** návrh bezpečného `subscription adopt` je v
   [subscription-adopt-design.md](subscription-adopt-design.md). Určuje jednu
   žurnálovanou operaci, přesný cíl document rootu, defaultní atomický přesun,
