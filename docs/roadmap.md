@@ -145,6 +145,10 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   Při `website delete` se nyní nejprve odstraní a reloaduje Apache vhost, pak
   se podle per-website metadata odstraní Certbot lineage a jeho cache a až
   nakonec SQLite web; web bez vydaného certifikátu tuto větev nepoužije.
+  Permanentní `subscription delete` stejnou posloupnost rozšiřuje na všechny
+  vhosty a certificate lineages: každý vhost je odstraněn přes Apache applier
+  s configtestem a reloadem, Certbot lineages následují před smazáním SQLite
+  certificate metadata.
 - [~] **M7 — provoz:** první read-only část `health` je dostupná jako
   `provctl health [<subscription> [<domain>]]` v textu i přes `--json`.
   Kontroluje aktivní Apache, `apachectl configtest`, read-only SQLite spojení,
