@@ -10,7 +10,23 @@ System configuration is generated from the database; it is not the source of tru
 
 ## Current status
 
-The foundation, operation executor, durable journal, lock, rollback, and the first subscription operation are in place. `subscription create` creates the Unix account, isolated directory layout, and final SQLite record; website and PHP-FPM lifecycle commands are not available yet.
+The implementation status and outstanding work are tracked in
+[the roadmap](docs/roadmap.md). The command-line interface and read-mostly TUI
+are both available.
+
+## Terminal UI
+
+Running `provctl` without a subcommand starts the terminal UI:
+
+```bash
+sudo provctl
+```
+
+The UI reads the same `/etc/provctl/config.toml` and SQLite state as the CLI.
+On a fresh server, install the package and run `sudo provctl bootstrap` first;
+in an uninitialized development checkout, the missing configuration error is
+expected. Use explicit subcommands for non-interactive administration, for
+example `sudo provctl subscription list`.
 
 ## Local development
 

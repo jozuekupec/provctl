@@ -8,3 +8,10 @@ func TestNewRootCommand_SilencesCobraErrors(t *testing.T) {
 		t.Error("SilenceErrors = false, want true because main prints command errors")
 	}
 }
+
+func TestNewRootCommand_DefaultActionStartsTUI(t *testing.T) {
+	command := NewRootCommand()
+	if command.RunE == nil {
+		t.Fatal("root command has no default action; want the TUI launcher")
+	}
+}
