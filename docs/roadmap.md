@@ -319,6 +319,11 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   nejnovější verzi evidovanou standardním nastavením `reprepro`.
   Zbývá napojení na úplné stažení GitHub Releases, Pages workflow a test
   skutečného APT klienta; produkční podpis dosud nebyl ověřen.
+  Workflow nyní navazuje na release stateless stažením všech publikovaných
+  `.deb`, podpisem a Pages deploymentem. Downloader stránkuje releases i
+  assets, vynechává drafts, řadí prereleases do testing a selže při kolizi
+  názvu či neúplném stažení. Tři offline Python testy prošly (stránkování,
+  routování a nebezpečné názvy). Vzdálené spuštění a APT klient zatím zbývají.
 - [~] **M10 — migrace:** návrh bezpečného `subscription adopt` je v
   [subscription-adopt-design.md](subscription-adopt-design.md). Určuje jednu
   žurnálovanou operaci, přesný cíl document rootu, defaultní atomický přesun,

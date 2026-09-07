@@ -19,6 +19,7 @@ jobs:
           check-latest: true
       - run: go mod tidy
       - run: go vet ./...
+      - run: python3 -m unittest discover -s scripts -p 'test_*.py'
       - run: go install honnef.co/go/tools/cmd/staticcheck@latest
       - run: staticcheck ./...
       - run: go test ./... -race -count=1

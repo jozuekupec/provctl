@@ -5,7 +5,7 @@ on:
     tags: ['v*']
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   debian:
@@ -34,6 +34,8 @@ jobs:
   release:
     needs: debian
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/download-artifact@v4
         with:
@@ -47,3 +49,43 @@ jobs:
           prerelease: ${{ contains(github.ref_name, 'rc') }}
           fail_on_unmatched_files: true
           files: dist/*.deb
+
+  publish-apt:
+    needs: release
+    runs-on: ubuntu-latest
+    concurrency:
+      group: apt-pages
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install APT tooling
+        run: sudo apt-get update && sudo apt-get install -y apt-utils
+      - name: Download all published packages
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/download-release-debs.py "$GITHUB_REPOSITORY" incoming
+      - name: Build signed APT repository
+        env:
+          APT_GPG_PRIVATE_KEY: ${{ secrets.APT_GPG_PRIVATE_KEY }}
+          APT_GPG_PASSPHRASE: ${{ secrets.APT_GPG_PASSPHRASE }}
+        run: |
+          export GNUPGHOME="$(mktemp -d)"
+          trap 'gpgconf --kill gpg-agent' EXIT
+          printf '%s\n' "$APT_GPG_PRIVATE_KEY" | gpg --batch --import
+          unset APT_GPG_PRIVATE_KEY
+          export APT_SIGNING_FPR="$(sed -n 's/^SignWith: \([A-F0-9]*\)!$/\1/p' packaging/apt/distributions | sort -u)"
+          sh scripts/build-apt-repo.sh incoming out
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: out
+      - name: Deploy APT repository
+        id: deployment
+        uses: actions/deploy-pages@v4
