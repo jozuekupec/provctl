@@ -299,6 +299,18 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   `.deb` s verzí `X.Y.Z` a připojí jej ke GitHub Release. V `pv` úspěšně
   proběhl upgrade `0.0.1~local → 0.0.2~local` přes `dpkg -i`; kontejner byl
   obnoven na `clean`. Zbývá stateless APT repozitář.
+  Uživatel potvrdil vytvoření GitHub signing secrets; veřejný export je v
+  `packaging/apt/provctl.asc`. Replikovatelný postup vytvoření klíčů, nastavení
+  secrets, zálohy do trezoru a ověření obnovy je v
+  [apt-signing-keys.md](apt-signing-keys.md). Skutečný podpis v CI a obnova
+  ze zálohy zatím nejsou ověřeny.
+  Release build nyní používá matici `amd64`/`arm64` a publikuje společný
+  release až po sestavení obou balíčků. Opraveno předávání `GOOS=linux` a
+  `GOARCH` do kompilátoru (dříve `ARCH` měnilo jen metadata balíčku).
+  Lokálně sestaveny oba `.deb` verze `0.0.3~local`; `file` potvrdil AArch64
+  a x86-64 binárky. Doplněna konfigurace APT kanálů se skutečným signing
+  fingerprintem a podrobnější anglický popis balíčku. Samotné sestavení
+  a publikace APT indexů zůstávají rozpracované.
 - [~] **M10 — migrace:** návrh bezpečného `subscription adopt` je v
   [subscription-adopt-design.md](subscription-adopt-design.md). Určuje jednu
   žurnálovanou operaci, přesný cíl document rootu, defaultní atomický přesun,

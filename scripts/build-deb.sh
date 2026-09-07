@@ -10,5 +10,5 @@ case "$arch" in
 esac
 
 mkdir -p dist
-CGO_ENABLED=0 go build -trimpath -ldflags "-X provctl/internal/meta.Version=$version" -o dist/provctl ./cmd/provctl
+GOOS=linux GOARCH=$arch CGO_ENABLED=0 go build -trimpath -ldflags "-X provctl/internal/meta.Version=$version" -o dist/provctl ./cmd/provctl
 VERSION=$version ARCH=$arch nfpm package --config packaging/nfpm.yaml --packager deb --target dist

@@ -4,6 +4,8 @@
 
 The binding design is [the project specification](docs/project-specification.md). Test environments and acceptance scenarios are in [the testing cookbook](docs/testing-cookbook.md).
 
+Maintainers: [APT signing-key setup, vault backup, and recovery](docs/apt-signing-keys.md).
+
 ## Safety model
 
 System configuration is generated from the database; it is not the source of truth. Mutating operations are planned, journaled, locked, and rolled back on failure. Commands use explicit arguments through a restricted system abstraction—never a shell. Do not run unfinished mutating commands as root on a workstation.

@@ -1,0 +1,15 @@
+Origin: provctl
+Label: provctl
+Codename: stable
+Architectures: amd64 arm64
+Components: main
+Description: provctl web hosting management for Debian - stable releases
+SignWith: B7B280D4D1213EC9EE782940B4A47B2231020B84!
+
+Origin: provctl
+Label: provctl
+Codename: testing
+Architectures: amd64 arm64
+Components: main
+Description: provctl web hosting management for Debian - release candidates
+SignWith: B7B280D4D1213EC9EE782940B4A47B2231020B84!

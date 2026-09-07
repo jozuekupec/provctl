@@ -6,7 +6,12 @@ section: admin
 priority: optional
 maintainer: Jozue Kupec <jozuekupec80@gmail.com>
 description: |
-  Minimal hosting control-plane for Debian with Apache, PHP-FPM, MariaDB, and SSL.
+  Web hosting management for Debian servers.
+  Manage hosting subscriptions, Apache websites, PHP-FPM versions, MariaDB
+  databases, TLS certificates, backups, scheduled jobs, and SSH access through
+  a command-line interface and an interactive terminal dashboard.
+  Generate server configuration from managed state with operation journaling,
+  health checks, and rollback support.
 homepage: https://github.com/jozuekupec/provctl
 license: MIT
 
