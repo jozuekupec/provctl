@@ -311,6 +311,14 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   a x86-64 binárky. Doplněna konfigurace APT kanálů se skutečným signing
   fingerprintem a podrobnější anglický popis balíčku. Samotné sestavení
   a publikace APT indexů zůstávají rozpracované.
+  Skript `scripts/build-apt-repo.sh` vytváří oba kanály a architekturní
+  indexy, podepisuje `InRelease` i `Release.gpg` a ověřuje je přes `gpgv`
+  distribuovaným veřejným klíčem. Izolovaný lokální test s dočasným klíčem
+  prošel pro amd64/arm64 i prázdný testing kanál. Oproti ukázce ve specifikaci
+  používá `apt-ftparchive`, aby indexoval všechny historické verze, nejen
+  nejnovější verzi evidovanou standardním nastavením `reprepro`.
+  Zbývá napojení na úplné stažení GitHub Releases, Pages workflow a test
+  skutečného APT klienta; produkční podpis dosud nebyl ověřen.
 - [~] **M10 — migrace:** návrh bezpečného `subscription adopt` je v
   [subscription-adopt-design.md](subscription-adopt-design.md). Určuje jednu
   žurnálovanou operaci, přesný cíl document rootu, defaultní atomický přesun,
