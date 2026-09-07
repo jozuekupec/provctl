@@ -157,6 +157,42 @@ func TestRepository_WebsiteCertificateNameUsesStableWebsiteID(t *testing.T) {
 	}
 }
 
+func TestRepository_PreservesAdoptedCertificateLineage(t *testing.T) {
+	repository, err := Open(context.Background(), filepath.Join(t.TempDir(), "provctl.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer repository.Close()
+	ctx := context.Background()
+	if err := repository.CreateSubscription(ctx, domain.Subscription{Name: "acme", UnixUser: "acme", UnixUID: 5000, Home: "/vhosts/acme", PHPMaxChildren: 10, PHPMemoryLimit: "256M", PHPUploadMax: "64M", PHPMaxExecTime: 60, SSHAccess: "none"}); err != nil {
+		t.Fatal(err)
+	}
+	subscription, err := repository.SubscriptionByName(ctx, "acme")
+	if err != nil {
+		t.Fatal(err)
+	}
+	website := domain.Website{SubscriptionID: subscription.ID, Type: domain.WebsiteStatic, PrimaryDomain: "example.test", Enabled: true, CertificateName: "legacy.example.test-0001"}
+	if _, err := repository.CreateWebsite(ctx, website); err != nil {
+		t.Fatal(err)
+	}
+	name, err := repository.WebsiteCertificateName(ctx, "acme", "example.test")
+	if err != nil || name != website.CertificateName {
+		t.Fatalf("resolved lineage = %q, %v", name, err)
+	}
+	websites, err := repository.ListWebsites(ctx, subscription.ID)
+	if err != nil || len(websites) != 1 || websites[0].CertificateName != name {
+		t.Fatalf("listed websites = %#v, %v", websites, err)
+	}
+	website.PrimaryDomain = "other.test"
+	if _, err := repository.CreateWebsite(ctx, website); err == nil {
+		t.Fatal("shared lineage unexpectedly accepted")
+	}
+	website.CertificateName = "../escape"
+	if _, err := repository.CreateWebsite(ctx, website); err == nil {
+		t.Fatal("unsafe lineage unexpectedly accepted")
+	}
+}
+
 func TestRepository_UpdatePHPSettingsMirrorsPHPFPMWebsites(t *testing.T) {
 	repository, err := Open(context.Background(), filepath.Join(t.TempDir(), "provctl.db"))
 	if err != nil {

@@ -21,6 +21,21 @@ renames fail with an actionable message rather than silently copying data.
 
 ## Plan order
 
+### Accepted TLS identity decision
+
+Adoption preserves the existing Certbot lineage instead of issuing a new
+certificate. `Website.CertificateName` is the persistent website-to-lineage
+mapping: ordinary creation defaults to `provctl-site-<id>`, while adoption
+may supply the validated original name. This uses the existing column and
+unique constraint; a lineage cannot silently become owned by two websites.
+Live certificate files remain authoritative for SANs and expiry.
+
+Repository persistence supports this mapping. Adoption wiring, certificate
+validation, TLS activation, certificate metadata, and renewal rollback are
+still required before this decision is fully implemented.
+
+### Execution
+
 1. Inspect source, destination, Unix identity, database/domain conflicts, and
    matching Certbot renewal lineages. Present all of these in dry-run output.
 2. Create a recoverable backup of the source when backup is enabled (default).

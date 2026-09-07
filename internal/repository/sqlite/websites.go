@@ -85,6 +85,11 @@ func (repository *Repository) websiteAliases(ctx context.Context, websiteID int6
 }
 
 func (repository *Repository) CreateWebsite(ctx context.Context, website domain.Website) (int64, error) {
+	if website.CertificateName != "" {
+		if err := domain.ValidateCertificateName(website.CertificateName); err != nil {
+			return 0, err
+		}
+	}
 	transaction, err := repository.DB.BeginTx(ctx, nil)
 	if err != nil {
 		return 0, fmt.Errorf("begin website insert: %w", err)
@@ -99,7 +104,10 @@ func (repository *Repository) CreateWebsite(ctx context.Context, website domain.
 	if err != nil {
 		return 0, fmt.Errorf("read website ID: %w", err)
 	}
-	certificateName := "provctl-site-" + fmt.Sprint(websiteID)
+	certificateName := website.CertificateName
+	if certificateName == "" {
+		certificateName = "provctl-site-" + fmt.Sprint(websiteID)
+	}
 	if _, err := transaction.ExecContext(ctx, `UPDATE websites SET certificate_name = ? WHERE id = ?`, certificateName, websiteID); err != nil {
 		return 0, fmt.Errorf("set website certificate name: %w", err)
 	}

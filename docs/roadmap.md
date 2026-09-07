@@ -334,7 +334,17 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   verze binárky a čtení databáze přes `subscription list`; kontejner obnoven
   na `clean` a potvrzen stav RUNNING. Jde o lokální testovací klíč a file
   transport, nikoli důkaz produkčního podpisu nebo dostupnosti GitHub Pages.
-- [~] **M10 — migrace:** návrh bezpečného `subscription adopt` je v
+- [~] **M10 — migrace:**
+  Schválené zachování původního Certbot lineage má podporu v repository:
+  `CreateWebsite` zachová validovaný explicitní `CertificateName`, pro nové
+  weby zůstává default `provctl-site-<id>`. Test pokrývá round-trip přes
+  resolver i seznam, konflikt sdíleného lineage a odmítnutí nebezpečné cesty.
+  Napojení adopce na zachování TLS zůstává rozpracované. Návrh je v
+  Doménová validace nyní rozlišuje bezpečný původní název od existujícího
+  guardu pro mazání `provctl-*` certifikátů. Testy domain, SQLite i service
+  s race detektorem prošly. Zachování názvu samo o sobě ještě neaktivuje TLS;
+  zbývá certifikát ověřit, převzít metadata a vyřešit jeho životní cyklus.
+  Návrh je v
   [subscription-adopt-design.md](subscription-adopt-design.md). Určuje jednu
   žurnálovanou operaci, přesný cíl document rootu, defaultní atomický přesun,
   volitelnou kopii, rollback hranice a povinné převzetí renewal lineage.
