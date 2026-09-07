@@ -329,6 +329,11 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   `0.0.3~local`. Instalace přes APT v `pv` zatím zbývá. Review doplnilo
   testovací gate před release build a sjednotilo Go ve workflow podle
   `go.mod` (1.24 místo zastaralého 1.22).
+  V `pv` následně prošlo `apt-get update` i instalace `provctl=0.0.3~local`
+  z lokálního podepsaného repozitáře s explicitním `Signed-By`. Ověřena
+  verze binárky a čtení databáze přes `subscription list`; kontejner obnoven
+  na `clean` a potvrzen stav RUNNING. Jde o lokální testovací klíč a file
+  transport, nikoli důkaz produkčního podpisu nebo dostupnosti GitHub Pages.
 - [~] **M10 — migrace:** návrh bezpečného `subscription adopt` je v
   [subscription-adopt-design.md](subscription-adopt-design.md). Určuje jednu
   žurnálovanou operaci, přesný cíl document rootu, defaultní atomický přesun,

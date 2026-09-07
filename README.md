@@ -30,6 +30,33 @@ in an uninitialized development checkout, the missing configuration error is
 expected. Use explicit subcommands for non-interactive administration, for
 example `sudo provctl subscription list`.
 
+## Install from the APT repository
+
+The following endpoint is the planned release destination; its first public
+deployment is still pending verification. Once published, install on your
+Debian hosting server using:
+
+```bash
+curl -fsSLo /tmp/provctl.asc https://jozuekupec.github.io/provctl/debian/provctl.asc
+gpg --show-keys --with-fingerprint /tmp/provctl.asc
+```
+
+Check the primary fingerprint against the maintainer-provided value:
+`578A5B0F5AABFB5851803D05FE92B73E4B3967C4`.
+
+```bash
+sudo install -d -m 0755 /etc/apt/keyrings
+sudo gpg --dearmor --output /etc/apt/keyrings/provctl.gpg /tmp/provctl.asc
+echo 'deb [signed-by=/etc/apt/keyrings/provctl.gpg] https://jozuekupec.github.io/provctl/debian stable main' | sudo tee /etc/apt/sources.list.d/provctl.list
+sudo apt update
+sudo apt install provctl
+sudo provctl doctor
+sudo provctl bootstrap
+```
+
+Use `testing` instead of `stable` for release candidates. Public repository
+configuration never requires the private signing key or its passphrase.
+
 ## Local development
 
 Go 1.22+ is required. These commands do not require root or Debian services:
