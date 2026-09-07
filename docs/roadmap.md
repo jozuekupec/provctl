@@ -324,6 +324,11 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   assets, vynechává drafts, řadí prereleases do testing a selže při kolizi
   názvu či neúplném stažení. Tři offline Python testy prošly (stránkování,
   routování a nebezpečné názvy). Vzdálené spuštění a APT klient zatím zbývají.
+  Následný lokální `apt-get update` s oddělenými seznamy přijal podepsané
+  indexy obou kanálů a `apt-cache policy provctl` našel kandidáta
+  `0.0.3~local`. Instalace přes APT v `pv` zatím zbývá. Review doplnilo
+  testovací gate před release build a sjednotilo Go ve workflow podle
+  `go.mod` (1.24 místo zastaralého 1.22).
 - [~] **M10 — migrace:** návrh bezpečného `subscription adopt` je v
   [subscription-adopt-design.md](subscription-adopt-design.md). Určuje jednu
   žurnálovanou operaci, přesný cíl document rootu, defaultní atomický přesun,
