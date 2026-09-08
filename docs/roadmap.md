@@ -335,6 +335,10 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   na `clean` a potvrzen stav RUNNING. Jde o lokální testovací klíč a file
   transport, nikoli důkaz produkčního podpisu nebo dostupnosti GitHub Pages.
 - [~] **M10 — migrace:**
+  Před adopcí se kontroluje aktivní konfigurace přes `apache2ctl -S` včetně
+  aliasů a wildcardů. Kolize vyžaduje explicitní vypnutí původního vhostu;
+  cizí konfiguraci nástroj automaticky nepřepisuje. Parser pokrývá jednotlivý
+  vhost i name-based výpis; reálný výpis je nutné ověřit v integračním testu.
   SAN převzatého certifikátu se přenášejí jako aliasy webu do Apache i DB.
   Před změnami se ověřují doménová pravidla a konflikt s již spravovanými
   doménami; wildcard není v této HTTP-01 adopci podporován. Service race

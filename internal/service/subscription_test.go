@@ -458,7 +458,7 @@ func TestSubscriptionService_AdoptMovesDataAndRecordsWebsite(t *testing.T) {
 	if !users.created || len(store.websites) != 1 || store.websites[0].SubscriptionID == 0 {
 		t.Errorf("adopted state: user=%t websites=%#v", users.created, store.websites)
 	}
-	if len(commands.Calls) != 1 || commands.Calls[0].Name != "/usr/bin/chown" {
+	if len(commands.Calls) != 2 || commands.Calls[0].Name != "/usr/sbin/apache2ctl" || commands.Calls[1].Name != "/usr/bin/chown" {
 		t.Errorf("ownership command = %#v", commands.Calls)
 	}
 }

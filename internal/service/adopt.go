@@ -293,7 +293,46 @@ func (service SubscriptionService) PrepareAdopt(ctx context.Context, name string
 			}
 		}
 	}
+	if service.Commands == nil {
+		return plan.Plan{}, errors.New("adoption requires Apache configuration inspection")
+	}
+	result, err := service.Commands.Run(ctx, "/usr/sbin/apache2ctl", "-S")
+	if err != nil {
+		return plan.Plan{}, commandError("inspect existing Apache virtual hosts", result, err)
+	}
+	names := []string{options.Domain}
+	if len(renewals) == 1 {
+		names = append(names, renewals[0].Domains...)
+	}
+	if err := checkAdoptionVHostConflicts(result.Stdout+"\n"+result.Stderr, names); err != nil {
+		return plan.Plan{}, err
+	}
 	return service.adoptPlan(store, renewalManager, subscription, options, source, siteRoot, documentRoot, renewals), nil
+}
+
+func checkAdoptionVHostConflicts(dump string, domains []string) error {
+	for _, line := range strings.Split(dump, "\n") {
+		fields := strings.Fields(line)
+		if len(fields) >= 3 && strings.Contains(fields[0], ":") && strings.HasPrefix(fields[2], "(") {
+			fields = append([]string{"namevhost"}, fields[1:]...)
+		}
+		for index, field := range fields {
+			if field != "namevhost" && field != "alias" && !(field == "server" && index > 0 && fields[index-1] == "default") {
+				continue
+			}
+			if index+1 >= len(fields) {
+				continue
+			}
+			pattern := strings.ToLower(fields[index+1])
+			for _, name := range domains {
+				matched, _ := filepath.Match(pattern, name)
+				if matched {
+					return fmt.Errorf("domain %q is already served by Apache (%s); disable the legacy vhost explicitly before adoption", name, strings.TrimSpace(line))
+				}
+			}
+		}
+	}
+	return nil
 }
 
 func pathWithin(root, path string) bool {
