@@ -362,6 +362,11 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   --keep-until-expiring`, které mohlo vydat nový živý certifikát. Regresní
   test ověřuje přesné argumenty bez změny SAN; service race testy prošly.
   Reálná ACME testovací obnova a rollback renewal konfigurace ještě zbývají.
+  Rollback nyní zachycuje původní renewal soubor a jeho oprávnění před
+  reconfigure. Obnovuje jej při selhání příkazu i při rollbacku po selhání
+  následného dry-run. Test ověřuje obnovu obsahu/oprávnění a zapojení do
+  chybové cesty adopce. Záloha je zatím v paměti probíhající operace,
+  ne trvalá ochrana proti pádu procesu; tato část recovery zbývá.
   Návrh je v
   [subscription-adopt-design.md](subscription-adopt-design.md). Určuje jednu
   žurnálovanou operaci, přesný cíl document rootu, defaultní atomický přesun,

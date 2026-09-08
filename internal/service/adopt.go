@@ -126,6 +126,23 @@ func (manager CertbotRenewals) Verify(ctx context.Context, lineage string) error
 	return nil
 }
 
+// Snapshot preserves the Certbot-owned configuration for operation rollback.
+func (manager CertbotRenewals) Snapshot(_ context.Context, lineage string) (func(context.Context) error, error) {
+	if err := domain.ValidateCertificateName(lineage); err != nil {
+		return nil, err
+	}
+	path := filepath.Join(manager.directory(), lineage+".conf")
+	info, err := manager.FS.Stat(path)
+	if err != nil {
+		return nil, fmt.Errorf("inspect renewal configuration: %w", err)
+	}
+	contents, err := manager.FS.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("snapshot renewal configuration: %w", err)
+	}
+	return func(context.Context) error { return manager.FS.WriteFileAtomic(path, contents, info.Mode().Perm()) }, nil
+}
+
 func (manager CertbotRenewals) directory() string {
 	if manager.Directory != "" {
 		return manager.Directory
@@ -369,8 +386,29 @@ func (service SubscriptionService) adoptPlan(store subscriptionAdoptStore, renew
 			_, err := certificateStore.CreateCertificate(ctx, domain.Certificate{SubscriptionID: subscription.ID, WebsiteID: website.ID, Lineage: lineage.Name, PrimaryDomain: options.Domain, SANs: lineage.Domains, Issuer: lineage.Issuer, NotBefore: lineage.NotBefore, NotAfter: lineage.NotAfter, LastCheckedAt: time.Now().UTC()})
 			return err
 		}, Undo: func(ctx context.Context) error { return certificateStore.DeleteCertificateByWebsite(ctx, website.ID) }})
+		var restoreRenewal func(context.Context) error
 		steps = append(steps, plan.Step{Name: "reconfigure certificate renewal " + lineage.Name, Preview: "certbot reconfigure --cert-name " + lineage.Name, Do: func(ctx context.Context) error {
-			return renewalManager.Reconfigure(ctx, lineage, service.Config.Paths.ACMEChallenge)
+			if recovery, ok := renewalManager.(interface {
+				Snapshot(context.Context, string) (func(context.Context) error, error)
+			}); ok {
+				var err error
+				restoreRenewal, err = recovery.Snapshot(ctx, lineage.Name)
+				if err != nil {
+					return err
+				}
+			}
+			if err := renewalManager.Reconfigure(ctx, lineage, service.Config.Paths.ACMEChallenge); err != nil {
+				if restoreRenewal != nil {
+					return errors.Join(err, restoreRenewal(context.Background()))
+				}
+				return err
+			}
+			return nil
+		}, Undo: func(ctx context.Context) error {
+			if restoreRenewal != nil {
+				return restoreRenewal(ctx)
+			}
+			return nil
 		}})
 		steps = append(steps, plan.Step{Name: "verify certificate renewal " + lineage.Name, Preview: "certbot renew --cert-name " + lineage.Name + " --dry-run", Do: func(ctx context.Context) error { return renewalManager.Verify(ctx, lineage.Name) }})
 	}

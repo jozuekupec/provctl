@@ -191,6 +191,11 @@ type subscriptionRenewals struct {
 	lineages     []RenewalLineage
 	reconfigured []string
 	verifyErr    error
+	restored     bool
+}
+
+func (renewals *subscriptionRenewals) Snapshot(context.Context, string) (func(context.Context) error, error) {
+	return func(context.Context) error { renewals.restored = true; return nil }, nil
 }
 
 func (renewals *subscriptionRenewals) Find(context.Context, string) ([]RenewalLineage, error) {
@@ -478,6 +483,9 @@ func TestSubscriptionService_AdoptMarksRenewalFailureInconsistent(t *testing.T) 
 	}
 	if !cmp.Equal(renewals.reconfigured, []string{"legacy"}) {
 		t.Errorf("reconfigured lineages = %#v", renewals.reconfigured)
+	}
+	if !renewals.restored {
+		t.Error("renewal verification failure did not restore original configuration")
 	}
 }
 

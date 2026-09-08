@@ -29,6 +29,37 @@ func TestCertbotRenewals_ReconfigurePreservesLiveCertificate(t *testing.T) {
 	}
 }
 
+func TestCertbotRenewals_SnapshotRestoresContentsAndMode(t *testing.T) {
+	directory := t.TempDir()
+	path := filepath.Join(directory, "legacy.conf")
+	original := []byte("# original options\nauthenticator = apache\n")
+	if err := os.WriteFile(path, original, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	manager := CertbotRenewals{FS: system.OSFS{}, Directory: directory}
+	restore, err := manager.Snapshot(context.Background(), "legacy")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte("authenticator = webroot\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(path, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := restore(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	contents, err := os.ReadFile(path)
+	if err != nil || string(contents) != string(original) {
+		t.Fatalf("restored contents = %q, %v", contents, err)
+	}
+	info, err := os.Stat(path)
+	if err != nil || info.Mode().Perm() != 0o600 {
+		t.Fatalf("restored mode: %v, %v", info, err)
+	}
+}
+
 func TestCertbotRenewals_FindUsesLiveCertificateSANs(t *testing.T) {
 	root := t.TempDir()
 	renewal, live := filepath.Join(root, "renewal"), filepath.Join(root, "live")
