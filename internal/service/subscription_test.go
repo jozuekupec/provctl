@@ -150,6 +150,11 @@ func (store *subscriptionStore) CreateCertificate(_ context.Context, certificate
 func (store *subscriptionStore) DeleteCertificateByWebsite(context.Context, int64) error {
 	return nil
 }
+
+func (store *subscriptionStore) AddWebsiteAlias(_ context.Context, _ int64, alias string) error {
+	store.domains[alias] = true
+	return nil
+}
 func (store *subscriptionStore) DeleteSubscription(_ context.Context, name string) error {
 	delete(store.values, name)
 	return nil
@@ -494,7 +499,7 @@ func TestSubscriptionService_AdoptPreservesTLSLineage(t *testing.T) {
 	store := &subscriptionStore{values: map[string]domain.Subscription{}, domains: map[string]bool{}}
 	service := newSubscriptionService(fs, &subscriptionUsers{}, store, &subscriptionJournal{})
 	service.Commands, service.Apache, service.PHPFPM, service.PHPVersion = &fake.Commander{}, websiteApache{}, websitePHPFPM{}, "8.4"
-	service.Renewals = &subscriptionRenewals{lineages: []RenewalLineage{{Name: "example.test-0001", Domains: []string{"example.test"}}}}
+	service.Renewals = &subscriptionRenewals{lineages: []RenewalLineage{{Name: "example.test-0001", Domains: []string{"example.test", "www.example.test"}}}}
 	if _, err := service.Adopt(context.Background(), "acme", SubscriptionAdoptOptions{Source: "/legacy/example.test", Domain: "example.test"}); err != nil {
 		t.Fatal(err)
 	}
@@ -503,6 +508,9 @@ func TestSubscriptionService_AdoptPreservesTLSLineage(t *testing.T) {
 	}
 	if len(store.certificates) != 1 || store.certificates[0].WebsiteID != store.websites[0].ID || store.certificates[0].Lineage != "example.test-0001" {
 		t.Fatalf("adopted certificate: %#v", store.certificates)
+	}
+	if !store.domains["www.example.test"] || !cmp.Equal(store.websites[0].Aliases, []string{"www.example.test"}) {
+		t.Fatal("certificate SAN alias was not adopted")
 	}
 }
 

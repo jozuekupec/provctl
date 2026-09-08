@@ -335,6 +335,11 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   na `clean` a potvrzen stav RUNNING. Jde o lokální testovací klíč a file
   transport, nikoli důkaz produkčního podpisu nebo dostupnosti GitHub Pages.
 - [~] **M10 — migrace:**
+  SAN převzatého certifikátu se přenášejí jako aliasy webu do Apache i DB.
+  Před změnami se ověřují doménová pravidla a konflikt s již spravovanými
+  doménami; wildcard není v této HTTP-01 adopci podporován. Service race
+  test ověřuje zachování aliasu. Kontrola nespravovaných Apache vhostů
+  a skutečný integrační průchod stále zbývají.
   Schválené zachování původního Certbot lineage má podporu v repository:
   `CreateWebsite` zachová validovaný explicitní `CertificateName`, pro nové
   weby zůstává default `provctl-site-<id>`. Test pokrývá round-trip přes

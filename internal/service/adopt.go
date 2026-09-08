@@ -191,6 +191,7 @@ type subscriptionAdoptStore interface {
 	SubscriptionStore
 	DomainExists(context.Context, string) (bool, error)
 	CreateWebsite(context.Context, domain.Website) (int64, error)
+	AddWebsiteAlias(context.Context, int64, string) error
 }
 
 type adoptionCertificateStore interface {
@@ -276,6 +277,21 @@ func (service SubscriptionService) PrepareAdopt(ctx context.Context, name string
 		if _, ok := store.(adoptionCertificateStore); !ok {
 			return plan.Plan{}, errors.New("TLS adoption requires certificate metadata storage")
 		}
+		for _, alias := range renewals[0].Domains {
+			if alias == options.Domain {
+				continue
+			}
+			if err := domain.ValidateDomain(alias); err != nil {
+				return plan.Plan{}, fmt.Errorf("cannot adopt certificate alias: %w", err)
+			}
+			exists, err := store.DomainExists(ctx, alias)
+			if err != nil {
+				return plan.Plan{}, err
+			}
+			if exists {
+				return plan.Plan{}, fmt.Errorf("certificate alias %q is already assigned", alias)
+			}
+		}
 	}
 	return service.adoptPlan(store, renewalManager, subscription, options, source, siteRoot, documentRoot, renewals), nil
 }
@@ -300,6 +316,11 @@ func (service SubscriptionService) adoptPlan(store subscriptionAdoptStore, renew
 	if len(renewals) == 1 {
 		website.CertificateName = renewals[0].Name
 		website.SSLEnabled = true
+		for _, alias := range renewals[0].Domains {
+			if alias != options.Domain && !containsDomain(website.Aliases, alias) {
+				website.Aliases = append(website.Aliases, alias)
+			}
+		}
 	}
 	steps := make([]plan.Step, 0, 18+len(renewals)*2)
 	if options.Backup {
@@ -398,7 +419,15 @@ func (service SubscriptionService) adoptPlan(store subscriptionAdoptStore, renew
 	steps = append(steps, plan.Step{Name: "record website", Preview: "insert website into SQLite", Do: func(ctx context.Context) error {
 		id, err := store.CreateWebsite(ctx, website)
 		website.ID = id
-		return err
+		if err != nil {
+			return err
+		}
+		for _, alias := range website.Aliases {
+			if err := store.AddWebsiteAlias(ctx, id, alias); err != nil {
+				return errors.Join(err, store.DeleteWebsite(ctx, id))
+			}
+		}
+		return nil
 	}, Undo: func(ctx context.Context) error { return store.DeleteWebsite(ctx, website.ID) }})
 	for _, lineage := range renewals {
 		lineage := lineage
