@@ -358,6 +358,10 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   Více nalezených certifikátů odmítá před změnami. Service test ověřuje
   zachování názvu a vazby metadat; zbývá review obnovy/mazání převzatého
   certifikátu a reálný kontejnerový test TLS adopce.
+  Review změnilo obnovu při adopci na Certbot `reconfigure` místo `certonly
+  --keep-until-expiring`, které mohlo vydat nový živý certifikát. Regresní
+  test ověřuje přesné argumenty bez změny SAN; service race testy prošly.
+  Reálná ACME testovací obnova a rollback renewal konfigurace ještě zbývají.
   Návrh je v
   [subscription-adopt-design.md](subscription-adopt-design.md). Určuje jednu
   žurnálovanou operaci, přesný cíl document rootu, defaultní atomický přesun,

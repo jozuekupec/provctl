@@ -12,8 +12,22 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	"provctl/internal/system"
+	"provctl/internal/system/fake"
 )
+
+func TestCertbotRenewals_ReconfigurePreservesLiveCertificate(t *testing.T) {
+	commands := &fake.Commander{}
+	manager := CertbotRenewals{Commands: commands}
+	if err := manager.Reconfigure(context.Background(), RenewalLineage{Name: "legacy-0001", Domains: []string{"example.test"}}, "/acme"); err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"reconfigure", "--cert-name", "legacy-0001", "--authenticator", "webroot", "--webroot-path", "/acme", "--non-interactive"}
+	if len(commands.Calls) != 1 || !cmp.Equal(commands.Calls[0].Args, want) {
+		t.Fatalf("commands = %#v", commands.Calls)
+	}
+}
 
 func TestCertbotRenewals_FindUsesLiveCertificateSANs(t *testing.T) {
 	root := t.TempDir()

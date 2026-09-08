@@ -49,6 +49,13 @@ still required before this decision is fully implemented.
 8. Reconfigure every discovered certificate lineage to the shared ACME
    webroot, then run `certbot renew --cert-name <lineage> --dry-run`.
 
+Renewal configuration uses Certbot 2.3+ `reconfigure --authenticator webroot
+--webroot-path <shared-root> --cert-name <lineage>`. It tests the new options
+against staging before saving them and preserves the live certificate. Do not
+use `certonly --keep-until-expiring` here: it can issue a replacement when the
+certificate is nearing expiration. See the
+[Certbot renewal configuration guide](https://eff-certbot.readthedocs.io/en/stable/using.html#modifying-the-renewal-configuration-of-existing-certificates).
+
 The first seven steps are reversible. If certificate renewal verification
 fails after the filesystem transfer, the operation is recorded as
 `inconsistent`; it must state the affected lineage and preserve both the data

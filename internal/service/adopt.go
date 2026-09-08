@@ -107,11 +107,10 @@ func (manager CertbotRenewals) Find(_ context.Context, domainName string) ([]Ren
 }
 
 func (manager CertbotRenewals) Reconfigure(ctx context.Context, lineage RenewalLineage, webroot string) error {
-	args := []string{"certonly", "--webroot", "-w", webroot}
-	for _, name := range lineage.Domains {
-		args = append(args, "-d", name)
+	if err := domain.ValidateCertificateName(lineage.Name); err != nil {
+		return err
 	}
-	args = append(args, "--cert-name", lineage.Name, "--keep-until-expiring", "--non-interactive")
+	args := []string{"reconfigure", "--cert-name", lineage.Name, "--authenticator", "webroot", "--webroot-path", webroot, "--non-interactive"}
 	result, err := manager.Commands.Run(ctx, "/usr/bin/certbot", args...)
 	if err != nil {
 		return commandError("reconfigure certificate renewal", result, err)
@@ -370,7 +369,7 @@ func (service SubscriptionService) adoptPlan(store subscriptionAdoptStore, renew
 			_, err := certificateStore.CreateCertificate(ctx, domain.Certificate{SubscriptionID: subscription.ID, WebsiteID: website.ID, Lineage: lineage.Name, PrimaryDomain: options.Domain, SANs: lineage.Domains, Issuer: lineage.Issuer, NotBefore: lineage.NotBefore, NotAfter: lineage.NotAfter, LastCheckedAt: time.Now().UTC()})
 			return err
 		}, Undo: func(ctx context.Context) error { return certificateStore.DeleteCertificateByWebsite(ctx, website.ID) }})
-		steps = append(steps, plan.Step{Name: "reconfigure certificate renewal " + lineage.Name, Preview: "certbot certonly --cert-name " + lineage.Name, Do: func(ctx context.Context) error {
+		steps = append(steps, plan.Step{Name: "reconfigure certificate renewal " + lineage.Name, Preview: "certbot reconfigure --cert-name " + lineage.Name, Do: func(ctx context.Context) error {
 			return renewalManager.Reconfigure(ctx, lineage, service.Config.Paths.ACMEChallenge)
 		}})
 		steps = append(steps, plan.Step{Name: "verify certificate renewal " + lineage.Name, Preview: "certbot renew --cert-name " + lineage.Name + " --dry-run", Do: func(ctx context.Context) error { return renewalManager.Verify(ctx, lineage.Name) }})
