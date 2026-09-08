@@ -449,13 +449,6 @@ func TestSubscriptionService_TransferDocumentRootRejectsMissingAtomicMover(t *te
 	}
 }
 
-func TestRenewalDomainsParsesCertbotDomains(t *testing.T) {
-	got := renewalDomains("version = 4.0\ndomains = example.test www.example.test\n")
-	if want := []string{"example.test", "www.example.test"}; !cmp.Equal(got, want) {
-		t.Errorf("renewalDomains() = %#v, want %#v", got, want)
-	}
-}
-
 func TestSubscriptionService_AdoptMarksRenewalFailureInconsistent(t *testing.T) {
 	fs := &subscriptionFS{directories: map[string]bool{"/legacy/example.test": true}}
 	journal := &subscriptionJournal{}

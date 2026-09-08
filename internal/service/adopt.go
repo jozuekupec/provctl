@@ -2,6 +2,8 @@ package service
 
 import (
 	"context"
+	"crypto/x509"
+	"encoding/pem"
 	"errors"
 	"fmt"
 	"os"
@@ -34,9 +36,10 @@ type RenewalManager interface {
 // CertbotRenewals reads Certbot's renewal files and reconfigures matching
 // lineages with explicit Certbot arguments.
 type CertbotRenewals struct {
-	FS        system.FS
-	Commands  system.Commander
-	Directory string
+	FS            system.FS
+	Commands      system.Commander
+	Directory     string
+	LiveDirectory string
 }
 
 func (manager CertbotRenewals) Find(_ context.Context, domainName string) ([]RenewalLineage, error) {
@@ -52,13 +55,29 @@ func (manager CertbotRenewals) Find(_ context.Context, domainName string) ([]Ren
 		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".conf") {
 			continue
 		}
-		contents, err := manager.FS.ReadFile(filepath.Join(manager.directory(), entry.Name()))
-		if err != nil {
-			return nil, fmt.Errorf("read Certbot renewal file %q: %w", entry.Name(), err)
+		lineage := strings.TrimSuffix(entry.Name(), ".conf")
+		if err := domain.ValidateCertificateName(lineage); err != nil {
+			return nil, err
 		}
-		domains := renewalDomains(string(contents))
+		liveDirectory := manager.LiveDirectory
+		if liveDirectory == "" {
+			liveDirectory = "/etc/letsencrypt/live"
+		}
+		contents, err := manager.FS.ReadFile(filepath.Join(liveDirectory, lineage, "cert.pem"))
+		if err != nil {
+			return nil, fmt.Errorf("read certificate for lineage %q: %w", lineage, err)
+		}
+		block, _ := pem.Decode(contents)
+		if block == nil || block.Type != "CERTIFICATE" {
+			return nil, fmt.Errorf("invalid PEM certificate for lineage %q", lineage)
+		}
+		certificate, err := x509.ParseCertificate(block.Bytes)
+		if err != nil {
+			return nil, fmt.Errorf("parse certificate for lineage %q: %w", lineage, err)
+		}
+		domains := certificate.DNSNames
 		if containsDomain(domains, domainName) {
-			lineages = append(lineages, RenewalLineage{Name: strings.TrimSuffix(entry.Name(), ".conf"), Domains: domains})
+			lineages = append(lineages, RenewalLineage{Name: lineage, Domains: domains})
 		}
 	}
 	return lineages, nil
@@ -90,16 +109,6 @@ func (manager CertbotRenewals) directory() string {
 		return manager.Directory
 	}
 	return "/etc/letsencrypt/renewal"
-}
-
-func renewalDomains(contents string) []string {
-	for _, line := range strings.Split(contents, "\n") {
-		key, value, found := strings.Cut(line, "=")
-		if found && strings.TrimSpace(key) == "domains" {
-			return strings.Fields(strings.TrimSpace(value))
-		}
-	}
-	return nil
 }
 
 func containsDomain(domains []string, name string) bool {

@@ -339,11 +339,15 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   `CreateWebsite` zachová validovaný explicitní `CertificateName`, pro nové
   weby zůstává default `provctl-site-<id>`. Test pokrývá round-trip přes
   resolver i seznam, konflikt sdíleného lineage a odmítnutí nebezpečné cesty.
-  Napojení adopce na zachování TLS zůstává rozpracované. Návrh je v
+  Napojení adopce na zachování TLS zůstává rozpracované.
   Doménová validace nyní rozlišuje bezpečný původní název od existujícího
   guardu pro mazání `provctl-*` certifikátů. Testy domain, SQLite i service
   s race detektorem prošly. Zachování názvu samo o sobě ještě neaktivuje TLS;
   zbývá certifikát ověřit, převzít metadata a vyřešit jeho životní cyklus.
+  Vyhledávání certifikátů nově čte SAN přímo z `live/<lineage>/cert.pem`
+  a nezávisí na poli `domains` v renewal konfiguraci. Test se skutečným
+  lokálně vytvořeným X.509 certifikátem ověřil alias, cizí doménu a chybný
+  PEM. Nejde zatím o kontrolu platnosti, klíče či kompletní TLS adopci.
   Návrh je v
   [subscription-adopt-design.md](subscription-adopt-design.md). Určuje jednu
   žurnálovanou operaci, přesný cíl document rootu, defaultní atomický přesun,
