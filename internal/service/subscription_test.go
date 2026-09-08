@@ -93,9 +93,10 @@ func (users *subscriptionUsers) Delete(context.Context, string, bool) error {
 }
 
 type subscriptionStore struct {
-	values   map[string]domain.Subscription
-	domains  map[string]bool
-	websites []domain.Website
+	values       map[string]domain.Subscription
+	domains      map[string]bool
+	websites     []domain.Website
+	certificates []domain.Certificate
 }
 
 func (store *subscriptionStore) SubscriptionExists(_ context.Context, name string) (bool, error) {
@@ -139,6 +140,15 @@ func (store *subscriptionStore) CreateWebsite(_ context.Context, website domain.
 	store.websites = append(store.websites, website)
 	store.domains[website.PrimaryDomain] = true
 	return website.ID, nil
+}
+
+func (store *subscriptionStore) CreateCertificate(_ context.Context, certificate domain.Certificate) (int64, error) {
+	store.certificates = append(store.certificates, certificate)
+	return 1, nil
+}
+
+func (store *subscriptionStore) DeleteCertificateByWebsite(context.Context, int64) error {
+	return nil
 }
 func (store *subscriptionStore) DeleteSubscription(_ context.Context, name string) error {
 	delete(store.values, name)
@@ -202,6 +212,8 @@ func (subscriptionLocker) Lock(context.Context, string) (system.Unlock, error) {
 
 func newSubscriptionService(fs *subscriptionFS, users *subscriptionUsers, store *subscriptionStore, journal *subscriptionJournal) SubscriptionService {
 	cfg := config.Config{Paths: config.Paths{VHosts: "/vhosts"}, PHP: config.PHP{MaxChildren: 10, MemoryLimit: "256M", UploadMax: "64M", MaxExecTime: 60}, Users: config.Users{UIDMin: 5000, UIDMax: 5001, Shell: "/bin/bash"}}
+	cfg.Paths.ACMEChallenge = "/var/lib/provctl-acme-challenge"
+	cfg.Apache.ProxyTimeout = 60
 	return SubscriptionService{FS: fs, Users: users, Store: store, Executor: plan.Executor{Journal: journal, Locker: subscriptionLocker{}}, Config: cfg}
 }
 
@@ -466,6 +478,23 @@ func TestSubscriptionService_AdoptMarksRenewalFailureInconsistent(t *testing.T) 
 	}
 	if !cmp.Equal(renewals.reconfigured, []string{"legacy"}) {
 		t.Errorf("reconfigured lineages = %#v", renewals.reconfigured)
+	}
+}
+
+func TestSubscriptionService_AdoptPreservesTLSLineage(t *testing.T) {
+	fs := &subscriptionFS{directories: map[string]bool{"/legacy/example.test": true}}
+	store := &subscriptionStore{values: map[string]domain.Subscription{}, domains: map[string]bool{}}
+	service := newSubscriptionService(fs, &subscriptionUsers{}, store, &subscriptionJournal{})
+	service.Commands, service.Apache, service.PHPFPM, service.PHPVersion = &fake.Commander{}, websiteApache{}, websitePHPFPM{}, "8.4"
+	service.Renewals = &subscriptionRenewals{lineages: []RenewalLineage{{Name: "example.test-0001", Domains: []string{"example.test"}}}}
+	if _, err := service.Adopt(context.Background(), "acme", SubscriptionAdoptOptions{Source: "/legacy/example.test", Domain: "example.test"}); err != nil {
+		t.Fatal(err)
+	}
+	if len(store.websites) != 1 || !store.websites[0].SSLEnabled || store.websites[0].CertificateName != "example.test-0001" {
+		t.Fatalf("adopted website: %#v", store.websites)
+	}
+	if len(store.certificates) != 1 || store.certificates[0].WebsiteID != store.websites[0].ID || store.certificates[0].Lineage != "example.test-0001" {
+		t.Fatalf("adopted certificate: %#v", store.certificates)
 	}
 }
 

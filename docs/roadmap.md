@@ -353,6 +353,11 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   `tls.X509KeyPair`. Testy service s race detektorem prošly včetně odmítnutí
   vadného privátního klíče. Důvěra vydavatele ani úplná TLS adopce tím nejsou
   ověřeny; metadata platnosti a vydavatele jsou připravena pro převzetí.
+  Adopční plán nyní přebírá jediný jednoznačný lineage do webu, generuje
+  HTTPS vhost a zapisuje metadata certifikátu s vazbou na website ID.
+  Více nalezených certifikátů odmítá před změnami. Service test ověřuje
+  zachování názvu a vazby metadat; zbývá review obnovy/mazání převzatého
+  certifikátu a reálný kontejnerový test TLS adopce.
   Návrh je v
   [subscription-adopt-design.md](subscription-adopt-design.md). Určuje jednu
   žurnálovanou operaci, přesný cíl document rootu, defaultní atomický přesun,

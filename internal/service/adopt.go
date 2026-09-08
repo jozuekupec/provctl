@@ -156,6 +156,11 @@ type subscriptionAdoptStore interface {
 	CreateWebsite(context.Context, domain.Website) (int64, error)
 }
 
+type adoptionCertificateStore interface {
+	CreateCertificate(context.Context, domain.Certificate) (int64, error)
+	DeleteCertificateByWebsite(context.Context, int64) error
+}
+
 // Adopt imports an existing document root as one PHP-FPM website.
 func (service SubscriptionService) Adopt(ctx context.Context, name string, options SubscriptionAdoptOptions) (int64, error) {
 	operation, err := service.PrepareAdopt(ctx, name, options)
@@ -227,6 +232,14 @@ func (service SubscriptionService) PrepareAdopt(ctx context.Context, name string
 	if err != nil {
 		return plan.Plan{}, err
 	}
+	if len(renewals) > 1 {
+		return plan.Plan{}, errors.New("multiple certificates cover the adoption domain; resolve the ambiguous lineage before adoption")
+	}
+	if len(renewals) == 1 {
+		if _, ok := store.(adoptionCertificateStore); !ok {
+			return plan.Plan{}, errors.New("TLS adoption requires certificate metadata storage")
+		}
+	}
 	return service.adoptPlan(store, renewalManager, subscription, options, source, siteRoot, documentRoot, renewals), nil
 }
 
@@ -247,6 +260,10 @@ func (service SubscriptionService) adoptPlan(store subscriptionAdoptStore, renew
 	poolContents, _ := render.RenderPHPFPMPool(render.PHPFPMPool{Name: subscription.Name, Home: subscription.Home, Socket: socket, MaxChildren: subscription.PHPMaxChildren, MemoryLimit: subscription.PHPMemoryLimit, UploadMax: subscription.PHPUploadMax, MaxExecTime: subscription.PHPMaxExecTime, PhpErrorLog: fpmErrorLog})
 	vhostContents, _ := render.RenderApachePHPFPMHTTP(render.ApacheHTTPVHost{Subscription: subscription.Name, PrimaryDomain: options.Domain, DocumentRoot: documentRoot, AcmeChallengeRoot: service.Config.Paths.ACMEChallenge, FPMSocket: socket, ProxyTimeout: service.Config.Apache.ProxyTimeout, LogDir: logDir})
 	website := domain.Website{SubscriptionID: subscription.ID, Type: domain.WebsitePHPFPM, PrimaryDomain: options.Domain, DocumentRoot: documentRoot, PHPVersion: subscription.PHPVersion, Enabled: true}
+	if len(renewals) == 1 {
+		website.CertificateName = renewals[0].Name
+		website.SSLEnabled = true
+	}
 	steps := make([]plan.Step, 0, 18+len(renewals)*2)
 	if options.Backup {
 		archive := filepath.Join(service.Config.Paths.Backups, "adopt", subscription.Name, filepath.Base(source)+"-"+time.Now().UTC().Format("20060102T150405.000000000Z")+".tar")
@@ -316,6 +333,12 @@ func (service SubscriptionService) adoptPlan(store subscriptionAdoptStore, renew
 	var undoApache func(context.Context) error
 	steps = append(steps, plan.Step{Name: "install and enable Apache vhost", Preview: "write " + vhostPath, Do: func(ctx context.Context) error {
 		var err error
+		if website.SSLEnabled {
+			vhostContents, err = websiteService.RenderVHost(subscription.Name, website)
+			if err != nil {
+				return err
+			}
+		}
 		undoApache, err = service.Apache.ApplyVHost(ctx, vhostPath, vhostContents, enabledPath)
 		return err
 	}, Undo: func(ctx context.Context) error {
@@ -342,6 +365,11 @@ func (service SubscriptionService) adoptPlan(store subscriptionAdoptStore, renew
 	}, Undo: func(ctx context.Context) error { return store.DeleteWebsite(ctx, website.ID) }})
 	for _, lineage := range renewals {
 		lineage := lineage
+		certificateStore := store.(adoptionCertificateStore)
+		steps = append(steps, plan.Step{Name: "record adopted certificate", Preview: "retain Certbot lineage " + lineage.Name, Do: func(ctx context.Context) error {
+			_, err := certificateStore.CreateCertificate(ctx, domain.Certificate{SubscriptionID: subscription.ID, WebsiteID: website.ID, Lineage: lineage.Name, PrimaryDomain: options.Domain, SANs: lineage.Domains, Issuer: lineage.Issuer, NotBefore: lineage.NotBefore, NotAfter: lineage.NotAfter, LastCheckedAt: time.Now().UTC()})
+			return err
+		}, Undo: func(ctx context.Context) error { return certificateStore.DeleteCertificateByWebsite(ctx, website.ID) }})
 		steps = append(steps, plan.Step{Name: "reconfigure certificate renewal " + lineage.Name, Preview: "certbot certonly --cert-name " + lineage.Name, Do: func(ctx context.Context) error {
 			return renewalManager.Reconfigure(ctx, lineage, service.Config.Paths.ACMEChallenge)
 		}})
