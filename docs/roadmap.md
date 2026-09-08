@@ -367,6 +367,10 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   následného dry-run. Test ověřuje obnovu obsahu/oprávnění a zapojení do
   chybové cesty adopce. Záloha je zatím v paměti probíhající operace,
   ne trvalá ochrana proti pádu procesu; tato část recovery zbývá.
+  Následně doplněna trvalá záloha před změnou renewal konfigurace v
+  `/var/lib/provctl/renewal-backups/<lineage>/<timestamp>-<nonce>/`, včetně
+  původní cesty a oprávnění pro ruční obnovu. Test ověřuje původní obsah
+  na disku. Automatická obnova po pádu a retence záloh nejsou implementovány.
   Návrh je v
   [subscription-adopt-design.md](subscription-adopt-design.md). Určuje jednu
   žurnálovanou operaci, přesný cíl document rootu, defaultní atomický přesun,

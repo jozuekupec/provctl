@@ -63,6 +63,15 @@ and the pre-change renewal configuration for manual recovery.
 
 ## Required seams and tests
 
+Renewal snapshots are retained at
+`/var/lib/provctl/renewal-backups/<lineage>/<UTC timestamp>-<nonce>/`.
+`renewal.conf` holds the original bytes; `restore.txt` records the destination
+and original file mode. Backups use private directories and mode 0600 files.
+They remain after success or rollback for recovery after a process crash.
+For manual recovery, stop concurrent provisioning/Certbot work, review the
+recorded destination and original contents, restore with the recorded mode,
+then verify renewal. This is not automatic crash recovery or backup rotation.
+
 - `system.FileMover` for same-filesystem rename; a dedicated copy seam for
   `--copy`, never a shell string.
 - a command seam for recursive ownership, using explicit `chown` arguments;

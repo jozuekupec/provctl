@@ -6,6 +6,7 @@ const (
 	ConfigDir             = "/etc/provctl"
 	ConfigFile            = ConfigDir + "/config.toml"
 	StateDir              = "/var/lib/provctl"
+	RenewalBackupDir      = StateDir + "/renewal-backups"
 	DatabaseFile          = StateDir + "/provctl.db"
 	LockFile              = "/run/provctl.lock"
 	LogDir                = "/var/log/provctl"

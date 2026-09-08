@@ -36,13 +36,21 @@ func TestCertbotRenewals_SnapshotRestoresContentsAndMode(t *testing.T) {
 	if err := os.WriteFile(path, original, 0o600); err != nil {
 		t.Fatal(err)
 	}
-	manager := CertbotRenewals{FS: system.OSFS{}, Directory: directory}
+	manager := CertbotRenewals{FS: system.OSFS{}, Directory: directory, BackupDirectory: filepath.Join(directory, "backups")}
 	restore, err := manager.Snapshot(context.Background(), "legacy")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(path, []byte("authenticator = webroot\n"), 0o600); err != nil {
 		t.Fatal(err)
+	}
+	backups, err := filepath.Glob(filepath.Join(directory, "backups", "legacy", "*", "renewal.conf"))
+	if err != nil || len(backups) != 1 {
+		t.Fatalf("persistent backups = %v, %v", backups, err)
+	}
+	backup, err := os.ReadFile(backups[0])
+	if err != nil || string(backup) != string(original) {
+		t.Fatalf("persistent backup = %q, %v", backup, err)
 	}
 	if err := os.Chmod(path, 0o644); err != nil {
 		t.Fatal(err)

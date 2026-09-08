@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"crypto/rand"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/pem"
@@ -40,10 +41,11 @@ type RenewalManager interface {
 // CertbotRenewals reads Certbot's renewal files and reconfigures matching
 // lineages with explicit Certbot arguments.
 type CertbotRenewals struct {
-	FS            system.FS
-	Commands      system.Commander
-	Directory     string
-	LiveDirectory string
+	FS              system.FS
+	Commands        system.Commander
+	Directory       string
+	LiveDirectory   string
+	BackupDirectory string
 }
 
 func (manager CertbotRenewals) Find(_ context.Context, domainName string) ([]RenewalLineage, error) {
@@ -139,6 +141,25 @@ func (manager CertbotRenewals) Snapshot(_ context.Context, lineage string) (func
 	contents, err := manager.FS.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("snapshot renewal configuration: %w", err)
+	}
+	backupDirectory := manager.BackupDirectory
+	if backupDirectory == "" {
+		backupDirectory = meta.RenewalBackupDir
+	}
+	var nonce [16]byte
+	if _, err := rand.Read(nonce[:]); err != nil {
+		return nil, fmt.Errorf("name renewal backup: %w", err)
+	}
+	backupDirectory = filepath.Join(backupDirectory, lineage, fmt.Sprintf("%s-%x", time.Now().UTC().Format("20060102T150405Z"), nonce))
+	if err := manager.FS.MkdirAll(backupDirectory, 0o700); err != nil {
+		return nil, fmt.Errorf("create renewal backup directory: %w", err)
+	}
+	if err := manager.FS.WriteFileAtomic(filepath.Join(backupDirectory, "renewal.conf"), contents, 0o600); err != nil {
+		return nil, fmt.Errorf("persist renewal backup: %w", err)
+	}
+	metadata := []byte(fmt.Sprintf("source=%s\nmode=%04o\n", path, info.Mode().Perm()))
+	if err := manager.FS.WriteFileAtomic(filepath.Join(backupDirectory, "restore.txt"), metadata, 0o600); err != nil {
+		return nil, fmt.Errorf("persist renewal restore instructions: %w", err)
 	}
 	return func(context.Context) error { return manager.FS.WriteFileAtomic(path, contents, info.Mode().Perm()) }, nil
 }
