@@ -348,6 +348,11 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   a nezávisí na poli `domains` v renewal konfiguraci. Test se skutečným
   lokálně vytvořeným X.509 certifikátem ověřil alias, cizí doménu a chybný
   PEM. Nejde zatím o kontrolu platnosti, klíče či kompletní TLS adopci.
+  Následně doplněna kontrola časové platnosti, shody `cert.pem` s listovým
+  certifikátem ve `fullchain.pem` a párování privátního klíče přes
+  `tls.X509KeyPair`. Testy service s race detektorem prošly včetně odmítnutí
+  vadného privátního klíče. Důvěra vydavatele ani úplná TLS adopce tím nejsou
+  ověřeny; metadata platnosti a vydavatele jsou připravena pro převzetí.
   Návrh je v
   [subscription-adopt-design.md](subscription-adopt-design.md). Určuje jednu
   žurnálovanou operaci, přesný cíl document rootu, defaultní atomický přesun,

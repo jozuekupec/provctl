@@ -36,6 +36,16 @@ func TestCertbotRenewals_FindUsesLiveCertificateSANs(t *testing.T) {
 		t.Fatal(err)
 	}
 	certPath := filepath.Join(live, "legacy-0001", "cert.pem")
+	keyDER, err := x509.MarshalPKCS8PrivateKey(private)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(live, "legacy-0001", "privkey.pem"), pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: keyDER}), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(live, "legacy-0001", "fullchain.pem"), pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der}), 0o600); err != nil {
+		t.Fatal(err)
+	}
 	if err := os.WriteFile(certPath, pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der}), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -53,5 +63,14 @@ func TestCertbotRenewals_FindUsesLiveCertificateSANs(t *testing.T) {
 	}
 	if _, err := manager.Find(context.Background(), "example.test"); err == nil {
 		t.Fatal("malformed certificate was silently ignored")
+	}
+	if err := os.WriteFile(certPath, pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der}), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(live, "legacy-0001", "privkey.pem"), []byte("invalid key"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := manager.Find(context.Background(), "example.test"); err == nil {
+		t.Fatal("invalid private key was silently ignored")
 	}
 }

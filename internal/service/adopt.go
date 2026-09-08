@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"crypto/tls"
 	"crypto/x509"
 	"encoding/pem"
 	"errors"
@@ -21,8 +22,11 @@ import (
 // RenewalLineage is the live Certbot lineage which must be kept renewable
 // after an adopted document root has moved.
 type RenewalLineage struct {
-	Name    string
-	Domains []string
+	Name      string
+	Domains   []string
+	NotBefore time.Time
+	NotAfter  time.Time
+	Issuer    string
 }
 
 // RenewalManager keeps certificate renewal configuration outside SQLite,
@@ -77,7 +81,26 @@ func (manager CertbotRenewals) Find(_ context.Context, domainName string) ([]Ren
 		}
 		domains := certificate.DNSNames
 		if containsDomain(domains, domainName) {
-			lineages = append(lineages, RenewalLineage{Name: lineage, Domains: domains})
+			now := time.Now()
+			if now.Before(certificate.NotBefore) || !now.Before(certificate.NotAfter) {
+				return nil, fmt.Errorf("certificate for lineage %q is outside its validity period", lineage)
+			}
+			chain, err := manager.FS.ReadFile(filepath.Join(liveDirectory, lineage, "fullchain.pem"))
+			if err != nil {
+				return nil, fmt.Errorf("read certificate chain for lineage %q: %w", lineage, err)
+			}
+			key, err := manager.FS.ReadFile(filepath.Join(liveDirectory, lineage, "privkey.pem"))
+			if err != nil {
+				return nil, fmt.Errorf("read private key for lineage %q: %w", lineage, err)
+			}
+			pair, err := tls.X509KeyPair(chain, key)
+			if err != nil {
+				return nil, fmt.Errorf("certificate and private key do not form a usable pair for lineage %q", lineage)
+			}
+			if len(pair.Certificate) == 0 || string(pair.Certificate[0]) != string(certificate.Raw) {
+				return nil, fmt.Errorf("certificate and fullchain disagree for lineage %q", lineage)
+			}
+			lineages = append(lineages, RenewalLineage{Name: lineage, Domains: domains, NotBefore: certificate.NotBefore, NotAfter: certificate.NotAfter, Issuer: certificate.Issuer.String()})
 		}
 	}
 	return lineages, nil
