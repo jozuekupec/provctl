@@ -203,7 +203,7 @@ func (service BootstrapService) Prepare(ctx context.Context) (plan.Plan, error) 
 	if needed {
 		steps = append(steps, service.managedFileStep("install Certbot deploy hook", meta.DeployHook, hook, 0o750))
 	}
-	logrotate := []byte("/var/log/provctl/audit.jsonl {\n    daily\n    rotate 90\n    compress\n    missingok\n    notifempty\n    create 0640 root adm\n}\n")
+	logrotate := []byte("/var/log/provctl/*.log /var/log/provctl/*.jsonl {\n    weekly\n    rotate 14\n    missingok\n    notifempty\n    compress\n    delaycompress\n    create 0640 root adm\n}\n")
 	needed, err = managedFileNeeded(service.FS, meta.LogrotateConfig, logrotate)
 	if err != nil {
 		return plan.Plan{}, err

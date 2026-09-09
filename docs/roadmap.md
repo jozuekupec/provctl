@@ -335,6 +335,11 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   na `clean` a potvrzen stav RUNNING. Jde o lokální testovací klíč a file
   transport, nikoli důkaz produkčního podpisu nebo dostupnosti GitHub Pages.
 - [~] **M10 — migrace:**
+  První integrační běh v `pv` odhalil rozpor: Debian balíček instaloval
+  `/etc/logrotate.d/provctl`, ale bootstrap očekával jiný obsah a odmítal jej.
+  Bootstrap nyní používá totožný balíčkový obsah; jeho no-op a změnové testy
+  prošly. Druhý běh HTTP adopce v `pv` je zatím neověřený, protože automatické
+  oprávnění k Incus bylo odmítnuto.
   Před adopcí se kontroluje aktivní konfigurace přes `apache2ctl -S` včetně
   aliasů a wildcardů. Kolize vyžaduje explicitní vypnutí původního vhostu;
   cizí konfiguraci nástroj automaticky nepřepisuje. Parser pokrývá jednotlivý
