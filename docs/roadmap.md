@@ -466,8 +466,9 @@ se do tohoto souboru doplní rozsah ověření a případná odchylka od specifi
 Pro opakovatelné ruční E2 scénáře je nyní k dispozici omezený helper
 `scripts/e2.sh`: umí zobrazit stav `pv`, vrátit pouze jeho `clean` snapshot,
 nahrát jeden fixture do `/root` a spustit výslovný testovací příkaz jen uvnitř
-kontejneru. Syntaxe helperu i skutečný read-only `status` proti běžícímu `pv`
-byly ověřeny; postup je v [testing-cookbook.md](testing-cookbook.md).
+kontejneru. Syntaxe helperu i celý bezpečný tok `reset → push → sh → reset`
+pro aktuální `.deb` proti běžícímu `pv` byly ověřeny; postup je v
+[testing-cookbook.md](testing-cookbook.md).
 
 Poslední integrační ověření (2026-08-30): bootstrap vytvořil požadované cesty
 včetně práv, `apachectl configtest` a reload uspěly a druhý běh byl beze změn.
