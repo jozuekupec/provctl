@@ -22,8 +22,15 @@ func newBackupCommand() *cobra.Command {
 
 func newBackupRestoreCommand() *cobra.Command {
 	var configPath string
-	var dryRun, force bool
+	var dryRun, force, sure bool
+	var confirmName string
 	command := &cobra.Command{Use: "restore <subscription> <id>", Short: "validate and restore a subscription backup", Args: cobra.ExactArgs(2), RunE: func(command *cobra.Command, args []string) error {
+		if force && confirmName != args[0] {
+			return fmt.Errorf("--confirm-name must exactly match %q when using --force", args[0])
+		}
+		if force && !sure {
+			return fmt.Errorf("refusing forced restore without --yes-i-am-sure")
+		}
 		cfg, err := config.Load(configPath)
 		if err != nil {
 			return fmt.Errorf("load configuration: %w", err)
@@ -82,6 +89,8 @@ func newBackupRestoreCommand() *cobra.Command {
 	command.Flags().StringVar(&configPath, "config", meta.ConfigFile, "path to config.toml")
 	command.Flags().BoolVar(&dryRun, "dry-run", false, "validate the backup without restoring")
 	command.Flags().BoolVar(&force, "force", false, "replace an existing subscription after making a current-state backup")
+	command.Flags().StringVar(&confirmName, "confirm-name", "", "repeat the subscription name when using --force")
+	command.Flags().BoolVar(&sure, "yes-i-am-sure", false, "confirm replacement of an existing subscription")
 	return command
 }
 

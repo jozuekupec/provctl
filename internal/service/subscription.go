@@ -394,7 +394,7 @@ func (service SubscriptionService) deletePlan(subscription domain.Subscription, 
 			return service.Store.DeleteCertificatesBySubscription(ctx, subscription.ID)
 		}},
 	)
-	if service.PHPFPM != nil && subscription.PHPVersion != "" {
+	if service.PHPFPM != nil && subscription.PHPVersion != "" && hasPHPFPMWebsite(websites) {
 		version := PHPFPMVersion{Version: subscription.PHPVersion, Binary: filepath.Join("/usr/sbin", "php-fpm"+subscription.PHPVersion), Service: "php" + subscription.PHPVersion + "-fpm.service"}
 		poolPath := filepath.Join("/etc/php", subscription.PHPVersion, "fpm", "pool.d", meta.FilePrefix+subscription.Name+".conf")
 		steps = append(steps, plan.Step{Name: "remove PHP-FPM pool", Preview: "remove " + poolPath, Do: func(ctx context.Context) error {
@@ -408,6 +408,15 @@ func (service SubscriptionService) deletePlan(subscription domain.Subscription, 
 		plan.Step{Name: "delete subscription record", Preview: "delete subscription record from SQLite", Do: func(ctx context.Context) error { return service.Store.DeleteSubscription(ctx, subscription.Name) }},
 	)
 	return plan.Plan{Action: "subscription.delete", Target: subscription.Name, Steps: steps}
+}
+
+func hasPHPFPMWebsite(websites []domain.Website) bool {
+	for _, website := range websites {
+		if website.Type == domain.WebsitePHPFPM {
+			return true
+		}
+	}
+	return false
 }
 
 func hasManagedCertificates(certificates []domain.Certificate) bool {

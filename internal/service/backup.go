@@ -34,6 +34,7 @@ type BackupStore interface {
 	BackupByIDAny(context.Context, int64) (domain.Backup, error)
 	CreateBackup(context.Context, domain.Backup) (int64, error)
 	FinishBackup(context.Context, int64, int64, string) error
+	ReassignOrphanedBackups(context.Context, int64, string) error
 	ListDatabases(context.Context, int64) ([]domain.Database, error)
 	ListWebsites(context.Context, int64) ([]domain.Website, error)
 	ListCronJobs(context.Context, int64) ([]domain.CronJob, error)
@@ -242,8 +243,15 @@ func (service BackupService) restoreFiles(ctx context.Context, archivePath strin
 			}
 			return nil
 		}},
-		{Name: "record restored subscription", Preview: "insert subscription into SQLite", Do: func(ctx context.Context) error {
-			return service.Store.CreateSubscription(ctx, subscription)
+		{Name: "record restored subscription", Preview: "insert subscription into SQLite and reattach matching backups", Do: func(ctx context.Context) error {
+			if err := service.Store.CreateSubscription(ctx, subscription); err != nil {
+				return err
+			}
+			restored, err := service.Store.SubscriptionByName(ctx, subscription.Name)
+			if err != nil {
+				return err
+			}
+			return service.Store.ReassignOrphanedBackups(ctx, restored.ID, filepath.Join(service.Config.Paths.Backups, subscription.Name))
 		}, Undo: func(ctx context.Context) error { return service.Store.DeleteSubscription(ctx, subscription.Name) }},
 	}
 	for _, database := range databases {

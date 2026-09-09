@@ -79,6 +79,23 @@ func (repository *Repository) FinishBackup(ctx context.Context, id, sizeBytes in
 	return nil
 }
 
+// ReassignOrphanedBackups attaches historical backups below one subscription's
+// configured backup root after a clean or forced restore. It never touches a
+// backup already assigned to another subscription or a sibling path.
+func (repository *Repository) ReassignOrphanedBackups(ctx context.Context, subscriptionID int64, root string) error {
+	result, err := repository.DB.ExecContext(ctx, `UPDATE backups
+		SET subscription_id = ?
+		WHERE subscription_id IS NULL
+		  AND (path = ? OR (substr(path, 1, length(?)) = ? AND substr(path, length(?) + 1, 1) = '/'))`, subscriptionID, root, root, root, root)
+	if err != nil {
+		return fmt.Errorf("reattach orphaned backups below %q: %w", root, err)
+	}
+	if _, err := result.RowsAffected(); err != nil {
+		return fmt.Errorf("count reattached backups: %w", err)
+	}
+	return nil
+}
+
 type backupScanner interface{ Scan(...any) error }
 
 func scanBackup(scanner backupScanner) (domain.Backup, error) {

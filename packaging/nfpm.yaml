@@ -18,6 +18,8 @@ license: MIT
 depends:
   - adduser
   - apache2
+  - cron
+  - zstd
 recommends:
   - certbot
   - logrotate

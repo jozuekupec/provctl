@@ -127,3 +127,45 @@ func TestRepository_BackupSurvivesSubscriptionDeletion(t *testing.T) {
 		t.Errorf("backup = %#v", backup)
 	}
 }
+
+func TestRepository_ReassignOrphanedBackupsLimitsPathToSubscriptionRoot(t *testing.T) {
+	ctx := context.Background()
+	repository, err := Open(ctx, filepath.Join(t.TempDir(), "provctl.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer repository.Close()
+	if err := repository.CreateSubscription(ctx, domain.Subscription{Name: "acme", UnixUser: "acme", UnixUID: 5000, Home: "/vhosts/acme", PHPMaxChildren: 10, PHPMemoryLimit: "256M", PHPUploadMax: "64M", PHPMaxExecTime: 60, SSHAccess: "none"}); err != nil {
+		t.Fatal(err)
+	}
+	old, err := repository.SubscriptionByName(ctx, "acme")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, path := range []string{"/backups/acme/one", "/backups/acme-two/not-ours"} {
+		if _, err := repository.CreateBackup(ctx, domain.Backup{SubscriptionID: old.ID, Path: path, Status: "running", StartedAt: time.Now().UTC()}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := repository.DeleteSubscription(ctx, "acme"); err != nil {
+		t.Fatal(err)
+	}
+	if err := repository.CreateSubscription(ctx, domain.Subscription{Name: "acme", UnixUser: "acme", UnixUID: 5001, Home: "/vhosts/acme", PHPMaxChildren: 10, PHPMemoryLimit: "256M", PHPUploadMax: "64M", PHPMaxExecTime: 60, SSHAccess: "none"}); err != nil {
+		t.Fatal(err)
+	}
+	restored, err := repository.SubscriptionByName(ctx, "acme")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := repository.ReassignOrphanedBackups(ctx, restored.ID, "/backups/acme"); err != nil {
+		t.Fatal(err)
+	}
+	backups, err := repository.ListBackups(ctx, restored.ID)
+	if err != nil || len(backups) != 1 || backups[0].Path != "/backups/acme/one" {
+		t.Fatalf("reassigned backups = %#v, %v", backups, err)
+	}
+	foreign, err := repository.BackupByIDAny(ctx, 2)
+	if err != nil || foreign.SubscriptionID != 0 {
+		t.Fatalf("foreign backup = %#v, %v", foreign, err)
+	}
+}

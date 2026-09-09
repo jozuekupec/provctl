@@ -173,8 +173,8 @@ func (*subscriptionStore) ListDatabases(context.Context, int64) ([]domain.Databa
 	return nil, nil
 }
 func (*subscriptionStore) DeleteDatabase(context.Context, int64, string) error { return nil }
-func (*subscriptionStore) ListWebsites(context.Context, int64) ([]domain.Website, error) {
-	return nil, nil
+func (store *subscriptionStore) ListWebsites(context.Context, int64) ([]domain.Website, error) {
+	return store.websites, nil
 }
 func (*subscriptionStore) DeleteWebsite(context.Context, int64) error { return nil }
 func (*subscriptionStore) ListCertificates(context.Context, int64) ([]domain.Certificate, error) {
@@ -354,9 +354,9 @@ func TestSubscriptionService_PrepareDeleteRejectsUnexpectedHome(t *testing.T) {
 func TestSubscriptionService_PrepareDeleteRemovesPHPFPMBeforeUnixUser(t *testing.T) {
 	fs := &subscriptionFS{directories: map[string]bool{"/vhosts/acme": true}}
 	users := &subscriptionUsers{account: &user.User{Username: "acme", Uid: "5000", HomeDir: "/vhosts/acme"}}
-	store := &subscriptionStore{values: map[string]domain.Subscription{"acme": {ID: 1, Name: "acme", UnixUser: "acme", UnixUID: 5000, Home: "/vhosts/acme", Status: "archived", PHPVersion: "8.4"}}}
+	store := &subscriptionStore{values: map[string]domain.Subscription{"acme": {ID: 1, Name: "acme", UnixUser: "acme", UnixUID: 5000, Home: "/vhosts/acme", Status: "archived", PHPVersion: "8.4"}}, websites: []domain.Website{{Type: domain.WebsitePHPFPM}}}
 	service := newSubscriptionService(fs, users, store, &subscriptionJournal{})
-	service.PHPFPM = websitePHPFPM{}
+	service.PHPFPM, service.Apache = websitePHPFPM{}, websiteApache{}
 	operation, err := service.PrepareDelete(context.Background(), "acme", false)
 	if err != nil {
 		t.Fatal(err)
@@ -372,6 +372,23 @@ func TestSubscriptionService_PrepareDeleteRemovesPHPFPMBeforeUnixUser(t *testing
 	}
 	if p < 0 || u < 0 || p >= u {
 		t.Errorf("delete steps do not remove PHP-FPM before user: %#v", operation.Steps)
+	}
+}
+
+func TestSubscriptionService_PrepareDeleteSkipsAbsentPHPFPMPoolForStaticOnlySubscription(t *testing.T) {
+	fs := &subscriptionFS{directories: map[string]bool{"/vhosts/acme": true}}
+	users := &subscriptionUsers{account: &user.User{Username: "acme", Uid: "5000", HomeDir: "/vhosts/acme"}}
+	store := &subscriptionStore{values: map[string]domain.Subscription{"acme": {ID: 1, Name: "acme", UnixUser: "acme", UnixUID: 5000, Home: "/vhosts/acme", Status: "archived", PHPVersion: "8.4"}}, websites: []domain.Website{{Type: domain.WebsiteStatic}}}
+	service := newSubscriptionService(fs, users, store, &subscriptionJournal{})
+	service.PHPFPM, service.Apache = websitePHPFPM{}, websiteApache{}
+	operation, err := service.PrepareDelete(context.Background(), "acme", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, step := range operation.Steps {
+		if step.Name == "remove PHP-FPM pool" {
+			t.Fatal("static-only subscription unexpectedly removes a PHP-FPM pool")
+		}
 	}
 }
 

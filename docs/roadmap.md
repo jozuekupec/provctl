@@ -241,6 +241,22 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   Adresář každé nové zálohy nyní zahrnuje nanosekundy UTC, takže běžná záloha
   a bezprostřední current-state záloha při `restore --force` nemohou sdílet
   stejnou cestu. Regresní test kryje tuto kolizi.
+  Jelikož `restore --force` nahrazuje existující subscription, CLI nyní
+  vyžaduje i přesný `--confirm-name` a `--yes-i-am-sure`; žádná konfigurace
+  ani záloha se bez této dvojité brány neotevře. Cílený CLI test pokrývá oba
+  odmítavé stavy.
+  E2 přepis static-only subscription odhalil a opravil ještě lifecycle chybu:
+  subscription s uloženou výchozí PHP verzí, ale bez PHP-FPM website, nemá
+  žádný pool k odstranění. Delete jej nyní odstraňuje jen když alespoň jeden
+  web skutečně používá PHP-FPM; unit test kryje PHP-FPM i static-only větev.
+  Stejný E2 průchod potvrdil obnovení původního markeru a `apache2ctl
+  configtest`, ale odhalil, že clean restore zanechával historické backup
+  záznamy bez vazby na nový subscription ID. Restore je nyní po zápisu nového
+  subscription bezpečně znovu přiřadí pouze z jeho přesného backup rootu;
+  sousední cesty zůstávají orphaned. SQLite regresní test kryje obě větve.
+  Druhý E2 běh této poslední větve nebyl spuštěn, protože automatické Incus
+  oprávnění odmítlo zápis do `pv`; kontejner byl bezpečně vrácen na `clean` a
+  potvrzen jako `RUNNING`.
 - [x] **M8 — TUI:** návrh je zaznamenán v [tui-design.md](tui-design.md) a
   cíleně přebírá konzistentní Bubble Tea vzor z projektu `depo`: hodnotový
   model, `Deps`, samostatné routing/render/keys/theme a I/O jen přes `tea.Cmd`.
@@ -304,6 +320,12 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   Lokální build s nfpm nyní prošel; manifest používá standardní `dist/provctl`
   a výslovně nastavuje práva binárky, konfigurace a šablon. V `pv` prošel
   `dpkg -i` včetně `postinst` a následný purge zachoval `/var/www/vhosts`.
+  Integrace backupu následně odhalila, že balíčku chyběly runtime závislosti
+  `zstd` a `cron`; obě jsou nyní explicitní Debian `Depends`, takže instalace
+  nemůže úspěšně skončit bez binárek potřebných pro backup a cron lifecycle.
+  Lokální fallback verze balíčku také nyní normalizuje netagovaný commit na
+  validní Debian tvar `0.0.0+git.<sha>` (a release tagy dál používají verzi
+  tagu); `dpkg-deb --field Version` tento tvar ověřil.
   CI nyní spouští `lintian` i `piuparts` proti Debianu trixie; první vzdálený
   běh ještě musí potvrdit. Tag `vX.Y.Z` spouští release workflow, který vytvoří
   `.deb` s verzí `X.Y.Z` a připojí jej ke GitHub Release. V `pv` úspěšně

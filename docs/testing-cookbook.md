@@ -555,7 +555,7 @@ Přepis existující subscription se testuje odděleně až po čistém round-tr
 ```bash
 # Nech obnovenu subscription existovat, uprav marker a obnov původní backup.
 ./scripts/e2.sh sh 'echo CURRENT > /var/www/vhosts/acme/sites/example.test/public/marker.txt'
-./scripts/e2.sh sh 'provctl backup restore acme <puvodni-id> --force'
+./scripts/e2.sh sh 'provctl backup restore acme <puvodni-id> --force --confirm-name acme --yes-i-am-sure'
 ./scripts/e2.sh sh 'cat /var/www/vhosts/acme/sites/example.test/public/marker.txt' # MARKER
 ./scripts/e2.sh sh 'provctl backup list acme' # obsahuje i current-state backup
 ```
