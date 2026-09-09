@@ -373,8 +373,10 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   První integrační běh v `pv` odhalil rozpor: Debian balíček instaloval
   `/etc/logrotate.d/provctl`, ale bootstrap očekával jiný obsah a odmítal jej.
   Bootstrap nyní používá totožný balíčkový obsah; jeho no-op a změnové testy
-  prošly. Druhý běh HTTP adopce v `pv` je zatím neověřený, protože automatické
-  oprávnění k Incus bylo odmítnuto.
+  prošly. Následný čistý HTTP běh v `pv` ověřil instalaci balíčku, bootstrap,
+  atomický přesun legacy document rootu, PHP-FPM pool, odpověď Apache
+  s očekávaným obsahem a `apache2ctl configtest`; kontejner byl vrácen na
+  `clean`.
   Před adopcí se kontroluje aktivní konfigurace přes `apache2ctl -S` včetně
   aliasů a wildcardů. Kolize vyžaduje explicitní vypnutí původního vhostu;
   cizí konfiguraci nástroj automaticky nepřepisuje. Parser pokrývá jednotlivý
@@ -382,8 +384,8 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   SAN převzatého certifikátu se přenášejí jako aliasy webu do Apache i DB.
   Před změnami se ověřují doménová pravidla a konflikt s již spravovanými
   doménami; wildcard není v této HTTP-01 adopci podporován. Service race
-  test ověřuje zachování aliasu. Kontrola nespravovaných Apache vhostů
-  a skutečný integrační průchod stále zbývají.
+  test ověřuje zachování aliasu. Reálná kolize s nespravovaným Apache vhostem
+  a TLS/Pebble větev stále zbývají.
   Schválené zachování původního Certbot lineage má podporu v repository:
   `CreateWebsite` zachová validovaný explicitní `CertificateName`, pro nové
   weby zůstává default `provctl-site-<id>`. Test pokrývá round-trip přes
