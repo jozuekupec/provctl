@@ -72,17 +72,22 @@ func (executor Executor) Run(ctx context.Context, operation Plan) (operationID i
 		return 0, fmt.Errorf("start operation journal: %w", err)
 	}
 	completed := make([]int, 0, len(operation.Steps))
+	committed := make([]string, 0, 1)
 	for index, step := range operation.Steps {
 		if step.Do == nil {
-			return id, executor.fail(ctx, id, operation, snapshot, completed, index, errors.New("step has no action"))
+			return id, executor.fail(ctx, id, operation, snapshot, completed, committed, index, errors.New("step has no action"))
 		}
 		if err := step.Do(ctx); err != nil {
-			return id, executor.fail(ctx, id, operation, snapshot, completed, index, err)
+			return id, executor.fail(ctx, id, operation, snapshot, completed, committed, index, err)
 		}
 		snapshot.Steps[index].Status = StepDone
 		completed = append(completed, index)
 		if err := executor.Journal.Update(ctx, id, OperationRunning, snapshot, ""); err != nil {
-			return id, executor.rollback(ctx, id, operation, snapshot, completed, fmt.Errorf("record completed step: %w", err))
+			return id, executor.rollback(ctx, id, operation, snapshot, completed, committed, fmt.Errorf("record completed step: %w", err))
+		}
+		if step.Commit {
+			committed = append(committed, step.Name)
+			completed = completed[:0]
 		}
 	}
 	if err := executor.Journal.Update(ctx, id, OperationDone, snapshot, ""); err != nil {
@@ -91,15 +96,15 @@ func (executor Executor) Run(ctx context.Context, operation Plan) (operationID i
 	return id, nil
 }
 
-func (executor Executor) fail(ctx context.Context, id int64, operation Plan, snapshot Snapshot, completed []int, failed int, cause error) error {
+func (executor Executor) fail(ctx context.Context, id int64, operation Plan, snapshot Snapshot, completed []int, committed []string, failed int, cause error) error {
 	snapshot.Steps[failed].Status, snapshot.Steps[failed].Error = StepFailed, cause.Error()
 	_ = executor.Journal.Update(ctx, id, OperationRunning, snapshot, cause.Error())
-	return executor.rollback(ctx, id, operation, snapshot, completed, cause)
+	return executor.rollback(ctx, id, operation, snapshot, completed, committed, cause)
 }
 
-func (executor Executor) rollback(ctx context.Context, id int64, operation Plan, snapshot Snapshot, completed []int, cause error) error {
+func (executor Executor) rollback(ctx context.Context, id int64, operation Plan, snapshot Snapshot, completed []int, committed []string, cause error) error {
 	var undoErrors []error
-	var irreversible []string
+	irreversible := append([]string(nil), committed...)
 	for offset := len(completed) - 1; offset >= 0; offset-- {
 		index := completed[offset]
 		undo := operation.Steps[index].Undo

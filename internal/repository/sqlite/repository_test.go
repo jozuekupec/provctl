@@ -20,8 +20,8 @@ func TestOpen_AppliesInitialMigration(t *testing.T) {
 	if err := repository.DB.QueryRow("SELECT MAX(version) FROM schema_migrations").Scan(&version); err != nil {
 		t.Fatalf("read schema version: %v", err)
 	}
-	if version != 4 {
-		t.Errorf("schema version = %d, want 4", version)
+	if version != 6 {
+		t.Errorf("schema version = %d, want 6", version)
 	}
 }
 
@@ -34,7 +34,7 @@ func TestApplyMigrations_RejectsNewerSchema(t *testing.T) {
 	if _, err := database.Exec(`CREATE TABLE schema_migrations (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL)`); err != nil {
 		t.Fatalf("create migration table: %v", err)
 	}
-	if _, err := database.Exec(`INSERT INTO schema_migrations VALUES (5, '2026-01-01T00:00:00Z')`); err != nil {
+	if _, err := database.Exec(`INSERT INTO schema_migrations VALUES (7, '2026-01-01T00:00:00Z')`); err != nil {
 		t.Fatalf("insert migration: %v", err)
 	}
 	if err := ApplyMigrations(context.Background(), database); !errors.Is(err, ErrSchemaTooNew) {
@@ -55,8 +55,8 @@ func TestInspectSchema_ReadsCurrentVersion(t *testing.T) {
 	if err != nil {
 		t.Fatalf("InspectSchema() error = %v", err)
 	}
-	if info.Current != 4 || info.Latest != 4 {
-		t.Errorf("InspectSchema() = %#v, want current and latest 4", info)
+	if info.Current != 6 || info.Latest != 6 {
+		t.Errorf("InspectSchema() = %#v, want current and latest 6", info)
 	}
 }
 
@@ -87,7 +87,7 @@ func TestApplyMigrations_PreservesBackupsFromSchemaOne(t *testing.T) {
 		t.Fatalf("ApplyMigrations() error = %v", err)
 	}
 	var version int
-	if err := database.QueryRow(`SELECT MAX(version) FROM schema_migrations`).Scan(&version); err != nil || version != 4 {
+	if err := database.QueryRow(`SELECT MAX(version) FROM schema_migrations`).Scan(&version); err != nil || version != 6 {
 		t.Fatalf("schema version = %d, %v", version, err)
 	}
 	if _, err := database.Exec(`DELETE FROM subscriptions WHERE id = 1`); err != nil {

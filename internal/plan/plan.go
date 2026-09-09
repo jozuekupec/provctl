@@ -9,6 +9,10 @@ type Step struct {
 	Do         func(context.Context) error
 	Undo       func(context.Context) error
 	Idempotent bool
+	// Commit makes all completed prior steps a durable recovery boundary once
+	// their journal update succeeds. Later failures roll back only subsequent
+	// steps and are reported as inconsistent for operator recovery.
+	Commit bool
 }
 
 type Plan struct {

@@ -366,7 +366,7 @@ func (service WebsiteService) PrepareDelete(ctx context.Context, subscriptionNam
 	if certificateErr != nil && !strings.Contains(certificateErr.Error(), "not found") {
 		return plan.Plan{}, certificateErr
 	}
-	if hasCertificate && service.Certificates == nil {
+	if hasCertificate && certificate.Managed && service.Certificates == nil {
 		return plan.Plan{}, fmt.Errorf("certificate remover is required to delete TLS website %q", primaryDomain)
 	}
 	vhostPath := filepath.Join(service.Config.Apache.SitesAvailable, meta.FilePrefix+subscriptionName+"-"+primaryDomain+".conf")
@@ -378,14 +378,14 @@ func (service WebsiteService) PrepareDelete(ctx context.Context, subscriptionNam
 		return err
 	}, Undo: func(ctx context.Context) error { return undoApache(ctx) }}}
 	if hasCertificate {
-		steps = append(steps,
-			plan.Step{Name: "delete Certbot certificate", Preview: "certbot delete --cert-name " + certificate.Lineage, Do: func(ctx context.Context) error {
+		if certificate.Managed {
+			steps = append(steps, plan.Step{Name: "delete Certbot certificate", Preview: "certbot delete --cert-name " + certificate.Lineage, Do: func(ctx context.Context) error {
 				return service.Certificates.Delete(ctx, certificate.Lineage)
-			}},
-			plan.Step{Name: "delete certificate metadata", Preview: "delete certificate metadata from SQLite", Do: func(ctx context.Context) error {
-				return service.Store.DeleteCertificateByWebsite(ctx, website.ID)
-			}},
-		)
+			}})
+		}
+		steps = append(steps, plan.Step{Name: "delete certificate metadata", Preview: "delete certificate metadata from SQLite", Do: func(ctx context.Context) error {
+			return service.Store.DeleteCertificateByWebsite(ctx, website.ID)
+		}})
 	}
 	steps = append(steps, plan.Step{Name: "remove website from SQLite", Preview: "delete website and domains from SQLite; retain site data and logs", Do: func(ctx context.Context) error {
 		return service.Store.DeleteWebsite(ctx, website.ID)

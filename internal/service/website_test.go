@@ -55,7 +55,7 @@ type websiteApache struct{}
 type certificateWebsiteStore struct{ websiteStore }
 
 func (store certificateWebsiteStore) CertificateByWebsite(context.Context, int64) (domain.Certificate, error) {
-	return domain.Certificate{ID: 9, Lineage: "provctl-site-4"}, nil
+	return domain.Certificate{ID: 9, Lineage: "provctl-site-4", Managed: true}, nil
 }
 
 type certificateRemover struct{ lineage string }
@@ -210,6 +210,30 @@ func TestWebsiteService_PrepareDeleteDeletesCertificateAfterVHost(t *testing.T) 
 	if got, want := operation.Steps[1].Name, "delete Certbot certificate"; got != want {
 		t.Errorf("second step = %q, want %q", got, want)
 	}
+}
+
+func TestWebsiteService_PrepareDeletePreservesAdoptedCertificate(t *testing.T) {
+	remover := &certificateRemover{}
+	store := certificateWebsiteStore{websiteStore: websiteStore{subscription: domain.Subscription{ID: 1, Name: "acme"}, websites: []domain.Website{{ID: 4, SubscriptionID: 1, Type: domain.WebsiteStatic, PrimaryDomain: "example.test"}}}}
+	service := WebsiteService{Store: adoptedCertificateWebsiteStore{store}, Apache: websiteApache{}, Certificates: remover, Config: config.Config{Apache: config.Apache{SitesAvailable: "/etc/apache2/sites-available", SitesEnabled: "/etc/apache2/sites-enabled"}}}
+	operation, err := service.PrepareDelete(context.Background(), "acme", "example.test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := len(operation.Steps), 3; got != want {
+		t.Fatalf("steps = %d, want %d", got, want)
+	}
+	for _, step := range operation.Steps {
+		if step.Name == "delete Certbot certificate" {
+			t.Fatal("adopted certificate must not be deleted")
+		}
+	}
+}
+
+type adoptedCertificateWebsiteStore struct{ certificateWebsiteStore }
+
+func (store adoptedCertificateWebsiteStore) CertificateByWebsite(context.Context, int64) (domain.Certificate, error) {
+	return domain.Certificate{ID: 9, Lineage: "legacy-example.test", Managed: false}, nil
 }
 
 func TestWebsiteService_ReadLogsReturnsFinalLines(t *testing.T) {

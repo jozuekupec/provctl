@@ -17,9 +17,13 @@ type Certificate struct {
 	PrimaryDomain  string
 	SANs           []string
 	Issuer         string
-	NotBefore      time.Time
-	NotAfter       time.Time
-	LastCheckedAt  time.Time
+	// Managed is true only when provctl issued and may delete the lineage.
+	// Adopted lineages remain Certbot-owned even if their names use provctl's
+	// historical prefix.
+	Managed       bool
+	NotBefore     time.Time
+	NotAfter      time.Time
+	LastCheckedAt time.Time
 }
 
 var certificateName = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,254}$`)

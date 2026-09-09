@@ -30,6 +30,13 @@ may supply the validated original name. This uses the existing column and
 unique constraint; a lineage cannot silently become owned by two websites.
 Live certificate files remain authoritative for SANs and expiry.
 
+Certificate metadata records explicit ownership. Certificates issued by
+provctl are `managed`; an adopted lineage is not, even when its historical
+name happens to begin with `provctl-`. Deleting an adopted website removes its
+generated vhost and local metadata but deliberately leaves the Certbot
+lineage intact. This prevents a migration rollback or later website deletion
+from revoking a certificate that existed before provctl controlled the site.
+
 Repository persistence supports this mapping. Adoption wiring, certificate
 validation, TLS activation, certificate metadata, and renewal rollback are
 still required before this decision is fully implemented.
@@ -56,10 +63,12 @@ use `certonly --keep-until-expiring` here: it can issue a replacement when the
 certificate is nearing expiration. See the
 [Certbot renewal configuration guide](https://eff-certbot.readthedocs.io/en/stable/using.html#modifying-the-renewal-configuration-of-existing-certificates).
 
-The first seven steps are reversible. If certificate renewal verification
-fails after the filesystem transfer, the operation is recorded as
-`inconsistent`; it must state the affected lineage and preserve both the data
-and the pre-change renewal configuration for manual recovery.
+After the system artifacts and SQLite rows are durable, the plan writes an
+explicit recovery boundary before modifying renewal configuration. If
+certificate renewal verification then fails, the operation is recorded as
+`inconsistent`: the adopted data and metadata remain available, while the
+captured pre-change renewal configuration is restored for manual recovery.
+Failures before that boundary roll back normally.
 
 ## Required seams and tests
 

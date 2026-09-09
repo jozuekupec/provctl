@@ -87,3 +87,34 @@ func TestExecutor_MarksInconsistentWhenIrreversibleStepCompleted(t *testing.T) {
 		t.Errorf("final status = %s, want inconsistent", journal.records[len(journal.records)-1].status)
 	}
 }
+
+func TestExecutor_CommitBoundaryPreservesPriorStepsAfterLaterFailure(t *testing.T) {
+	var calls []string
+	journal, locker := &testJournal{}, &testLocker{}
+	_, err := (Executor{Journal: journal, Locker: locker}).Run(context.Background(), Plan{Action: "test", Target: "target", Steps: []Step{
+		{Name: "persist artifact", Do: func(context.Context) error { calls = append(calls, "do artifact"); return nil }, Undo: func(context.Context) error { calls = append(calls, "undo artifact"); return nil }},
+		{Name: "commit", Do: func(context.Context) error { calls = append(calls, "commit"); return nil }, Commit: true},
+		{Name: "verify external state", Do: func(context.Context) error { return errors.New("boom") }},
+	}})
+	if err == nil {
+		t.Fatal("Run() error = nil, want failure")
+	}
+	if got, want := calls, []string{"do artifact", "commit"}; !equalStrings(got, want) {
+		t.Errorf("calls = %#v, want %#v", got, want)
+	}
+	if journal.records[len(journal.records)-1].status != OperationInconsistent {
+		t.Errorf("final status = %s, want inconsistent", journal.records[len(journal.records)-1].status)
+	}
+}
+
+func equalStrings(got, want []string) bool {
+	if len(got) != len(want) {
+		return false
+	}
+	for index := range got {
+		if got[index] != want[index] {
+			return false
+		}
+	}
+	return true
+}

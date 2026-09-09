@@ -492,6 +492,9 @@ func TestSubscriptionService_AdoptMarksRenewalFailureInconsistent(t *testing.T) 
 	if !renewals.restored {
 		t.Error("renewal verification failure did not restore original configuration")
 	}
+	if len(store.values) != 1 || len(store.websites) != 1 {
+		t.Errorf("adopted artifacts were rolled back after renewal failure: subscriptions=%#v websites=%#v", store.values, store.websites)
+	}
 }
 
 func TestSubscriptionService_AdoptPreservesTLSLineage(t *testing.T) {
@@ -508,6 +511,9 @@ func TestSubscriptionService_AdoptPreservesTLSLineage(t *testing.T) {
 	}
 	if len(store.certificates) != 1 || store.certificates[0].WebsiteID != store.websites[0].ID || store.certificates[0].Lineage != "example.test-0001" {
 		t.Fatalf("adopted certificate: %#v", store.certificates)
+	}
+	if store.certificates[0].Managed {
+		t.Fatal("adopted certificate is incorrectly marked as provctl-managed")
 	}
 	if !store.domains["www.example.test"] || !cmp.Equal(store.websites[0].Aliases, []string{"www.example.test"}) {
 		t.Fatal("certificate SAN alias was not adopted")

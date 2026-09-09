@@ -28,7 +28,7 @@ func TestRepository_CertificateRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := repository.CreateCertificate(context.Background(), domain.Certificate{SubscriptionID: subscription.ID, WebsiteID: websiteID, Lineage: "provctl-acme-example.test", PrimaryDomain: "example.test", SANs: []string{"example.test", "www.example.test"}, NotAfter: want}); err != nil {
+	if _, err := repository.CreateCertificate(context.Background(), domain.Certificate{SubscriptionID: subscription.ID, WebsiteID: websiteID, Lineage: "provctl-acme-example.test", PrimaryDomain: "example.test", SANs: []string{"example.test", "www.example.test"}, Managed: true, NotAfter: want}); err != nil {
 		t.Fatal(err)
 	}
 	certificate, err := repository.CertificateByLineage(context.Background(), "provctl-acme-example.test")

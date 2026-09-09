@@ -202,7 +202,7 @@ func (service SubscriptionService) PrepareDelete(ctx context.Context, name strin
 	if err != nil {
 		return plan.Plan{}, fmt.Errorf("list subscription certificates: %w", err)
 	}
-	if len(certificates) > 0 && service.Commands == nil {
+	if hasManagedCertificates(certificates) && service.Commands == nil {
 		return plan.Plan{}, errors.New("commander is required to delete subscription certificates")
 	}
 	account, err := service.Users.Lookup(subscription.UnixUser)
@@ -382,6 +382,9 @@ func (service SubscriptionService) deletePlan(subscription domain.Subscription, 
 	}
 	for _, certificate := range certificates {
 		certificate := certificate
+		if !certificate.Managed {
+			continue
+		}
 		steps = append(steps, plan.Step{Name: "delete Certbot certificate", Preview: "certbot delete --cert-name " + certificate.Lineage, Do: func(ctx context.Context) error {
 			return (CertbotCertificateRemover{Commands: service.Commands}).Delete(ctx, certificate.Lineage)
 		}})
@@ -405,6 +408,15 @@ func (service SubscriptionService) deletePlan(subscription domain.Subscription, 
 		plan.Step{Name: "delete subscription record", Preview: "delete subscription record from SQLite", Do: func(ctx context.Context) error { return service.Store.DeleteSubscription(ctx, subscription.Name) }},
 	)
 	return plan.Plan{Action: "subscription.delete", Target: subscription.Name, Steps: steps}
+}
+
+func hasManagedCertificates(certificates []domain.Certificate) bool {
+	for _, certificate := range certificates {
+		if certificate.Managed {
+			return true
+		}
+	}
+	return false
 }
 
 func (service SubscriptionService) createDirectory(path string, uid int, mode os.FileMode) func(context.Context) error {

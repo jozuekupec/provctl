@@ -468,11 +468,14 @@ func (service SubscriptionService) adoptPlan(store subscriptionAdoptStore, renew
 		}
 		return nil
 	}, Undo: func(ctx context.Context) error { return store.DeleteWebsite(ctx, website.ID) }})
+	if len(renewals) > 0 {
+		steps = append(steps, plan.Step{Name: "commit adopted artifacts before certificate renewal", Preview: "retain adopted system artifacts and SQLite records if certificate renewal verification fails", Do: func(context.Context) error { return nil }, Commit: true})
+	}
 	for _, lineage := range renewals {
 		lineage := lineage
 		certificateStore := store.(adoptionCertificateStore)
 		steps = append(steps, plan.Step{Name: "record adopted certificate", Preview: "retain Certbot lineage " + lineage.Name, Do: func(ctx context.Context) error {
-			_, err := certificateStore.CreateCertificate(ctx, domain.Certificate{SubscriptionID: subscription.ID, WebsiteID: website.ID, Lineage: lineage.Name, PrimaryDomain: options.Domain, SANs: lineage.Domains, Issuer: lineage.Issuer, NotBefore: lineage.NotBefore, NotAfter: lineage.NotAfter, LastCheckedAt: time.Now().UTC()})
+			_, err := certificateStore.CreateCertificate(ctx, domain.Certificate{SubscriptionID: subscription.ID, WebsiteID: website.ID, Lineage: lineage.Name, PrimaryDomain: options.Domain, SANs: lineage.Domains, Issuer: lineage.Issuer, Managed: false, NotBefore: lineage.NotBefore, NotAfter: lineage.NotAfter, LastCheckedAt: time.Now().UTC()})
 			return err
 		}, Undo: func(ctx context.Context) error { return certificateStore.DeleteCertificateByWebsite(ctx, website.ID) }})
 		var restoreRenewal func(context.Context) error

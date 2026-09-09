@@ -372,6 +372,18 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   Více nalezených certifikátů odmítá před změnami. Service test ověřuje
   zachování názvu a vazby metadat; zbývá review obnovy/mazání převzatého
   certifikátu a reálný kontejnerový test TLS adopce.
+  Review mazání je nyní zapracované: migrace SQLite `0006` ukládá explicitní
+  vlastnictví certifikátu. Nově vydané lineage jsou `managed`, ale převzaté
+  jsou vždy cizí bez ohledu na svůj historický název. Mazání webu nebo
+  subscription proto odstraní Certbot lineage jen pro `managed` záznam;
+  převzatý certifikát a jeho živé soubory zůstanou zachované, odstraní se jen
+  provctl metadata. Cílené service a SQLite race testy prošly.
+  Obnovovací větev má nyní v journalu explicitní recovery hranici až po
+  úspěšném vytvoření systémových artefaktů a SQLite záznamů. Selže-li až
+  následný `certbot renew --dry-run`, plán obnoví zachycenou renewal konfiguraci,
+  ale data adopce záměrně ponechá a operaci označí `inconsistent` pro ruční
+  dokončení. Selhání před hranicí se dál standardně vrací rollbackem. Nový
+  unit test executoru a service race test ověřují obě vlastnosti.
   Review změnilo obnovu při adopci na Certbot `reconfigure` místo `certonly
   --keep-until-expiring`, které mohlo vydat nový živý certifikát. Regresní
   test ověřuje přesné argumenty bez změny SAN; service race testy prošly.
