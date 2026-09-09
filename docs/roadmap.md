@@ -231,6 +231,13 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   runtime závislosti `zstd` a pro cron artefakty balíček `cron`; oba jsou
   uvedeny v cookbooku. Zbývá nový lifecycle certifikátů a bezpečný scénář
   přepisu pomocí `--force`.
+  `backup restore --force` nyní před smazáním existující subscription vždy
+  vytvoří novou current-state zálohu; teprve po jejím úspěchu spustí stejný
+  bezpečný delete lifecycle a clean restore. Když delete selže, chyba vypíše
+  ID bezpečně vytvořené zálohy pro obnovu a původní data se nepřepisují.
+  Cílené unit testy ověřují pořadí backup → delete, odmítnutí delete při
+  selhání backupu a dohledatelné ID při selhání delete. Reálný E2 overwrite
+  round-trip ještě zbývá.
 - [x] **M8 — TUI:** návrh je zaznamenán v [tui-design.md](tui-design.md) a
   cíleně přebírá konzistentní Bubble Tea vzor z projektu `depo`: hodnotový
   model, `Deps`, samostatné routing/render/keys/theme a I/O jen přes `tea.Cmd`.

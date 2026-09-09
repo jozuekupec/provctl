@@ -154,6 +154,7 @@ func (backupStore) ListSSHKeys(context.Context, int64) ([]domain.SSHKey, error) 
 func (backupStore) ListCertificates(context.Context, int64) ([]domain.Certificate, error) {
 	return nil, nil
 }
+func (backupStore) DeleteCertificatesBySubscription(context.Context, int64) error { return nil }
 func (backupStore) CreateDatabase(context.Context, domain.Database) error         { return nil }
 func (backupStore) DeleteDatabase(context.Context, int64, string) error           { return nil }
 func (backupStore) CreateWebsite(context.Context, domain.Website) (int64, error)  { return 1, nil }
@@ -249,6 +250,50 @@ func TestBackupService_PromoteStagingRejectsExistingTarget(t *testing.T) {
 	err := service.promoteStaging("/vhosts/.restore-acme", "/vhosts/acme")
 	if err == nil || !strings.Contains(err.Error(), "already exists") {
 		t.Fatalf("promoteStaging() error = %v", err)
+	}
+}
+
+func TestReplaceCurrentState_BacksUpBeforeDelete(t *testing.T) {
+	var calls []string
+	backupID, err := replaceCurrentState(context.Background(), "acme", func(context.Context, string) (int64, error) {
+		calls = append(calls, "backup")
+		return 42, nil
+	}, func(context.Context, string) error {
+		calls = append(calls, "delete")
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if backupID != 42 || strings.Join(calls, ",") != "backup,delete" {
+		t.Fatalf("backupID=%d calls=%#v", backupID, calls)
+	}
+}
+
+func TestReplaceCurrentState_DoesNotDeleteWithoutBackup(t *testing.T) {
+	deleted := false
+	_, err := replaceCurrentState(context.Background(), "acme", func(context.Context, string) (int64, error) {
+		return 0, fmt.Errorf("archive failed")
+	}, func(context.Context, string) error {
+		deleted = true
+		return nil
+	})
+	if err == nil || !strings.Contains(err.Error(), "current-state backup") {
+		t.Fatalf("error = %v", err)
+	}
+	if deleted {
+		t.Fatal("delete ran despite backup failure")
+	}
+}
+
+func TestReplaceCurrentState_ReportsRecoverableBackupOnDeleteFailure(t *testing.T) {
+	_, err := replaceCurrentState(context.Background(), "acme", func(context.Context, string) (int64, error) {
+		return 42, nil
+	}, func(context.Context, string) error {
+		return fmt.Errorf("delete failed")
+	})
+	if err == nil || !strings.Contains(err.Error(), "backup 42") || !strings.Contains(err.Error(), "delete failed") {
+		t.Fatalf("error = %v", err)
 	}
 }
 

@@ -39,6 +39,7 @@ type BackupStore interface {
 	ListCronJobs(context.Context, int64) ([]domain.CronJob, error)
 	ListSSHKeys(context.Context, int64) ([]domain.SSHKey, error)
 	ListCertificates(context.Context, int64) ([]domain.Certificate, error)
+	DeleteCertificatesBySubscription(context.Context, int64) error
 	CreateDatabase(context.Context, domain.Database) error
 	DeleteDatabase(context.Context, int64, string) error
 	CreateWebsite(context.Context, domain.Website) (int64, error)
@@ -66,9 +67,8 @@ type BackupService struct {
 	LockerFor  func(string) system.Locker
 }
 
-// Restore restores a verified file archive onto a clean server. Existing
-// subscriptions are deliberately refused until overwrite recovery can first
-// make a new backup of their current state.
+// Restore restores a verified file archive. An existing subscription requires
+// force; its complete current state is backed up before removal and restore.
 type RestoreResult struct {
 	OperationID       int64
 	DatabasePasswords map[string]string
@@ -78,9 +78,6 @@ func (service BackupService) Restore(ctx context.Context, name string, id int64,
 	metadata, err := service.PrepareRestore(ctx, name, id)
 	if err != nil {
 		return RestoreResult{}, err
-	}
-	if force {
-		return RestoreResult{}, fmt.Errorf("restore --force is not available until current-state backup is implemented")
 	}
 	if service.Users == nil || service.Executor.Journal == nil || service.Executor.Locker == nil {
 		return RestoreResult{}, fmt.Errorf("restore user manager and executor are required")
@@ -96,7 +93,12 @@ func (service BackupService) Restore(ctx context.Context, name string, id int64,
 		return RestoreResult{}, fmt.Errorf("check restore subscription: %w", err)
 	}
 	if exists {
-		return RestoreResult{}, fmt.Errorf("subscription %q already exists; restore requires --force after a current-state backup", name)
+		if !force {
+			return RestoreResult{}, fmt.Errorf("subscription %q already exists; restore requires --force after a current-state backup", name)
+		}
+		if _, err := service.replaceExistingSubscription(ctx, name); err != nil {
+			return RestoreResult{}, err
+		}
 	}
 	target := filepath.Join(service.Config.Paths.VHosts, name)
 	if _, err := service.FS.Stat(target); err == nil {
@@ -124,6 +126,32 @@ func (service BackupService) Restore(ctx context.Context, name string, id int64,
 		return RestoreResult{OperationID: operationID}, err
 	}
 	return RestoreResult{OperationID: operationID, DatabasePasswords: passwords}, nil
+}
+
+// replaceExistingSubscription creates a recoverable archive before the
+// destructive delete. The archive ID is included in failures so the operator
+// can recover the original state instead of retrying a partial replacement.
+func (service BackupService) replaceExistingSubscription(ctx context.Context, name string) (int64, error) {
+	return replaceCurrentState(ctx, name, service.Create, func(ctx context.Context, target string) error {
+		deletion := SubscriptionService{
+			FS: service.FS, Users: service.Users, Store: service.Store,
+			Executor: service.Executor, Commands: service.Commands, Apache: service.Apache,
+			MariaDB: service.MariaDB, PHPFPM: service.PHPFPM, Config: service.Config,
+		}
+		_, err := deletion.Delete(ctx, target, true)
+		return err
+	})
+}
+
+func replaceCurrentState(ctx context.Context, name string, create func(context.Context, string) (int64, error), deleteCurrent func(context.Context, string) error) (int64, error) {
+	backupID, err := create(ctx, name)
+	if err != nil {
+		return 0, fmt.Errorf("create current-state backup before restore --force: %w", err)
+	}
+	if err := deleteCurrent(ctx, name); err != nil {
+		return backupID, fmt.Errorf("current state is safely backed up as backup %d, but could not remove subscription %q: %w", backupID, name, err)
+	}
+	return backupID, nil
 }
 
 func (service BackupService) restoreDatabasePasswords(databases []domain.Database) (map[string]string, error) {
