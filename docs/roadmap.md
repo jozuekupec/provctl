@@ -236,8 +236,10 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   bezpečný delete lifecycle a clean restore. Když delete selže, chyba vypíše
   ID bezpečně vytvořené zálohy pro obnovu a původní data se nepřepisují.
   Cílené unit testy ověřují pořadí backup → delete, odmítnutí delete při
-  selhání backupu a dohledatelné ID při selhání delete. Reálný E2 overwrite
-  round-trip ještě zbývá.
+  selhání backupu a dohledatelné ID při selhání delete. E2 overwrite
+  round-trip nyní prošel: static web obnovil původní marker, `backup list`
+  po restore ukázal původní i current-state zálohu a `apache2ctl configtest`
+  skončil úspěšně; `pv` byl vrácen na `clean`.
   Adresář každé nové zálohy nyní zahrnuje nanosekundy UTC, takže běžná záloha
   a bezprostřední current-state záloha při `restore --force` nemohou sdílet
   stejnou cestu. Regresní test kryje tuto kolizi.
@@ -249,14 +251,14 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   subscription s uloženou výchozí PHP verzí, ale bez PHP-FPM website, nemá
   žádný pool k odstranění. Delete jej nyní odstraňuje jen když alespoň jeden
   web skutečně používá PHP-FPM; unit test kryje PHP-FPM i static-only větev.
-  Stejný E2 průchod potvrdil obnovení původního markeru a `apache2ctl
+  Původní E2 průchod potvrdil obnovení původního markeru a `apache2ctl
   configtest`, ale odhalil, že clean restore zanechával historické backup
   záznamy bez vazby na nový subscription ID. Restore je nyní po zápisu nového
   subscription bezpečně znovu přiřadí pouze z jeho přesného backup rootu;
   sousední cesty zůstávají orphaned. SQLite regresní test kryje obě větve.
-  Druhý E2 běh této poslední větve nebyl spuštěn, protože automatické Incus
-  oprávnění odmítlo zápis do `pv`; kontejner byl bezpečně vrácen na `clean` a
-  potvrzen jako `RUNNING`.
+  Opakovaný E2 průchod pak reattachment ověřil: `backup list` po forced
+  restore vypisuje oba záznamy, marker z původní zálohy je obnoven a Apache
+  configtest zůstává zelený. Kontejner byl vrácen na `clean` a běží.
 - [x] **M8 — TUI:** návrh je zaznamenán v [tui-design.md](tui-design.md) a
   cíleně přebírá konzistentní Bubble Tea vzor z projektu `depo`: hodnotový
   model, `Deps`, samostatné routing/render/keys/theme a I/O jen přes `tea.Cmd`.
