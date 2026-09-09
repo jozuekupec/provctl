@@ -503,7 +503,7 @@ func (service BackupService) Create(ctx context.Context, name string) (backupID 
 	}
 	defer unlock()
 	started := time.Now().UTC()
-	directory := filepath.Join(service.Config.Paths.Backups, name, started.Format("2006-01-02T15-04-05Z"))
+	directory := filepath.Join(service.Config.Paths.Backups, name, backupDirectoryName(started))
 	if err := service.FS.MkdirAll(directory, 0o700); err != nil {
 		return 0, fmt.Errorf("create backup directory: %w", err)
 	}
@@ -591,6 +591,12 @@ func (service BackupService) Create(ctx context.Context, name string) (backupID 
 	}
 	finished = true
 	return backupID, nil
+}
+
+func backupDirectoryName(started time.Time) string {
+	// A forced restore can create a current-state archive immediately after an
+	// operator-created backup. Nanoseconds avoid both archives sharing a path.
+	return started.UTC().Format("2006-01-02T15-04-05.000000000Z")
 }
 
 func (service BackupService) writeChecksums(directory string, names []string) error {

@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"provctl/internal/config"
 	"provctl/internal/domain"
@@ -294,6 +295,14 @@ func TestReplaceCurrentState_ReportsRecoverableBackupOnDeleteFailure(t *testing.
 	})
 	if err == nil || !strings.Contains(err.Error(), "backup 42") || !strings.Contains(err.Error(), "delete failed") {
 		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestBackupDirectoryName_PreservesNanosecondUniqueness(t *testing.T) {
+	first := time.Date(2026, 9, 10, 12, 0, 0, 1, time.UTC)
+	second := first.Add(time.Nanosecond)
+	if backupDirectoryName(first) == backupDirectoryName(second) {
+		t.Fatalf("backup directory names collide: %q", backupDirectoryName(first))
 	}
 }
 

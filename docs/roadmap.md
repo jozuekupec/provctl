@@ -238,6 +238,9 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   Cílené unit testy ověřují pořadí backup → delete, odmítnutí delete při
   selhání backupu a dohledatelné ID při selhání delete. Reálný E2 overwrite
   round-trip ještě zbývá.
+  Adresář každé nové zálohy nyní zahrnuje nanosekundy UTC, takže běžná záloha
+  a bezprostřední current-state záloha při `restore --force` nemohou sdílet
+  stejnou cestu. Regresní test kryje tuto kolizi.
 - [x] **M8 — TUI:** návrh je zaznamenán v [tui-design.md](tui-design.md) a
   cíleně přebírá konzistentní Bubble Tea vzor z projektu `depo`: hodnotový
   model, `Deps`, samostatné routing/render/keys/theme a I/O jen přes `tea.Cmd`.
