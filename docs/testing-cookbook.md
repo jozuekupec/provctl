@@ -259,6 +259,26 @@ sudo incus admin init --minimal
 sudo usermod -aG incus-admin "$USER"   # odhlásit/přihlásit
 ```
 
+### Lokální E2 helper
+
+Scénáře níže používají `scripts/e2.sh`, aby se žádný příkaz určený pro test
+omylem nespustil na hostu. Helper je záměrně omezený na instanci `pv` a její
+snapshot `clean`; `sh` spustí zadaný příkaz jako root **jen uvnitř** tohoto
+kontejneru.
+
+```bash
+chmod +x scripts/e2.sh
+./scripts/e2.sh status
+./scripts/e2.sh reset
+./scripts/e2.sh push dist/provctl_1.0.0_amd64.deb
+./scripts/e2.sh sh 'dpkg -i /root/provctl_1.0.0_amd64.deb'
+```
+
+Vyžaduje to aktivní členství ve skupině `incus-admin` (po `usermod` se nově
+přihlas nebo použij `sg incus-admin -c '…'`). `reset` čeká až 30 sekund na
+systemd a vrátí úspěch také pro očekávaný stav `degraded`; před každým
+mutujícím scénářem jej spusť znovu.
+
 Pokud ne, funguje stejně `lxd` (snap) nebo přejdi na E4 (VM). Docker se pro tohle **nedoporučuje** — bez systemd nemá `systemctl` co dělat a testoval bys jinou cestu kódem než produkční.
 
 ### Vytvoření a zlatý snapshot
