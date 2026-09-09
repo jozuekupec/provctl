@@ -17,4 +17,7 @@ func TestCheckAdoptionVHostConflicts(t *testing.T) {
 	if err := checkAdoptionVHostConflicts("port 80 namevhost other.test (/etc/apache2/sites-enabled/example.test.conf:1)", []string{"example.test"}); err != nil {
 		t.Fatal(err)
 	}
+	if err := checkAdoptionVHostConflicts("alias [invalid", []string{"example.test"}); err == nil {
+		t.Fatal("malformed Apache pattern was accepted")
+	}
 }

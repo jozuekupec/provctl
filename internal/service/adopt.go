@@ -325,7 +325,10 @@ func checkAdoptionVHostConflicts(dump string, domains []string) error {
 			}
 			pattern := strings.ToLower(fields[index+1])
 			for _, name := range domains {
-				matched, _ := filepath.Match(pattern, name)
+				matched, err := filepath.Match(pattern, name)
+				if err != nil {
+					return fmt.Errorf("cannot safely inspect Apache hostname pattern %q: %w", pattern, err)
+				}
 				if matched {
 					return fmt.Errorf("domain %q is already served by Apache (%s); disable the legacy vhost explicitly before adoption", name, strings.TrimSpace(line))
 				}

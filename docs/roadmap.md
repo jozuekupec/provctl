@@ -381,6 +381,9 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   aliasů a wildcardů. Kolize vyžaduje explicitní vypnutí původního vhostu;
   cizí konfiguraci nástroj automaticky nepřepisuje. Parser pokrývá jednotlivý
   vhost i name-based výpis; reálný výpis je nutné ověřit v integračním testu.
+  Malformed wildcard pattern se nyní odmítá fail-closed, aby parser nikdy
+  neprohlásil nečitelnou legacy konfiguraci za bezpečnou; cílený unit test
+  pokrývá tento guard.
   SAN převzatého certifikátu se přenášejí jako aliasy webu do Apache i DB.
   Před změnami se ověřují doménová pravidla a konflikt s již spravovanými
   doménami; wildcard není v této HTTP-01 adopci podporován. Service race
