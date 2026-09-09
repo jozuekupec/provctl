@@ -149,7 +149,7 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   vhosty a certificate lineages: každý vhost je odstraněn přes Apache applier
   s configtestem a reloadem, Certbot lineages následují před smazáním SQLite
   certificate metadata.
-- [~] **M7 — provoz:** první read-only část `health` je dostupná jako
+- [x] **M7 — provoz:** první read-only část `health` je dostupná jako
   `provctl health [<subscription> [<domain>]]` v textu i přes `--json`.
   Kontroluje aktivní Apache, `apachectl configtest`, read-only SQLite spojení,
   enabled vhost, DocumentRoot, PHP-FPM pool a socket, DNS vůči IP serveru a
@@ -230,7 +230,7 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   a opravil pořadí mazání PHP-FPM poolu před `userdel`. Pro zálohy patří mezi
   runtime závislosti `zstd` a pro cron artefakty balíček `cron`; oba jsou
   uvedeny v cookbooku. Zbývá nový lifecycle certifikátů a bezpečný scénář
-  přepisu pomocí `--force`.
+  přepisu pomocí `--force`; ten je nyní implementovaný a E2 ověřený níže.
   `backup restore --force` nyní před smazáním existující subscription vždy
   vytvoří novou current-state zálohu; teprve po jejím úspěchu spustí stejný
   bezpečný delete lifecycle a clean restore. Když delete selže, chyba vypíše
