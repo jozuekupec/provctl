@@ -325,7 +325,8 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   nemůže úspěšně skončit bez binárek potřebných pro backup a cron lifecycle.
   Lokální fallback verze balíčku také nyní normalizuje netagovaný commit na
   validní Debian tvar `0.0.0+git.<sha>` (a release tagy dál používají verzi
-  tagu); `dpkg-deb --field Version` tento tvar ověřil.
+  tagu). Kontrola rozlišuje exact tag od hashe i když hash začíná číslicí;
+  `dpkg-deb --field Version` tento tvar ověřil.
   CI nyní spouští `lintian` i `piuparts` proti Debianu trixie; první vzdálený
   běh ještě musí potvrdit. Tag `vX.Y.Z` spouští release workflow, který vytvoří
   `.deb` s verzí `X.Y.Z` a připojí jej ke GitHub Release. V `pv` úspěšně

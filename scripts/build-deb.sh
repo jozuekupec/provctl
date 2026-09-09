@@ -4,12 +4,20 @@ set -eu
 if [ -n "${VERSION:-}" ]; then
   version=$VERSION
 else
-  described=$(git describe --tags --always --dirty 2>/dev/null || printf 'dev')
-  case "$described" in
-    v[0-9]*) version=${described#v} ;;
-    [0-9]*) version=$described ;;
-    *) version=0.0.0+git.$described ;;
-  esac
+  if tag=$(git describe --tags --exact-match 2>/dev/null); then
+    case "$tag" in
+      v[0-9]*) version=${tag#v} ;;
+      [0-9]*) version=$tag ;;
+      *) echo "release tag must begin with v followed by a digit: $tag" >&2; exit 2 ;;
+    esac
+  else
+    revision=$(git rev-parse --short HEAD 2>/dev/null || printf 'dev')
+    dirty=
+    if ! git diff --quiet 2>/dev/null; then
+      dirty=-dirty
+    fi
+    version=0.0.0+git.$revision$dirty
+  fi
 fi
 
 case "$version" in
