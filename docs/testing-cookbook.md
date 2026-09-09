@@ -566,6 +566,14 @@ Test timeoutu:
 
 **Očekávané:** `--dry-run` vypíše plán a **nic nepřesune**; ostrý běh přesune data, nastaví práva, vytvoří uživatele a web funguje. Záloha před přesunem existuje.
 
+TLS větev vyžaduje samostatný Pebble obraz: před adopcí připrav platný legacy
+lineage pokrývající `stary.test` (a případné SAN aliasy), pak ověř `curl -k
+--resolve stary.test:443:127.0.0.1 https://stary.test/`, `provctl ssl status
+stary stary.test` a `certbot renew --cert-name <legacy-lineage> --dry-run`.
+Po smazání adopovaného webu ověř, že jeho legacy lineage v
+`/etc/letsencrypt/live/` zůstal zachovaný. Běžný snapshot `clean` Pebble
+neobsahuje, proto je tento follow-up oddělený od standardního E2 průchodu.
+
 ### T18 — lokální APT repozitář
 
 ```bash
