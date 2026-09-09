@@ -369,6 +369,12 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   verze binárky a čtení databáze přes `subscription list`; kontejner obnoven
   na `clean` a potvrzen stav RUNNING. Jde o lokální testovací klíč a file
   transport, nikoli důkaz produkčního podpisu nebo dostupnosti GitHub Pages.
+  Read-only kontrola GitHub API nyní potvrzuje, že Pages používají workflow
+  deployment na `https://jozuekupec.github.io/provctl/`, oba potřebné Actions
+  secrets (`APT_GPG_PRIVATE_KEY`, `APT_GPG_PASSPHRASE`) jsou nastavené a
+  dosavadní CI běhy jsou zelené. Repo ale zatím nemá žádný GitHub Release;
+  produkční podpis, Pages deployment APT obsahu a instalace skutečným APT
+  klientem proto čekají na push aktuální větve a první záměrný release tag.
 - [~] **M10 — migrace:**
   První integrační běh v `pv` odhalil rozpor: Debian balíček instaloval
   `/etc/logrotate.d/provctl`, ale bootstrap očekával jiný obsah a odmítal jej.
