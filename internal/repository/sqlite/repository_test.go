@@ -80,7 +80,7 @@ func TestApplyMigrations_PreservesBackupsFromSchemaOne(t *testing.T) {
 	if _, err := database.Exec(`CREATE TABLE schema_migrations (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL); INSERT INTO schema_migrations VALUES (1, '2026-01-01T00:00:00Z')`); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := database.Exec(`INSERT INTO subscriptions (name, unix_user, unix_uid, home, status, php_max_children, php_memory_limit, php_upload_max, php_max_exec_time, ssh_access, created_at, updated_at) VALUES ('acme', 'acme', 5000, '/vhosts/acme', 'active', 10, '256M', '64M', 60, 'none', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z'); INSERT INTO backups (subscription_id, path, status, started_at) VALUES (1, '/backups/acme/one', 'complete', '2026-01-01T00:00:00Z')`); err != nil {
+	if _, err := database.Exec(`INSERT INTO subscriptions (name, unix_user, unix_uid, home, status, php_max_children, php_memory_limit, php_upload_max, php_max_exec_time, ssh_access, created_at, updated_at) VALUES ('acme', 'acme', 5000, '/vhosts/acme', 'active', 10, '256M', '64M', 60, 'none', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z'); INSERT INTO backups (subscription_id, path, status, started_at) VALUES (1, '/backups/acme/one', 'complete', '2026-01-01T00:00:00Z'); INSERT INTO certificates (subscription_id, lineage, primary_domain, sans) VALUES (1, 'provctl-acme-example.test', 'example.test', '["example.test"]')`); err != nil {
 		t.Fatal(err)
 	}
 	if err := ApplyMigrations(ctx, database); err != nil {
@@ -90,7 +90,11 @@ func TestApplyMigrations_PreservesBackupsFromSchemaOne(t *testing.T) {
 	if err := database.QueryRow(`SELECT MAX(version) FROM schema_migrations`).Scan(&version); err != nil || version != 6 {
 		t.Fatalf("schema version = %d, %v", version, err)
 	}
-	if _, err := database.Exec(`DELETE FROM subscriptions WHERE id = 1`); err != nil {
+	var managed bool
+	if err := database.QueryRow(`SELECT managed FROM certificates WHERE lineage = 'provctl-acme-example.test'`).Scan(&managed); err != nil || !managed {
+		t.Fatalf("migrated certificate ownership = %t, %v, want managed", managed, err)
+	}
+	if _, err := database.Exec(`DELETE FROM certificates WHERE subscription_id = 1; DELETE FROM subscriptions WHERE id = 1`); err != nil {
 		t.Fatalf("delete migrated subscription: %v", err)
 	}
 	var count int
