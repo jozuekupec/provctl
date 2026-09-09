@@ -387,8 +387,10 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   SAN převzatého certifikátu se přenášejí jako aliasy webu do Apache i DB.
   Před změnami se ověřují doménová pravidla a konflikt s již spravovanými
   doménami; wildcard není v této HTTP-01 adopci podporován. Service race
-  test ověřuje zachování aliasu. Reálná kolize s nespravovaným Apache vhostem
-  a TLS/Pebble větev stále zbývají.
+  test ověřuje zachování aliasu. Reálný `pv` test s aktivním legacy vhostem
+  pro stejnou doménu potvrdil odmítnutí před přesunem dat a bez vytvoření
+  subscription či provctl vhostu; kontejner byl vrácen na `clean`. TLS/Pebble
+  větev stále zbývá.
   Schválené zachování původního Certbot lineage má podporu v repository:
   `CreateWebsite` zachová validovaný explicitní `CertificateName`, pro nové
   weby zůstává default `provctl-site-<id>`. Test pokrývá round-trip přes
