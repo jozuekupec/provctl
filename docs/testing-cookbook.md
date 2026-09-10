@@ -242,6 +242,13 @@ sudo piuparts -d trixie \
   dist/provctl_0.9.0_amd64.deb dist/provctl_1.0.0_amd64.deb
 ```
 
+Pro stejný upgrade v izolovaném `pv` bez E1 nástrojů na hostu:
+
+```bash
+./scripts/tests/t06-piuparts-upgrade.sh \
+  dist/provctl_0.9.0_amd64.deb dist/provctl_1.0.0_amd64.deb
+```
+
 **[MUST] Ruční doplněk** (piuparts sám nezkontroluje obsah upraveného configu) — v E2:
 
 ```bash

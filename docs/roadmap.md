@@ -381,6 +381,10 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   konkrétní `.deb` a přes `trap` vrací `clean` snapshot. Cookbook již
   nepoužívá přepínač `--warn-on-leftover-files`, který aktuální piuparts
   nepodporuje.
+  T06 je obdobně opakovatelný přes `scripts/tests/t06-piuparts-upgrade.sh`;
+  upgrade `0.0.3~local → 0.0.4~local` proběhl v čistém trixie chrootu bez
+  chyby a instance se následně vrátila na `clean`. Ručně upravený conffile
+  zůstává samostatnou explicitní E2 kontrolou, protože ji piuparts nepokrývá.
 - [~] **M10 — migrace:**
   První integrační běh v `pv` odhalil rozpor: Debian balíček instaloval
   `/etc/logrotate.d/provctl`, ale bootstrap očekával jiný obsah a odmítal jej.
