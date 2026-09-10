@@ -442,7 +442,7 @@ CREATE TABLE operations (
 | `/var/lib/provctl/` | `root:root` | `0700` | |
 | `/var/lib/provctl/provctl.db` | `root:root` | `0600` | |
 | `/var/lib/provctl-acme-challenge/` a `/.well-known/acme-challenge/` | `root:root` | `0755` | centrální webroot pro ACME; je mimo privátní state dir, aby jej Apache mohl číst |
-| `/var/log/provctl/` | `root:adm` | `0750` | |
+| `/var/log/provctl/` | `root:adm` | `0751` | traversal only for subscriptions; listing remains restricted |
 | `/var/log/provctl/audit.jsonl` | `root:adm` | `0640` | |
 | `/run/provctl.lock` | `root:root` | `0600` | |
 
@@ -485,6 +485,9 @@ CREATE TABLE operations (
 
 - provctl **předvytvoří** prázdné log soubory se správnými právy před prvním reloadem Apache (Apache do existujícího souboru jen appenduje a práva nemění).
 - logrotate je udržuje přes `create 0640 root acme`.
+- Top-level `/var/log/provctl` is `root:adm 0751`: subscriptions may traverse
+  to a known own log path but cannot list the global log directory. Individual
+  subscription and website directories remain `root:<subscription> 0750`.
 - V home subscription může být **[LATER]** read-only pohled; v v0.1 se logy čtou přes `provctl website logs`.
 
 ---

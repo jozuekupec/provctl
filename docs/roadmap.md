@@ -476,6 +476,16 @@ kontejneru. Syntaxe helperu i celý bezpečný tok `reset → push → sh → re
 pro aktuální `.deb` proti běžícímu `pv` byly ověřeny; postup je v
 [testing-cookbook.md](testing-cookbook.md).
 
+T10 je nyní zapsaný jako opakovatelný `scripts/tests/t10-isolation.sh`. Test
+vytvoří dvě subscriptions a PHP-FPM weby a ověří oddělení shellu, PHP
+`open_basedir`, session, privátních cest HTTP i Apache logů; `trap` vždy
+obnoví `pv clean`. Při jeho prvním reálném běhu se ukázal nesoulad v průchodu
+kořenovým logovým adresářem. Bootstrap proto migruje známý starší režim
+`/var/log/provctl` z `0750` na `0751` (`root:adm`): uživatel může projít jen
+ke známé vlastní cestě, ale obsah kořene nevylistuje. Unit test pokrývá
+aplikaci i rollback této úzké migrace. Zbývá nové sestavení balíčku a závěrečný
+T10 běh v `pv`.
+
 Poslední integrační ověření (2026-08-30): bootstrap vytvořil požadované cesty
 včetně práv, `apachectl configtest` a reload uspěly a druhý běh byl beze změn.
 Následný `doctor` potvrdil provctl, Apache, PHP-FPM a Certbot; testovací obraz

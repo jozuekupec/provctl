@@ -447,7 +447,7 @@ incus file push /tmp/evil.php pv/var/www/vhosts/beta/sites/b.test/public/evil.ph
 **Test 5 — symlink útok na logy (privilege escalation):**
 
 ```bash
-./scripts/e2.sh sh 'sudo -u alfa ln -s /etc/shadow /var/log/provctl/alfa/a.test/access.log 2>&1'
+./scripts/e2.sh sh 'sudo -u alfa ln -s /etc/shadow /var/log/provctl/alfa/a.test/shadow-link 2>&1'
 ./scripts/e2.sh sh 'stat -c "%U:%G %a" /var/log/provctl/alfa/a.test'
 ```
 **Očekávané:** symlink **selže** (`Permission denied`) a adresář je `root:alfa 750`. Pokud symlink projde, je to kritická chyba — Apache otevírá logy jako root.
@@ -460,6 +460,13 @@ incus file push /tmp/evil.php pv/var/www/vhosts/beta/sites/b.test/public/evil.ph
 ```
 
 **[MUST]** Celý T10 zapiš jako skript `scripts/tests/t10-isolation.sh` s návratovým kódem. Je to test, který se musí pouštět po každé změně práv nebo šablon.
+
+Skript je implementovaný; přijímá přesnou cestu k `.deb`, vždy obnoví `pv`
+po úspěchu i selhání a nepouští žádný testovací příkaz na hostu:
+
+```bash
+./scripts/tests/t10-isolation.sh dist/provctl_0.0.0+git.<sha>_amd64.deb
+```
 
 ### T11 — rollback s reálným Apache
 

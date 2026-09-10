@@ -130,7 +130,7 @@ func (service BootstrapService) Prepare(ctx context.Context) (plan.Plan, error) 
 		{path: meta.StateDir, mode: 0o700, name: "create state directory"},
 		{path: service.Config.Paths.ACMEChallenge, mode: 0o755, name: "create ACME challenge directory"},
 		{path: filepath.Join(service.Config.Paths.ACMEChallenge, ".well-known", "acme-challenge"), mode: 0o755, name: "create ACME challenge content directory"},
-		{path: meta.LogDir, mode: 0o750, name: "create log directory", gid: service.AuditGroup},
+		{path: meta.LogDir, mode: 0o751, name: "create log directory", gid: service.AuditGroup, previousModes: []os.FileMode{0o750}},
 		{path: service.Config.Paths.VHosts, mode: 0o755, name: "create vhosts root"},
 	}
 	steps := make([]plan.Step, 0, 10)
@@ -225,10 +225,11 @@ func (service BootstrapService) Prepare(ctx context.Context) (plan.Plan, error) 
 }
 
 type managedDirectory struct {
-	name string
-	path string
-	mode os.FileMode
-	gid  int
+	name          string
+	path          string
+	mode          os.FileMode
+	gid           int
+	previousModes []os.FileMode
 }
 
 func (directory managedDirectory) needs(fs system.FS) (bool, error) {
@@ -243,6 +244,11 @@ func (directory managedDirectory) needs(fs system.FS) (bool, error) {
 		return false, fmt.Errorf("refuse to replace non-directory %q", directory.path)
 	}
 	if info.Mode().Perm() != directory.mode {
+		for _, previousMode := range directory.previousModes {
+			if info.Mode().Perm() == previousMode {
+				return true, nil
+			}
+		}
 		return false, fmt.Errorf("refuse to change permissions of existing directory %q", directory.path)
 	}
 	return false, nil
@@ -250,11 +256,19 @@ func (directory managedDirectory) needs(fs system.FS) (bool, error) {
 
 func (service BootstrapService) managedDirectoryStep(directory managedDirectory) plan.Step {
 	created := false
+	var previousMode os.FileMode
 	return plan.Step{Name: directory.name, Preview: fmt.Sprintf("mkdir -m %04o %s", directory.mode, directory.path), Do: func(context.Context) error {
+		info, err := service.FS.Stat(directory.path)
+		if errors.Is(err, os.ErrNotExist) {
+			created = true
+		} else if err != nil {
+			return fmt.Errorf("inspect directory %q before update: %w", directory.path, err)
+		} else {
+			previousMode = info.Mode().Perm()
+		}
 		if err := service.FS.MkdirAll(directory.path, directory.mode); err != nil {
 			return fmt.Errorf("create directory %q: %w", directory.path, err)
 		}
-		created = true
 		if err := service.FS.Chown(directory.path, 0, directory.gid); err != nil {
 			return fmt.Errorf("own directory %q: %w", directory.path, err)
 		}
@@ -263,10 +277,10 @@ func (service BootstrapService) managedDirectoryStep(directory managedDirectory)
 		}
 		return nil
 	}, Undo: func(context.Context) error {
-		if !created {
-			return nil
+		if created {
+			return service.FS.Remove(directory.path)
 		}
-		return service.FS.Remove(directory.path)
+		return service.FS.Chmod(directory.path, previousMode)
 	}}
 }
 

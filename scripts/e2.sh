@@ -34,6 +34,13 @@ wait_for_systemd() {
 	return 1
 }
 
+ensure_running() {
+	state=$(incus list "$instance" --format csv -c s)
+	if [ "$state" != "RUNNING" ]; then
+		incus start "$instance"
+	fi
+}
+
 command=${1:-}
 case "$command" in
 	status)
@@ -43,12 +50,13 @@ case "$command" in
 	reset)
 		test "$#" -eq 1 || { usage >&2; exit 2; }
 		incus snapshot restore "$instance" "$snapshot"
+		ensure_running
 		wait_for_systemd
 		;;
 	push)
 		test "$#" -eq 2 || { usage >&2; exit 2; }
 		test -f "$2" || { echo "not a regular file: $2" >&2; exit 2; }
-		incus file push "$2" "$instance/root/"
+		incus file push --quiet "$2" "$instance/root/"
 		;;
 	sh)
 		test "$#" -eq 2 || { usage >&2; exit 2; }

@@ -1,5 +1,18 @@
 # Repository Guidelines
 
+## Progress Notifications
+
+After each coherent implementation, test, or review block, send the user a
+concise Czech status report to the configured self-hosted ntfy topic. Use a
+POST body via `curl` and ignore its self-signed certificate:
+
+```bash
+curl -k -X POST -d '<status message>' https://ntfy.lifecode.cz/wfa-2fa-3zo
+```
+
+Do not report every individual command; report completed blocks, material
+findings, blockers, and the next active step.
+
 ## Project Structure & Module Organization
 
 This repository currently contains the implementation specification in `docs/`:
