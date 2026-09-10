@@ -211,7 +211,7 @@ diff -u testdata/packaging/contents.expected dist/contents.actual
 ### T05 — install / remove / purge
 
 ```bash
-sudo piuparts -d trixie --warn-on-leftover-files dist/provctl_1.0.0_amd64.deb
+sudo piuparts -d trixie dist/provctl_1.0.0_amd64.deb
 ```
 
 **Očekávané:**
@@ -219,6 +219,16 @@ sudo piuparts -d trixie --warn-on-leftover-files dist/provctl_1.0.0_amd64.deb
 - `postinst` neselže, ani když není Apache nakonfigurovaný
 - po `purge` nezůstane `/etc/provctl` ani `/var/lib/provctl`
 - piuparts nehlásí neznámé zbylé soubory
+
+Opakovatelný E2 běh, který instaluje `piuparts` pouze do `pv` a po úspěchu i
+selhání obnoví snapshot, je:
+
+```bash
+./scripts/tests/t05-piuparts.sh dist/provctl_0.0.0+git.<sha>_amd64.deb
+```
+
+Debian 13 `piuparts 1.6.0` nepodporuje historický přepínač
+`--warn-on-leftover-files`; upozornění na zbylé soubory kontroluje standardně.
 
 ### T06 — upgrade a zachování conffile
 
@@ -228,7 +238,7 @@ Potřebuješ dvě verze. Postav starší z tagu nebo jen s jiným `VERSION`:
 VERSION=0.9.0 ./scripts/build-deb.sh
 VERSION=1.0.0 ./scripts/build-deb.sh
 
-sudo piuparts -d trixie --warn-on-leftover-files \
+sudo piuparts -d trixie \
   dist/provctl_0.9.0_amd64.deb dist/provctl_1.0.0_amd64.deb
 ```
 
