@@ -383,8 +383,10 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   nepodporuje.
   T06 je obdobně opakovatelný přes `scripts/tests/t06-piuparts-upgrade.sh`;
   upgrade `0.0.3~local → 0.0.4~local` proběhl v čistém trixie chrootu bez
-  chyby a instance se následně vrátila na `clean`. Ručně upravený conffile
-  zůstává samostatnou explicitní E2 kontrolou, protože ji piuparts nepokrývá.
+  chyby a instance se následně vrátila na `clean`. Wrapper po piuparts navíc
+  nainstaluje oba balíčky přímo v `pv`, změní `config.toml` a ověří zachování
+  komentáře i `vhosts = "/data/web/vhosts"`; samostatná reprodukce potvrdila
+  obě hodnoty před upgradem i po něm.
 - [~] **M10 — migrace:**
   První integrační běh v `pv` odhalil rozpor: Debian balíček instaloval
   `/etc/logrotate.d/provctl`, ale bootstrap očekával jiný obsah a odmítal jej.

@@ -249,7 +249,7 @@ Pro stejný upgrade v izolovaném `pv` bez E1 nástrojů na hostu:
   dist/provctl_0.9.0_amd64.deb dist/provctl_1.0.0_amd64.deb
 ```
 
-**[MUST] Ruční doplněk** (piuparts sám nezkontroluje obsah upraveného configu) — v E2:
+**[MUST] Kontrola conffile** (piuparts sám nezkontroluje obsah upraveného configu) — v E2:
 
 ```bash
 apt install -y ./provctl_0.9.0_amd64.deb
@@ -264,6 +264,9 @@ test -f /etc/provctl/config.toml.dpkg-dist && echo "CHYBA: dpkg nabídl náhradu
 ```
 
 **Očekávané:** obě `OK`, žádná `CHYBA`, a **žádný interaktivní dotaz dpkg** na konfiguraci.
+
+`t06-piuparts-upgrade.sh` provádí stejnou aserci automaticky, s vlastním
+jednoznačným komentářem a cestou `/data/web/vhosts`.
 
 ---
 
