@@ -487,6 +487,11 @@ aplikaci i rollback této úzké migrace. Balíček
 `provctl_0.0.0+git.78689e3_amd64.deb` a celý T10 scénář proti `pv` prošly;
 po běhu byl ověřen návrat instance na snapshot `clean`.
 
+T04 má nyní neprivilegovaný `scripts/tests/t04-package.sh`: kontroluje control
+metadata, conffile, zákaznická data mimo balíček, požadované cesty a jejich
+práva i velikost artefaktu. Pro `provctl_0.0.0+git.78689e3_amd64.deb` prošel
+bez instalace; tím je ruční package-checklist z cookbooku opakovatelný.
+
 Poslední integrační ověření (2026-08-30): bootstrap vytvořil požadované cesty
 včetně práv, `apachectl configtest` a reload uspěly a druhý běh byl beze změn.
 Následný `doctor` potvrdil provctl, Apache, PHP-FPM a Certbot; testovací obraz

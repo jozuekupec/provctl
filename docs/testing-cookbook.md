@@ -191,6 +191,15 @@ dpkg-deb --contents dist/provctl_*_amd64.deb
 - [ ] balíček neobsahuje nic pod `/var/www`
 - [ ] velikost binárky je rozumná (< 30 MB)
 
+Pro opakovatelnou kontrolu bez instalace balíčku použij:
+
+```bash
+./scripts/tests/t04-package.sh dist/provctl_0.0.0+git.<sha>_amd64.deb
+```
+
+Skript ověří control metadata, conffile, povinné cesty a práva, absenci
+zákaznických dat pod `/var/www` a velikost balíčku. Nevyžaduje root ani Incus.
+
 Automatizace:
 
 ```bash
