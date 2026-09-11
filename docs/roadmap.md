@@ -393,11 +393,10 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   etapy. Úplný běh s `0.0.5~local` a předchozím `0.0.4~local` skončil kódem
   0; všechny čtyři etapy vypsaly `PASS` a `pv` se po závěrečném restore vrátil
   do stavu `RUNNING`.
-  Read-only kontrola 2026-09-11 potvrdila, že `origin/main` je na
-  `39f6c5d`, zatímco lokální `main` je na `52efb7c` (72 commitů napřed) a
-  vzdálený repozitář zatím nemá žádný tag. Další release brána je proto
-  jednoznačně push této větve a uživatelem zvolený první release tag; až ten
-  může spustit produkční podpis a Pages deployment.
+  Read-only kontrola 2026-09-12 potvrdila, že lokální `main` je synchronní s
+  `origin/main` a vzdálený repozitář stále nemá žádný tag. Další release
+  brána je proto pouze uživatelem zvolený první tag `vX.Y.Z`; až ten může
+  spustit produkční podpis a Pages deployment.
   První CI běh po pushi odhalil, že aktuální `ubuntu-latest` (Noble) nemá
   instalační kandidát pro `piuparts`; package job proto končil před buildem
   kódem 100. Kontrola install/purge proto běží v samostatném Debian 13 Docker
