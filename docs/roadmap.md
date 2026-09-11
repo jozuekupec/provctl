@@ -416,7 +416,10 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   Před adopcí se kontroluje aktivní konfigurace přes `apache2ctl -S` včetně
   aliasů a wildcardů. Kolize vyžaduje explicitní vypnutí původního vhostu;
   cizí konfiguraci nástroj automaticky nepřepisuje. Parser pokrývá jednotlivý
-  vhost i name-based výpis; reálný výpis je nutné ověřit v integračním testu.
+  vhost i name-based výpis; opakovatelný T17 vytváří skutečný aktivní legacy
+  vhost v `pv` a ověřuje odmítnutí ještě před přesunem dat či zápisem do
+  provctl. Balíček `0.0.7~local` tímto testem prošel a `pv` se následně
+  obnovil na `clean`.
   Malformed wildcard pattern se nyní odmítá fail-closed, aby parser nikdy
   neprohlásil nečitelnou legacy konfiguraci za bezpečnou; cílený unit test
   pokrývá tento guard.

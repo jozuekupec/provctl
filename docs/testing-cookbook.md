@@ -824,7 +824,7 @@ scripts/
 ├── build-apt-repo.sh       # volá reprepro, používá CI i lokál
 ├── e2.sh                   # helper nad incus
 └── tests/
-    ├── run-all.sh          # spustí implementované T04/T05/T06/T10, nenulový kód při selhání
+    ├── run-all.sh          # spustí implementované T04/T05/T06/T10/T17, nenulový kód při selhání
     ├── t04-package.sh
     ├── t05-piuparts.sh
     ├── t06-piuparts-upgrade.sh
@@ -876,6 +876,7 @@ který připojuje `/proc`; neprovádí žádnou operaci nad hostitelským projek
 [ ] piuparts upgrade z předchozí verze     (E1)
 [ ] scripts/tests/run-all.sh               (E2)
 [ ] t10-isolation.sh zvlášť a pozorně      (E2)
+[ ] t17-adopt.sh                           (E2)
 [ ] t16-ssl.sh proti Pebble                (E3)
 [ ] lokální file:// APT repo               (E2)
 [ ] git tag vX.Y.Z~rc1  → suite testing

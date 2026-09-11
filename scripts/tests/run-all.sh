@@ -33,5 +33,6 @@ if test -n "$previous"; then
 	run_stage T06 "$tests/t06-piuparts-upgrade.sh" "$previous" "$current"
 fi
 run_stage T10 "$tests/t10-isolation.sh" "$current"
+run_stage T17 "$tests/t17-adopt.sh" "$current"
 
 echo 'PASS: implemented package and E2 regressions'
