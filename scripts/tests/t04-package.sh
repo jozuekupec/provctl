@@ -46,6 +46,9 @@ require_entry() {
 }
 
 require_entry '^-rwxr-xr-x root/root .* ./usr/bin/provctl$'
+require_entry '^-rw-r--r-- root/root .* ./usr/share/doc/provctl/copyright$'
+require_entry '^-rw-r--r-- (root/root|0/0) .* ./usr/share/doc/provctl/changelog.Debian.gz$'
+require_entry '^-rw-r--r-- root/root .* ./usr/share/lintian/overrides/provctl$'
 require_entry '^drwx------ root/root .* ./var/lib/provctl/$'
 require_entry '^drwxr-x--- root/root .* ./var/log/provctl/$'
 if echo "$contents" | grep -F ' ./var/www/' >/dev/null; then

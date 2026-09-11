@@ -8,7 +8,7 @@ case "$1" in
     install -d -m 0755 -o root -g root /var/lib/provctl-acme-challenge
     install -d -m 0750 -o root -g adm /var/log/provctl
 
-    /usr/bin/provctl migrate --quiet || {
+    provctl migrate --quiet || {
       echo "provctl: database migration failed; run 'provctl migrate' manually" >&2
     }
 

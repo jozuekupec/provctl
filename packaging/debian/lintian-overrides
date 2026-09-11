@@ -1,0 +1,13 @@
+# provctl is deliberately built as one CGO-free Go binary for portable,
+# reproducible deployment; Debian's dynamic-linking warning is not applicable.
+provctl: statically-linked-binary
+provctl: unstripped-binary-or-object
+
+# These paths hold secrets and per-customer operational data, so their modes
+# are deliberately stricter than the generic Debian defaults.
+provctl: non-standard-dir-perm 0700 != 0755 [var/lib/provctl/]
+provctl: non-standard-dir-perm 0750 != 0755 [var/log/provctl/]
+provctl: non-standard-file-perm 0640 != 0644 [etc/provctl/config.toml]
+
+# Runtime discovery of installed packages is intentional product behavior.
+provctl: uses-dpkg-database-directly [usr/bin/provctl]

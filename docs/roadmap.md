@@ -521,6 +521,15 @@ metadata, conffile, zákaznická data mimo balíček, požadované cesty a jejic
 práva i velikost artefaktu. Pro `provctl_0.0.0+git.78689e3_amd64.deb` prošel
 bez instalace; tím je ruční package-checklist z cookbooku opakovatelný.
 
+V balíčkové CI se ukázal nesoulad licenčních metadat a chybějící Debian
+dokumentace. Závazná licence projektu je GPLv3 (`LICENSE`), proto nfpm i
+specifikace uvádějí `GPL-3.0-only`. Balíček nově nese strojově čitelný
+copyright a generovaný `changelog.Debian.gz`; T04 je kontroluje. Statický,
+CGO-free Go binární soubor a záměrně restriktivní oprávnění provozních cest
+mají úzce popsané lintian overrides. Lokální build `0.0.6~local`, T04,
+`lintian --no-tag-display-limit` v izolovaném Debian 13 `pv`, `make test` a
+actionlint prošly; opakovaný běh vzdálené CI zbývá po pushi.
+
 Poslední integrační ověření (2026-08-30): bootstrap vytvořil požadované cesty
 včetně práv, `apachectl configtest` a reload uspěly a druhý běh byl beze změn.
 Následný `doctor` potvrdil provctl, Apache, PHP-FPM a Certbot; testovací obraz

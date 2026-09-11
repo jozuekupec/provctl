@@ -13,7 +13,8 @@ description: |
   Generate server configuration from managed state with operation journaling,
   health checks, and rollback support.
 homepage: https://github.com/jozuekupec/provctl
-license: MIT
+license: GPL-3.0-only
+changelog: ./packaging/debian/changelog.yaml
 
 depends:
   - adduser
@@ -54,6 +55,14 @@ contents:
     type: config|noreplace
     file_info:
       mode: 0644
+  - src: ./packaging/debian/copyright
+    dst: /usr/share/doc/provctl/copyright
+    file_info:
+      mode: 0644
+  - src: ./packaging/debian/lintian-overrides
+    dst: /usr/share/lintian/overrides/provctl
+    file_info:
+      mode: 0644
   - dst: /var/lib/provctl
     type: dir
     file_info:
@@ -69,5 +78,4 @@ contents:
 
 scripts:
   postinstall: ./packaging/debian/postinst
-  preremove: ./packaging/debian/prerm
   postremove: ./packaging/debian/postrm

@@ -1416,7 +1416,7 @@ maintainer: "<jméno> <email>"
 description: |
   Minimal hosting control-plane for Debian (Apache, PHP-FPM, MariaDB, SSL).
 homepage: https://github.com/<org>/provctl
-license: MIT
+license: GPL-3.0-only
 
 depends:
   - adduser

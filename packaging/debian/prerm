@@ -1,6 +1,0 @@
-#!/bin/sh
-set -e
-
-# Removing the package intentionally leaves all generated hosting artifacts
-# intact so Apache can continue serving existing sites.
-exit 0
