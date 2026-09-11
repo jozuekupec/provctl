@@ -859,10 +859,11 @@ skriptu.
 
 **[MUST]** `scripts/build-deb.sh` a `scripts/build-apt-repo.sh` používá CI i lokální testování. Žádné inline kroky ve workflow — jinak testuješ jiný proces, než jaký publikuje.
 
-GitHub Actions sestavuje balíček a kontroluje `lintian` v hostitelském jobu,
-ale `piuparts` běží v samostatném jobu s obrazem `debian:trixie`. Ubuntu
-runner `piuparts` neposkytuje; Debian job zároveň odpovídá cílovému systému
-balíčku a stahuje přesně artefakt vytvořený package jobem.
+GitHub Actions sestavuje balíček a kontroluje `lintian` v hostitelském jobu.
+`piuparts` běží v samostatném jobu jako privilegovaný Docker kontejner
+`debian:trixie`, který stahuje přesně artefakt vytvořený package jobem.
+Privilegovaný kontejner je nutný pouze pro vlastní dočasný piuparts chroot,
+který připojuje `/proc`; neprovádí žádnou operaci nad hostitelským projektem.
 
 ---
 
