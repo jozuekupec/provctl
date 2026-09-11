@@ -22,7 +22,7 @@ EOF
 
 wait_for_systemd() {
 	attempt=0
-	while [ "$attempt" -lt 30 ]; do
+	while [ "$attempt" -lt 60 ]; do
 		state=$(incus exec "$instance" -- systemctl is-system-running 2>/dev/null || true)
 		case "$state" in
 			running|degraded) return 0 ;;
@@ -30,7 +30,7 @@ wait_for_systemd() {
 		attempt=$((attempt + 1))
 		sleep 1
 	done
-	echo "systemd in $instance did not become ready within 30 seconds" >&2
+	echo "systemd in $instance did not become ready within 60 seconds" >&2
 	return 1
 }
 

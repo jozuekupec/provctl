@@ -295,7 +295,9 @@ sudo usermod -aG incus-admin "$USER"   # odhlásit/přihlásit
 Scénáře níže používají `scripts/e2.sh`, aby se žádný příkaz určený pro test
 omylem nespustil na hostu. Helper je záměrně omezený na instanci `pv` a její
 snapshot `clean`; `sh` spustí zadaný příkaz jako root **jen uvnitř** tohoto
-kontejneru.
+kontejneru. Po restore helper čeká nejvýše 60 sekund na `running` nebo
+`degraded` systemd stav, aby pomalejší start kontejneru nezpůsobil falešné
+selhání integračního testu.
 
 ```bash
 chmod +x scripts/e2.sh
