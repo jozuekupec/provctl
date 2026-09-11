@@ -59,4 +59,4 @@ run 'test "$(stat -c "%U:%G %a" /var/log/provctl/alfa/a.test)" = "root:alfa 750"
 run 'runuser -u alfa -- head -1 /var/log/provctl/alfa/a.test/access.log >/dev/null'
 run 'if runuser -u beta -- head -1 /var/log/provctl/alfa/a.test/access.log >/dev/null 2>&1; then echo "beta read alfa log" >&2; exit 1; fi'
 
-echo 'T10 isolation passed.'
+echo 'PASS: T10 isolation'

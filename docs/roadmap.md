@@ -381,12 +381,18 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   konkrétní `.deb` a přes `trap` vrací `clean` snapshot. Cookbook již
   nepoužívá přepínač `--warn-on-leftover-files`, který aktuální piuparts
   nepodporuje.
-  T06 je obdobně opakovatelný přes `scripts/tests/t06-piuparts-upgrade.sh`;
-  upgrade `0.0.3~local → 0.0.4~local` proběhl v čistém trixie chrootu bez
-  chyby a instance se následně vrátila na `clean`. Wrapper po piuparts navíc
-  nainstaluje oba balíčky přímo v `pv`, změní `config.toml` a ověří zachování
-  komentáře i `vhosts = "/data/web/vhosts"`; samostatná reprodukce potvrdila
-  obě hodnoty před upgradem i po něm.
+  T06 je obdobně opakovatelný přes `scripts/tests/t06-piuparts-upgrade.sh`.
+  Jeho název je historický: `piuparts` neumí ověřit upgrade dvou lokálních
+  `.deb`, protože je nemá v APT cache. Wrapper proto provádí skutečný
+  `dpkg -i` upgrade v `pv`, změní `config.toml` a ověří zachování komentáře i
+  `vhosts = "/data/web/vhosts"`; samostatná reprodukce potvrdila obě hodnoty
+  před upgradem i po něm. `piuparts` zůstává přesně vymezený na T05
+  install/purge.
+  Nový `scripts/tests/run-all.sh` spouští implementované T04, T05, volitelné
+  T06 a T10 postupně a při selhání předává skutečný nenulový návratový kód
+  etapy. Úplný běh s `0.0.5~local` a předchozím `0.0.4~local` skončil kódem
+  0; všechny čtyři etapy vypsaly `PASS` a `pv` se po závěrečném restore vrátil
+  do stavu `RUNNING`.
 - [~] **M10 — migrace:**
   První integrační běh v `pv` odhalil rozpor: Debian balíček instaloval
   `/etc/logrotate.d/provctl`, ale bootstrap očekával jiný obsah a odmítal jej.

@@ -238,8 +238,8 @@ Potřebuješ dvě verze. Postav starší z tagu nebo jen s jiným `VERSION`:
 VERSION=0.9.0 ./scripts/build-deb.sh
 VERSION=1.0.0 ./scripts/build-deb.sh
 
-sudo piuparts -d trixie \
-  dist/provctl_0.9.0_amd64.deb dist/provctl_1.0.0_amd64.deb
+sudo apt install ./dist/provctl_0.9.0_amd64.deb
+sudo apt install ./dist/provctl_1.0.0_amd64.deb
 ```
 
 Pro stejný upgrade v izolovaném `pv` bez E1 nástrojů na hostu:
@@ -265,8 +265,10 @@ test -f /etc/provctl/config.toml.dpkg-dist && echo "CHYBA: dpkg nabídl náhradu
 
 **Očekávané:** obě `OK`, žádná `CHYBA`, a **žádný interaktivní dotaz dpkg** na konfiguraci.
 
-`t06-piuparts-upgrade.sh` provádí stejnou aserci automaticky, s vlastním
-jednoznačným komentářem a cestou `/data/web/vhosts`.
+`t06-piuparts-upgrade.sh` provádí skutečný `dpkg -i` upgrade a stejnou
+aserci automaticky, s vlastním jednoznačným komentářem a cestou
+`/data/web/vhosts`. `piuparts` nekontroluje upgrade dvou lokálních `.deb`,
+protože je nemá v APT cache; pro něj zůstává T05 install/purge kontrolou.
 
 ---
 
@@ -822,8 +824,10 @@ scripts/
 ├── build-apt-repo.sh       # volá reprepro, používá CI i lokál
 ├── e2.sh                   # helper nad incus
 └── tests/
-    ├── run-all.sh          # spustí T05–T19 v E2, vrací nenulový kód při selhání
+    ├── run-all.sh          # spustí implementované T04/T05/T06/T10, nenulový kód při selhání
     ├── t04-package.sh
+    ├── t05-piuparts.sh
+    ├── t06-piuparts-upgrade.sh
     ├── t07-doctor.sh
     ├── t08-bootstrap.sh
     ├── t09-lifecycle.sh
@@ -835,7 +839,19 @@ scripts/
     └── t17-adopt.sh
 ```
 
-**[MUST]** Každý skript:
+`run-all.sh` přijímá aktuální `.deb` a volitelně starší `.deb` pro T06:
+
+```bash
+./scripts/tests/run-all.sh dist/provctl_1.0.0_amd64.deb \
+  dist/provctl_0.9.0_amd64.deb
+```
+
+Spouští T04, T05, volitelné T06 a T10 v tomto pořadí. Při prvním selhání
+vypíše `FAIL: Tnn (exit N)` a předá návratový kód dané etapy; `PASS` na konci
+proto znamená úspěch celého implementovaného rozsahu, nikoli jen posledního
+skriptu.
+
+**[MUST]** Každý E2 skript:
 - začíná `set -eu`
 - resetuje kontejner na snapshot `clean`
 - na konci vypíše `PASS` / `FAIL: <důvod>` a vrací odpovídající exit kód
