@@ -418,8 +418,9 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   cizí konfiguraci nástroj automaticky nepřepisuje. Parser pokrývá jednotlivý
   vhost i name-based výpis; opakovatelný T17 vytváří skutečný aktivní legacy
   vhost v `pv` a ověřuje odmítnutí ještě před přesunem dat či zápisem do
-  provctl. Balíček `0.0.7~local` tímto testem prošel a `pv` se následně
-  obnovil na `clean`.
+  provctl. Po jeho explicitním vypnutí test provede atomickou adopci a ověří
+  PHP-FPM/Apache artefakty i HTTP odpověď. Balíček `0.0.7~local` prošel oběma
+  větvemi a `pv` se následně obnovil na `clean`.
   Malformed wildcard pattern se nyní odmítá fail-closed, aby parser nikdy
   neprohlásil nečitelnou legacy konfiguraci za bezpečnou; cílený unit test
   pokrývá tento guard.

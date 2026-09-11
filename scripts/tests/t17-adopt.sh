@@ -30,7 +30,7 @@ run() {
 
 "$e2" reset
 "$e2" push "$package"
-run "export DEBIAN_FRONTEND=noninteractive; { apt-get -qq update && apt-get -qq install -y adduser apache2 cron php-fpm zstd && dpkg -i /root/$package_name; } >/tmp/provctl-t17-install.log 2>&1 || { cat /tmp/provctl-t17-install.log >&2; exit 1; }"
+run "export DEBIAN_FRONTEND=noninteractive; { apt-get -qq update && apt-get -qq install -y adduser apache2 cron curl php-fpm zstd && dpkg -i /root/$package_name; } >/tmp/provctl-t17-install.log 2>&1 || { cat /tmp/provctl-t17-install.log >&2; exit 1; }"
 run 'provctl bootstrap --install-missing --yes'
 run 'install -d -m 0755 /srv/legacy && printf "legacy\n" >/srv/legacy/index.html'
 run 'printf "%s\n" "<VirtualHost *:80>" "    ServerName collision.test" "    DocumentRoot /srv/legacy" "</VirtualHost>" >/etc/apache2/sites-available/legacy-collision.conf && a2ensite legacy-collision.conf && apache2ctl configtest && systemctl reload apache2'
@@ -40,4 +40,10 @@ run 'printf "%s\n" "<VirtualHost *:80>" "    ServerName collision.test" "    Doc
 run 'if provctl subscription adopt migrated --from /srv/legacy --domain collision.test --dry-run >/tmp/provctl-t17.out 2>/tmp/provctl-t17.err; then echo "adoption accepted an active legacy vhost" >&2; exit 1; fi; grep -F "already served by Apache" /tmp/provctl-t17.err'
 run 'test -f /srv/legacy/index.html && ! test -e /var/www/vhosts/migrated && ! test -e /etc/apache2/sites-available/provctl-migrated-collision.test.conf && ! provctl subscription list | grep -Fx migrated'
 
-echo 'PASS: T17 adoption rejects active Apache vhost'
+# Once an operator explicitly disables the conflicting vhost, adoption moves
+# the legacy root and makes it reachable through the generated PHP-FPM vhost.
+run 'a2dissite legacy-collision.conf && apache2ctl configtest && systemctl reload apache2'
+run 'provctl subscription adopt migrated --from /srv/legacy --domain collision.test --no-backup'
+run 'test ! -e /srv/legacy && test -f /var/www/vhosts/migrated/sites/collision.test/public/index.html && grep -F "collision.test" /etc/apache2/sites-available/provctl-migrated-collision.test.conf && test "$(curl -fsS -H "Host: collision.test" http://127.0.0.1/)" = legacy && provctl subscription list | grep -E "^migrated[[:space:]]"'
+
+echo 'PASS: T17 adoption conflict and migration'
