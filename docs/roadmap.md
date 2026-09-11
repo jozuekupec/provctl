@@ -393,6 +393,11 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   etapy. Úplný běh s `0.0.5~local` a předchozím `0.0.4~local` skončil kódem
   0; všechny čtyři etapy vypsaly `PASS` a `pv` se po závěrečném restore vrátil
   do stavu `RUNNING`.
+  Read-only kontrola 2026-09-11 potvrdila, že `origin/main` je na
+  `39f6c5d`, zatímco lokální `main` je na `52efb7c` (72 commitů napřed) a
+  vzdálený repozitář zatím nemá žádný tag. Další release brána je proto
+  jednoznačně push této větve a uživatelem zvolený první release tag; až ten
+  může spustit produkční podpis a Pages deployment.
 - [~] **M10 — migrace:**
   První integrační běh v `pv` odhalil rozpor: Debian balíček instaloval
   `/etc/logrotate.d/provctl`, ale bootstrap očekával jiný obsah a odmítal jej.
