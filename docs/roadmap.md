@@ -422,7 +422,8 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   PHP-FPM/Apache artefakty i HTTP odpověď. Balíček `0.0.7~local` prošel oběma
   větvemi a `pv` se následně obnovil na `clean`.
   E2 helper po obnově snapshotu nyní čeká až 60 sekund na systemd místo 30;
-  tím se odstraní falešné selhání T05 při pomalejším startu `pv`.
+  tím se odstraní falešné selhání T05 při pomalejším startu `pv`. Změna
+  prošla také kompletní vzdálenou CI `34655796789` včetně Debian 13 piuparts.
   Malformed wildcard pattern se nyní odmítá fail-closed, aby parser nikdy
   neprohlásil nečitelnou legacy konfiguraci za bezpečnou; cílený unit test
   pokrývá tento guard.
