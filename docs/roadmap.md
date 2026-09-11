@@ -404,7 +404,8 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   kontejneru a stahuje artefakt z package jobu. Přímý GitHub Actions
   `container:` job selhal při piuparts mountu `/proc` kvůli chybějící
   `CAP_SYS_ADMIN`; workflow nyní používá pouze pro tento izolovaný chroot
-  `docker run --privileged`. Oprava čeká na CI ověření po pushi.
+  `docker run --privileged`. Lokální běh i vzdálený CI běh `34653180305`
+  (commit `9af00a0`) úspěšně ověřily build, lintian a Debian 13 piuparts.
 - [~] **M10 — migrace:**
   První integrační běh v `pv` odhalil rozpor: Debian balíček instaloval
   `/etc/logrotate.d/provctl`, ale bootstrap očekával jiný obsah a odmítal jej.
@@ -531,8 +532,8 @@ mají úzce popsané lintian overrides. Lokální build `0.0.6~local`, T04,
 `lintian --no-tag-display-limit` v izolovaném Debian 13 `pv`, `make test` a
 actionlint prošly. Vzdálený package job po pushi `b4b59d0` také prošel;
 piuparts selhal výhradně na omezeném mountu `/proc` v Actions container jobu.
-Workflow je upravený na privilegovaný Debian Docker chroot a jeho opakované
-CI ověření zbývá po následujícím pushi.
+Workflow byl upravený na privilegovaný Debian Docker chroot; následující
+vzdálený běh `34653180305` pro `9af00a0` je kompletně zelený.
 
 Poslední integrační ověření (2026-08-30): bootstrap vytvořil požadované cesty
 včetně práv, `apachectl configtest` a reload uspěly a druhý běh byl beze změn.
