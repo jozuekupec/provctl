@@ -398,6 +398,12 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   vzdálený repozitář zatím nemá žádný tag. Další release brána je proto
   jednoznačně push této větve a uživatelem zvolený první release tag; až ten
   může spustit produkční podpis a Pages deployment.
+  První CI běh po pushi odhalil, že aktuální `ubuntu-latest` (Noble) nemá
+  instalační kandidát pro `piuparts`; package job proto končil před buildem
+  kódem 100. Kontrola install/purge se přesouvá do samostatného jobu v
+  kontejneru `debian:trixie`, který stahuje artefakt z package jobu. Tím se
+  ověřuje v cílové Debian distribuci a není vázána na skladbu Ubuntu runneru;
+  oprava čeká na CI ověření po pushi.
 - [~] **M10 — migrace:**
   První integrační běh v `pv` odhalil rozpor: Debian balíček instaloval
   `/etc/logrotate.d/provctl`, ale bootstrap očekával jiný obsah a odmítal jej.
