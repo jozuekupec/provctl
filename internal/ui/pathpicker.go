@@ -44,11 +44,22 @@ func (m appModel) openPathPickerForSetting() (appModel, tea.Cmd) {
 	input.Prompt = ""
 	input.SetValue(m.settings.values[field])
 	m.pathPicker = pathPickerState{
-		open: true, field: field, mode: mode, loading: true,
+		open: true, field: field, target: pathPickerSettings, mode: mode, loading: true,
 		generation: m.pathPicker.generation + 1, filter: newFilter(), pathInput: input,
 	}
 	m.status = ""
 	return m, m.listPathCmd(m.settings.values[field], m.pathPicker.generation)
+}
+
+func (m appModel) openPathPickerForDocumentRoot() (appModel, tea.Cmd) {
+	input := newFilter().input
+	input.Prompt = ""
+	input.SetValue(m.documentRootForm.input.Value())
+	m.pathPicker = pathPickerState{
+		open: true, target: pathPickerDocumentRoot, mode: fsbrowse.Dirs, loading: true,
+		generation: m.pathPicker.generation + 1, filter: newFilter(), pathInput: input,
+	}
+	return m, m.listPathCmd(m.documentRootForm.input.Value(), m.pathPicker.generation)
 }
 
 func (m appModel) listPathCmd(path string, generation uint64) tea.Cmd {
@@ -123,8 +134,17 @@ func (m appModel) acceptPath(path string) appModel {
 		m.pathPicker.err = "resolve selected path: " + err.Error()
 		return m
 	}
-	m.settings.values[m.pathPicker.field] = absolute
+	switch m.pathPicker.target {
+	case pathPickerDocumentRoot:
+		m.documentRootForm.input.SetValue(absolute)
+	default:
+		m.settings.values[m.pathPicker.field] = absolute
+	}
 	m.pathPicker = pathPickerState{}
+	if m.documentRootForm.open {
+		m.documentRootForm.input.Focus()
+		return m
+	}
 	return m.focusSettingInput()
 }
 

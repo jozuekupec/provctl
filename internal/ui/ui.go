@@ -118,6 +118,20 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.output = m.output.append("TLS for " + msg.domain + " enabled=" + fmt.Sprint(msg.enabled))
 		m, command := m.startWebsites()
 		return m, command
+	case websiteDocumentRootChangedMsg:
+		m.progress.active = false
+		if msg.err != nil {
+			m.status = "document root change failed: " + msg.err.Error()
+			m.output = m.output.append(m.status)
+			return m, nil
+		}
+		m.documentRootForm = documentRootFormState{}
+		m.status = "document root for " + msg.domain + " updated"
+		m.output = m.output.append("document root updated: " + msg.root)
+		if msg.items != nil {
+			m.websites = append([]domain.Website(nil), msg.items...)
+		}
+		return m, nil
 	case subscriptionChangedMsg:
 		m.progress.active = false
 		if msg.err != nil {

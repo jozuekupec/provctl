@@ -393,6 +393,12 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   with rollback to the previous vhost/root. Focused service, SQLite and CLI
   tests cover the path validation and persisted state. The next part is the
   TUI domain create/edit form, including reuse of the picker for its root.
+  The first edit capability is complete: capital `E` over a static or PHP-FPM
+  domain opens a bounded document-root form; Enter opens the shared picker,
+  Ctrl+S follows the standard confirmation, and the existing progress popup
+  reports Apache apply plus refresh without changing focus. Its model tests
+  cover modal flow, service target, refreshed result and exact terminal width.
+  Domain creation and the remaining editable domain fields still follow.
   Původní návrh je zaznamenán v [tui-design.md](tui-design.md) a
   cíleně přebírá konzistentní Bubble Tea vzor z projektu `depo`: hodnotový
   model, `Deps`, samostatné routing/render/keys/theme a I/O jen přes `tea.Cmd`.

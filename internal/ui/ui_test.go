@@ -173,6 +173,55 @@ func TestModel_PathPickerPopupFitsTerminal(t *testing.T) {
 	}
 }
 
+func TestModel_DocumentRootFormConfirmsAndUpdatesSelectedDomain(t *testing.T) {
+	var gotSubscription, gotDomain, gotRoot string
+	m := New(Deps{
+		SetWebsiteDocumentRoot: func(_ context.Context, subscription, domain, root string) (int64, error) {
+			gotSubscription, gotDomain, gotRoot = subscription, domain, root
+			return 1, nil
+		},
+		LoadWebsites: func(_ context.Context, _ int64) ([]domain.Website, error) {
+			return []domain.Website{{ID: 2, PrimaryDomain: "example.test", Type: domain.WebsiteStatic, DocumentRoot: "/vhosts/acme/new-public"}}, nil
+		},
+	})
+	m.items = []domain.Subscription{{ID: 1, Name: "acme"}}
+	m.websites = []domain.Website{{ID: 2, PrimaryDomain: "example.test", Type: domain.WebsiteStatic, DocumentRoot: "/vhosts/acme/public"}}
+	m.workspace, m.showWebsites, m.focus = true, true, focusWebsites
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("E")})
+	m = updated.(appModel)
+	if !m.documentRootForm.open {
+		t.Fatal("document root form did not open")
+	}
+	m.documentRootForm.input.SetValue("/vhosts/acme/new-public")
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyCtrlS})
+	m = updated.(appModel)
+	if m.documentRootForm.open || m.confirm.action != "set-document-root" {
+		t.Fatalf("form/confirmation = %#v / %#v", m.documentRootForm, m.confirm)
+	}
+	updated, command := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("y")})
+	m = runProgress(t, updated.(appModel), command)
+	if gotSubscription != "acme" || gotDomain != "example.test" || gotRoot != "/vhosts/acme/new-public" {
+		t.Fatalf("SetWebsiteDocumentRoot(%q, %q, %q)", gotSubscription, gotDomain, gotRoot)
+	}
+	if got := m.websites[0].DocumentRoot; got != "/vhosts/acme/new-public" {
+		t.Errorf("refreshed root = %q", got)
+	}
+}
+
+func TestModel_DocumentRootFormFitsTerminal(t *testing.T) {
+	m := New(Deps{})
+	m.ready, m.width, m.height = true, 100, 28
+	m.items = []domain.Subscription{{ID: 1, Name: "acme"}}
+	m.websites = []domain.Website{{ID: 2, PrimaryDomain: "example.test", Type: domain.WebsiteStatic, DocumentRoot: "/vhosts/acme/sites/example.test/public"}}
+	m.workspace, m.showWebsites, m.focus = true, true, focusWebsites
+	m = m.openDocumentRootForm()
+	for index, line := range strings.Split(m.View(), "\n") {
+		if got := lipgloss.Width(line); got != m.width {
+			t.Fatalf("line %d width = %d, want %d: %q", index, got, m.width, line)
+		}
+	}
+}
+
 func TestModel_LoadWebsitesForSelectedSubscription(t *testing.T) {
 	m := New(Deps{LoadWebsites: func(_ context.Context, id int64) ([]domain.Website, error) {
 		if id != 7 {
@@ -693,12 +742,20 @@ func TestModel_ConfirmationCannotStartDuplicateMutation(t *testing.T) {
 
 func runProgress(t *testing.T, model appModel, command tea.Cmd) appModel {
 	t.Helper()
-	for range 4 { // start, running step, completed step, final operation message
+	started := false
+	for range 12 { // The number of progress messages follows the advertised steps.
 		message := command()
 		updated, next := model.Update(message)
 		model, command = updated.(appModel), next
+		if _, ok := message.(progressStartMsg); ok {
+			started = true
+		}
+		if started && !model.progress.active {
+			return model
+		}
 	}
-	return model
+	t.Fatal("progress did not finish")
+	return appModel{}
 }
 
 func TestModel_HealthWritesChecksToOutput(t *testing.T) {

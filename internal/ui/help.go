@@ -72,6 +72,7 @@ func helpSections() []helpSection {
 		}},
 		{title: "Domains", rows: []string{
 			"e         enable or disable selected domain",
+			"E         edit selected domain document root",
 			"t         enable or disable TLS for selected domain",
 			"l / L     load access or error log",
 			"b         load subscription databases",

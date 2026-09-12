@@ -60,6 +60,8 @@ func (m appModel) runConfirmed() (tea.Model, tea.Cmd) {
 		return m, m.changeWebsiteTLSCmd(confirm)
 	case "set-php":
 		return m, m.changeWebsitePHPCmd(confirm)
+	case "set-document-root":
+		return m, m.changeWebsiteDocumentRootCmd(confirm)
 	default:
 		return m, m.changeWebsiteCmd(confirm)
 	}

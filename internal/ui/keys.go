@@ -12,6 +12,9 @@ func (m appModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if m.pathPicker.open {
 		return m.handlePathPickerKey(msg)
 	}
+	if m.documentRootForm.open {
+		return m.handleDocumentRootFormKey(msg)
+	}
 	if m.settings.open {
 		return m.handleSettingsKey(msg)
 	}
@@ -156,6 +159,10 @@ func (m appModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				action: "set-enabled", enabled: !website.Enabled, domain: website.PrimaryDomain,
 				title: "Update domain", lines: []string{"Domain: " + website.PrimaryDomain, "Set enabled: " + map[bool]string{true: "yes", false: "no"}[!website.Enabled]},
 			})
+		}
+	case "E":
+		if m.focus == focusWebsites {
+			m = m.openDocumentRootForm()
 		}
 	case "t":
 		if m.focus == focusWebsites {

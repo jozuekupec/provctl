@@ -14,20 +14,21 @@ import (
 )
 
 type Deps struct {
-	LoadSubscriptions     func(context.Context) ([]domain.Subscription, error)
-	LoadWebsites          func(context.Context, int64) ([]domain.Website, error)
-	LoadDatabases         func(context.Context, string) ([]domain.Database, error)
-	ReadWebsiteLogs       func(context.Context, string, string, bool, int) (string, error)
-	SetWebsiteEnabled     func(context.Context, string, string, bool) (int64, error)
-	SetWebsiteTLS         func(context.Context, string, string, bool) error
-	SetSubscriptionStatus func(context.Context, string, string) (int64, error)
-	DeleteSubscription    func(context.Context, string, bool) (int64, error)
-	LoadPHPVersions       func(context.Context) ([]service.PHPFPMVersion, error)
-	SetWebsitePHP         func(context.Context, string, string, service.PHPSetOptions) (int64, error)
-	RunHealth             func(context.Context, string, string) ([]service.Check, error)
-	SaveConfig            func(context.Context, config.Config) error
-	BrowsePath            func(context.Context, string, fsbrowse.Mode) (string, []fsbrowse.Entry, error)
-	Config                config.Config
+	LoadSubscriptions      func(context.Context) ([]domain.Subscription, error)
+	LoadWebsites           func(context.Context, int64) ([]domain.Website, error)
+	LoadDatabases          func(context.Context, string) ([]domain.Database, error)
+	ReadWebsiteLogs        func(context.Context, string, string, bool, int) (string, error)
+	SetWebsiteEnabled      func(context.Context, string, string, bool) (int64, error)
+	SetWebsiteTLS          func(context.Context, string, string, bool) error
+	SetWebsiteDocumentRoot func(context.Context, string, string, string) (int64, error)
+	SetSubscriptionStatus  func(context.Context, string, string) (int64, error)
+	DeleteSubscription     func(context.Context, string, bool) (int64, error)
+	LoadPHPVersions        func(context.Context) ([]service.PHPFPMVersion, error)
+	SetWebsitePHP          func(context.Context, string, string, service.PHPSetOptions) (int64, error)
+	RunHealth              func(context.Context, string, string) ([]service.Check, error)
+	SaveConfig             func(context.Context, config.Config) error
+	BrowsePath             func(context.Context, string, fsbrowse.Mode) (string, []fsbrowse.Entry, error)
+	Config                 config.Config
 }
 type websitesLoadedMsg struct {
 	items      []domain.Website
@@ -54,6 +55,12 @@ type websiteTLSChangedMsg struct {
 	err     error
 	enabled bool
 	domain  string
+}
+type websiteDocumentRootChangedMsg struct {
+	err    error
+	domain string
+	root   string
+	items  []domain.Website
 }
 type subscriptionChangedMsg struct {
 	err          error
@@ -110,6 +117,7 @@ type confirmState struct {
 	action  string
 	enabled bool
 	domain  string
+	value   string
 	title   string
 	lines   []string
 	word    string
@@ -138,11 +146,25 @@ type settingsState struct {
 	input  textinput.Model
 }
 
+type documentRootFormState struct {
+	open    bool
+	website domain.Website
+	input   textinput.Model
+}
+
+type pathPickerTarget uint8
+
+const (
+	pathPickerSettings pathPickerTarget = iota
+	pathPickerDocumentRoot
+)
+
 // pathPickerState belongs to the picker, keeping its filter and asynchronous
 // generation separate from the settings form it temporarily overlays.
 type pathPickerState struct {
 	open       bool
 	field      int
+	target     pathPickerTarget
 	mode       fsbrowse.Mode
 	dir        string
 	entries    []pathEntry
@@ -186,6 +208,7 @@ type appModel struct {
 	help               helpState
 	phpPicker          phpPickerState
 	settings           settingsState
+	documentRootForm   documentRootFormState
 	pathPicker         pathPickerState
 	status             string
 	confirm            confirmState

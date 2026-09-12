@@ -39,6 +39,8 @@ them. Keep ACME staging enabled until certificate issuance has been verified;
 public Let's Encrypt issuance also needs public DNS and reachable HTTP port 80.
 For filesystem paths, Enter opens a directory or file picker; use Enter to
 open a directory, Space to select it, and confirm the selected absolute path.
+In the Domains panel, `E` opens the equivalent document-root editor for a
+selected static or PHP-FPM site; it uses the same picker and confirmation.
 
 For scripted document-root changes, use `sudo provctl website docroot set
 <subscription> <domain> <absolute-path>`. The target must already exist and,
