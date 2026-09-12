@@ -228,12 +228,83 @@ func TestModel_HelpOpensFiltersAndCloses(t *testing.T) {
 	}
 	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyEsc})
 	m = updated.(appModel)
+	if !m.help.open || m.help.filter.active || m.help.filter.query() != "d" {
+		t.Fatalf("escape did not apply active help filter: %#v", m.help)
+	}
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	m = updated.(appModel)
 	if !m.help.open || m.help.filter.query() != "" {
-		t.Fatalf("escape did not clear active help filter: %#v", m.help)
+		t.Fatal("second escape did not clear applied help filter")
 	}
 	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyEsc})
 	if updated.(appModel).help.open {
-		t.Fatal("second escape did not close help")
+		t.Fatal("third escape did not close help")
+	}
+}
+
+func TestModel_HelpPopupFitsAndPreservesFooter(t *testing.T) {
+	for _, size := range [][2]int{{80, 24}, {100, 28}, {160, 50}} {
+		m := New(Deps{})
+		m.ready, m.width, m.height = true, size[0], size[1]
+		m.help = helpState{open: true, filter: newFilter()}
+		popup := m.helpPopup()
+		if got := lipgloss.Width(popup); got > m.width {
+			t.Fatalf("popup width at %dx%d = %d", m.width, m.height, got)
+		}
+		if got := lipgloss.Height(popup); got > m.height {
+			t.Fatalf("popup height at %dx%d = %d", m.width, m.height, got)
+		}
+		if !strings.Contains(popup, "filter this help") {
+			t.Fatalf("help footer disappeared at %dx%d:\n%s", m.width, m.height, popup)
+		}
+	}
+}
+
+func TestModel_AppliedHelpFilterAlsoFitsPopup(t *testing.T) {
+	m := New(Deps{})
+	m.ready, m.width, m.height = true, minWidth, minHeight
+	m.help = helpState{open: true, filter: newFilter()}
+	m.help.filter.input.SetValue("subscription")
+	popup := m.helpPopup()
+	if got := lipgloss.Height(popup); got != 16 {
+		t.Fatalf("applied filter popup height = %d, want fixed 16", got)
+	}
+	if !strings.Contains(popup, "esc clear") || !strings.Contains(popup, "filter this help") {
+		t.Fatalf("applied filter lost chrome:\n%s", popup)
+	}
+}
+
+func TestModel_HelpFilterDropsUnmatchedSections(t *testing.T) {
+	m := New(Deps{})
+	m.help = helpState{open: true, filter: newFilter()}
+	m.help.filter.input.SetValue("TLS")
+	rows := strings.Join(m.filteredHelpRows(), "\n")
+	if !strings.Contains(rows, "Domains") || strings.Contains(rows, "Subscriptions") {
+		t.Fatalf("filtered help sections = %q", rows)
+	}
+}
+
+func TestModel_SubscriptionFilterShowsCountAndClearsFromWorkspace(t *testing.T) {
+	m := New(Deps{})
+	m.ready, m.width, m.height, m.workspace = true, 100, 28, true
+	m.items = []domain.Subscription{{Name: "acme", Status: "active"}, {Name: "beta", Status: "archived"}}
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("/")})
+	m = updated.(appModel)
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("a")})
+	m = updated.(appModel)
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("c")})
+	m = updated.(appModel)
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("m")})
+	m = updated.(appModel)
+	if !strings.Contains(m.keybar(), "1/2 matches") || !strings.Contains(m.subscriptionPanelTitle(), "1/2") {
+		t.Fatalf("filter indicators = %q / %q", m.keybar(), m.subscriptionPanelTitle())
+	}
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = updated.(appModel)
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	m = updated.(appModel)
+	if m.subscriptionFilter.query() != "" || m.cursor != 0 {
+		t.Fatalf("escape did not clear applied subscription filter: %#v", m.subscriptionFilter)
 	}
 }
 

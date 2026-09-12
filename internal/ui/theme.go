@@ -18,6 +18,8 @@ var (
 	dimStyle         = lipgloss.NewStyle().Foreground(dimColor)
 	keybarStyle      = lipgloss.NewStyle().Foreground(dimColor)
 	confirmStyle     = lipgloss.NewStyle().Foreground(warnColor).Bold(true)
+	filterLabelStyle = lipgloss.NewStyle().Foreground(accentColor).Bold(true)
+	filterCountStyle = lipgloss.NewStyle().Foreground(warnColor).Bold(true)
 )
 
 const (

@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/textinput"
@@ -20,6 +21,17 @@ func newFilter() filterState {
 }
 
 func (filter filterState) query() string { return strings.TrimSpace(filter.input.Value()) }
+
+func (filter filterState) activeSummary(label string, visible, total int) string {
+	count := filterCountStyle.Render("%d/%d matches")
+	if filter.active {
+		return filterLabelStyle.Render("Filter "+label+":") + " " + filter.input.View() + "  " + fmt.Sprintf(count, visible, total) + dimStyle.Render(" · enter apply · esc clear")
+	}
+	if filter.query() == "" {
+		return ""
+	}
+	return filterLabelStyle.Render("/"+filter.query()) + " " + fmt.Sprintf(count, visible, total) + dimStyle.Render(" · esc clear")
+}
 
 func (m appModel) visibleSubscriptions() []domain.Subscription {
 	query := strings.ToLower(m.subscriptionFilter.query())

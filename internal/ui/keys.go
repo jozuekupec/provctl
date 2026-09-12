@@ -34,7 +34,8 @@ func (m appModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 	switch msg.String() {
 	case "?":
-		m.help.open, m.help.scroll, m.status = true, 0, ""
+		m.help = helpState{open: true, filter: newFilter()}
+		m.status = ""
 		return m, nil
 	case "q", "ctrl+c":
 		return m, tea.Quit
@@ -79,7 +80,10 @@ func (m appModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m, command := m.startSubscriptions()
 		return m, command
 	case "/":
-		if m.focus == focusWebsites {
+		if m.focus == focusSubscriptions {
+			m.subscriptionFilter.active = true
+			m.subscriptionFilter.input.Focus()
+		} else if m.focus == focusWebsites {
 			m.websiteFilter.active = true
 			m.websiteFilter.input.Focus()
 		}
@@ -165,6 +169,11 @@ func (m appModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "left", "shift+tab":
 		m.focus = focusLeft(m.focus)
 	case "esc":
+		if m.focus == focusSubscriptions && m.subscriptionFilter.query() != "" {
+			m.subscriptionFilter.input.SetValue("")
+			m.cursor = 0
+			return m, nil
+		}
 		if m.focus == focusWebsites && m.websiteFilter.query() != "" {
 			m.websiteFilter.input.SetValue("")
 			m.websiteCursor = 0
@@ -215,7 +224,8 @@ func (m appModel) handlePickerKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.subscriptionFilter.active = true
 		m.subscriptionFilter.input.Focus()
 	case "?":
-		m.help.open, m.help.scroll, m.status = true, 0, ""
+		m.help = helpState{open: true, filter: newFilter()}
+		m.status = ""
 	case "r":
 		m.status = "loading subscriptions…"
 		m, command := m.startSubscriptions()

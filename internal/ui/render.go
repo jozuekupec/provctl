@@ -28,15 +28,15 @@ func (m appModel) View() string {
 }
 
 func (m appModel) renderPicker() string {
-	body := panel("Subscriptions", m.renderSubscriptions(m.height-4), m.width, m.height-2, true)
+	body := panel(m.subscriptionPanelTitle(), m.renderSubscriptions(m.height-4), m.width, m.height-2, true)
 	return m.renderFrame(body)
 }
 
 func (m appModel) renderWorkspace() string {
 	layout := computeLayout(m.width, m.height)
 	left := strings.Join([]string{
-		panel("Subscription", m.subscriptionMetadata(), layout.leftWidth, layout.metadata, m.focus == focusSubscriptions),
-		panel("Domains", m.renderWebsites(layout.domains-2), layout.leftWidth, layout.domains, m.focus == focusWebsites),
+		panel(m.subscriptionPanelTitle(), m.subscriptionMetadata(), layout.leftWidth, layout.metadata, m.focus == focusSubscriptions),
+		panel(m.websitePanelTitle(), m.renderWebsites(layout.domains-2), layout.leftWidth, layout.domains, m.focus == focusWebsites),
 	}, "\n")
 	output := m.outputLines(layout.output - 2)
 	if m.progress.active {
@@ -49,6 +49,21 @@ func (m appModel) renderWorkspace() string {
 	}, "\n")
 	body := joinColumns(left, right)
 	return m.renderFrame(body)
+}
+
+func (m appModel) subscriptionPanelTitle() string {
+	return m.filterPanelTitle("Subscriptions", m.subscriptionFilter, len(m.visibleSubscriptions()), len(m.items))
+}
+
+func (m appModel) websitePanelTitle() string {
+	return m.filterPanelTitle("Domains", m.websiteFilter, len(m.visibleWebsites()), len(m.websites))
+}
+
+func (m appModel) filterPanelTitle(title string, filter filterState, visible, total int) string {
+	if filter.query() == "" {
+		return title
+	}
+	return fmt.Sprintf("%s · /%s · %d/%d", title, filter.query(), visible, total)
 }
 
 func (m appModel) renderFrame(body string) string {
@@ -170,13 +185,26 @@ func window(contents string, rows, scroll int, fromBottom bool) string {
 
 func (m appModel) keybar() string {
 	if m.subscriptionFilter.active {
-		return m.subscriptionFilter.input.View() + "  enter apply • esc clear"
+		return m.subscriptionFilter.activeSummary("subscriptions", len(m.visibleSubscriptions()), len(m.items))
 	}
 	if m.websiteFilter.active {
-		return m.websiteFilter.input.View() + "  enter apply • esc clear"
+		return m.websiteFilter.activeSummary("domains", len(m.visibleWebsites()), len(m.websites))
 	}
 	if !m.workspace {
+		if summary := m.subscriptionFilter.activeSummary("subscriptions", len(m.visibleSubscriptions()), len(m.items)); summary != "" {
+			return summary
+		}
 		return "↑/↓ select · enter open · a archive · d delete · / filter · ? help · q quit"
+	}
+	if m.focus == focusSubscriptions {
+		if summary := m.subscriptionFilter.activeSummary("subscriptions", len(m.visibleSubscriptions()), len(m.items)); summary != "" {
+			return summary
+		}
+	}
+	if m.focus == focusWebsites {
+		if summary := m.websiteFilter.activeSummary("domains", len(m.visibleWebsites()), len(m.websites)); summary != "" {
+			return summary
+		}
 	}
 	switch m.focus {
 	case focusSubscriptions:

@@ -314,6 +314,17 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   through a Bubble Tea command; the model test verifies its target and enable
   state. `make test` passed. A real public-domain issuance remains an E3/E5
   follow-up, not a test to perform against the local `pv` container.
+  **Redesign block 6 complete:** Help now uses a fixed, bounded, ANSI-safe
+  popup with scroll overflow markers and a footer that remains visible on the
+  minimum 80×24 terminal. Its filter lives inside the dialog, hides sections
+  without matches, and follows a three-step Escape flow (finish typing, clear
+  an applied filter, close). Subscription and domain filters now have an
+  accent-coloured input row while typing, `visible/total` match counts, a
+  persistent applied-filter indicator, and the same count in the panel title.
+  Filtering subscriptions from the workspace and clearing either focused
+  filter with Escape are covered by model tests. This deliberately adopts the
+  current popup and filtering guidance pulled from `branchctl` and the Go TUI
+  cookbook. `make test` and `make build` passed.
   Původní návrh je zaznamenán v [tui-design.md](tui-design.md) a
   cíleně přebírá konzistentní Bubble Tea vzor z projektu `depo`: hodnotový
   model, `Deps`, samostatné routing/render/keys/theme a I/O jen přes `tea.Cmd`.
