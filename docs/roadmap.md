@@ -404,7 +404,12 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   progress pipeline and refreshes domains in place. Static/PHP-FPM creation
   deliberately retains the safe default root; an administrator can then use
   the explicit `E` root operation. Full editing of aliases, target and
-  redirect policy still follows.
+  redirect policy still follows. Alias editing is now available: `a` adds and
+  `A` removes an alias through a small confirmation form. Non-TLS websites use
+  the journalled WebsiteService operation; TLS websites deliberately route to
+  Certbot's complete-SAN reconciliation, preventing a database-only alias
+  change from leaving a certificate stale. A model test covers the service
+  target and refreshed aliases.
   Původní návrh je zaznamenán v [tui-design.md](tui-design.md) a
   cíleně přebírá konzistentní Bubble Tea vzor z projektu `depo`: hodnotový
   model, `Deps`, samostatné routing/render/keys/theme a I/O jen přes `tea.Cmd`.

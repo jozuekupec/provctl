@@ -146,6 +146,20 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.websiteCursor = clamp(m.websiteCursor, len(m.visibleWebsites()))
 		}
 		return m, nil
+	case websiteAliasChangedMsg:
+		m.progress.active = false
+		if msg.err != nil {
+			m.status = "alias change failed: " + msg.err.Error()
+			m.output = m.output.append(m.status)
+			return m, nil
+		}
+		verb := map[bool]string{true: "added", false: "removed"}[msg.add]
+		m.status = "alias " + msg.alias + " " + verb
+		m.output = m.output.append("alias " + verb + ": " + msg.alias)
+		if msg.items != nil {
+			m.websites = append([]domain.Website(nil), msg.items...)
+		}
+		return m, nil
 	case subscriptionChangedMsg:
 		m.progress.active = false
 		if msg.err != nil {

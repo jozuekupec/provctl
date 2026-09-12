@@ -105,7 +105,35 @@ func NewRootCommand() *cobra.Command {
 				return websiteWriteRuntime.Service.CreatePHPFPM(ctx, subscription, name)
 			}
 		}
-		_, err = ui.Program(ui.Deps{LoadSubscriptions: runtime.Service.List, LoadWebsites: websiteRuntime.Service.List, LoadDatabases: databaseRuntime.Service.ListForSubscription, ReadWebsiteLogs: websiteRuntime.Service.ReadLogs, SetWebsiteEnabled: websiteWriteRuntime.Service.SetEnabled, SetWebsiteTLS: setWebsiteTLS, SetWebsiteDocumentRoot: websiteWriteRuntime.Service.SetDocumentRoot, CreateWebsite: createWebsiteFromUI, SetSubscriptionStatus: subscriptionWriteRuntime.Service.SetStatus, DeleteSubscription: subscriptionWriteRuntime.Service.Delete, LoadPHPVersions: phpReadRuntime.Service.ListVersions, SetWebsitePHP: phpWriteRuntime.Service.Set, RunHealth: healthRuntime.Service.Run, SaveConfig: func(_ context.Context, updated config.Config) error {
+		setWebsiteAlias := func(ctx context.Context, subscription, primaryDomain, alias string, add bool) (int64, error) {
+			websites, err := websiteWriteRuntime.Service.ListForSubscription(ctx, subscription)
+			if err != nil {
+				return 0, err
+			}
+			for _, website := range websites {
+				if website.PrimaryDomain != primaryDomain {
+					continue
+				}
+				if !website.SSLEnabled {
+					if add {
+						return websiteWriteRuntime.Service.AddAlias(ctx, subscription, primaryDomain, alias)
+					}
+					return websiteWriteRuntime.Service.RemoveAlias(ctx, subscription, primaryDomain, alias)
+				}
+				current, err := config.Load(meta.ConfigFile)
+				if err != nil {
+					return 0, err
+				}
+				sslRuntime, err := service.NewProductionSSLRuntime(ctx, current)
+				if err != nil {
+					return 0, err
+				}
+				defer sslRuntime.Close()
+				return 0, sslRuntime.Service.ReconcileAliases(ctx, subscription, primaryDomain, alias, add, false)
+			}
+			return 0, fmt.Errorf("website %q not found in subscription %q", primaryDomain, subscription)
+		}
+		_, err = ui.Program(ui.Deps{LoadSubscriptions: runtime.Service.List, LoadWebsites: websiteRuntime.Service.List, LoadDatabases: databaseRuntime.Service.ListForSubscription, ReadWebsiteLogs: websiteRuntime.Service.ReadLogs, SetWebsiteEnabled: websiteWriteRuntime.Service.SetEnabled, SetWebsiteTLS: setWebsiteTLS, SetWebsiteDocumentRoot: websiteWriteRuntime.Service.SetDocumentRoot, CreateWebsite: createWebsiteFromUI, SetWebsiteAlias: setWebsiteAlias, SetSubscriptionStatus: subscriptionWriteRuntime.Service.SetStatus, DeleteSubscription: subscriptionWriteRuntime.Service.Delete, LoadPHPVersions: phpReadRuntime.Service.ListVersions, SetWebsitePHP: phpWriteRuntime.Service.Set, RunHealth: healthRuntime.Service.Run, SaveConfig: func(_ context.Context, updated config.Config) error {
 			return config.Update(meta.ConfigFile, updated)
 		}, BrowsePath: func(_ context.Context, path string, mode fsbrowse.Mode) (string, []fsbrowse.Entry, error) {
 			return fsbrowse.Browse(path, mode)

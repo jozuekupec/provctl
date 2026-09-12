@@ -262,6 +262,42 @@ func TestModel_WebsiteCreateFormCreatesSelectedType(t *testing.T) {
 	}
 }
 
+func TestModel_AliasFormAppliesAndRefreshes(t *testing.T) {
+	var gotSubscription, gotDomain, gotAlias string
+	var gotAdd bool
+	m := New(Deps{
+		SetWebsiteAlias: func(_ context.Context, subscription, domain, alias string, add bool) (int64, error) {
+			gotSubscription, gotDomain, gotAlias, gotAdd = subscription, domain, alias, add
+			return 1, nil
+		},
+		LoadWebsites: func(context.Context, int64) ([]domain.Website, error) {
+			return []domain.Website{{PrimaryDomain: "example.test", Type: domain.WebsiteStatic, Aliases: []string{"www.example.test"}}}, nil
+		},
+	})
+	m.items = []domain.Subscription{{ID: 1, Name: "acme"}}
+	m.websites = []domain.Website{{PrimaryDomain: "example.test", Type: domain.WebsiteStatic}}
+	m.workspace, m.showWebsites, m.focus = true, true, focusWebsites
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("a")})
+	m = updated.(appModel)
+	if !m.aliasForm.open || !m.aliasForm.add {
+		t.Fatalf("alias form = %#v", m.aliasForm)
+	}
+	m.aliasForm.input.SetValue("www.example.test")
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyCtrlS})
+	m = updated.(appModel)
+	if m.aliasForm.open || m.confirm.action != "set-alias" {
+		t.Fatalf("form/confirmation = %#v / %#v", m.aliasForm, m.confirm)
+	}
+	updated, command := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("y")})
+	m = runProgress(t, updated.(appModel), command)
+	if gotSubscription != "acme" || gotDomain != "example.test" || gotAlias != "www.example.test" || !gotAdd {
+		t.Fatalf("SetWebsiteAlias(%q, %q, %q, %t)", gotSubscription, gotDomain, gotAlias, gotAdd)
+	}
+	if got := m.websites[0].Aliases; len(got) != 1 || got[0] != "www.example.test" {
+		t.Fatalf("refreshed aliases = %#v", got)
+	}
+}
+
 func TestModel_LoadWebsitesForSelectedSubscription(t *testing.T) {
 	m := New(Deps{LoadWebsites: func(_ context.Context, id int64) ([]domain.Website, error) {
 		if id != 7 {

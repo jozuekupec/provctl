@@ -72,6 +72,7 @@ func helpSections() []helpSection {
 		}},
 		{title: "Domains", rows: []string{
 			"n         create a domain",
+			"a / A     add or remove a domain alias",
 			"e         enable or disable selected domain",
 			"E         edit selected domain document root",
 			"t         enable or disable TLS for selected domain",

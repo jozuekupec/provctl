@@ -18,6 +18,9 @@ func (m appModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if m.websiteCreateForm.open {
 		return m.handleWebsiteCreateFormKey(msg)
 	}
+	if m.aliasForm.open {
+		return m.handleAliasFormKey(msg)
+	}
 	if m.settings.open {
 		return m.handleSettingsKey(msg)
 	}
@@ -171,6 +174,19 @@ func (m appModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if m.focus == focusWebsites {
 			m = m.openWebsiteCreateForm()
 		}
+	case "a":
+		if m.focus == focusWebsites {
+			m = m.openAliasForm(true)
+		} else if m.focus == focusSubscriptions {
+			subscription, ok := m.selectedSubscription()
+			if ok && subscription.Status != "archived" {
+				m = m.askConfirm(confirmState{action: "archived", domain: subscription.Name, title: "Archive subscription", lines: []string{"Subscription: " + subscription.Name, "Archiving is required before permanent deletion."}})
+			}
+		}
+	case "A":
+		if m.focus == focusWebsites {
+			m = m.openAliasForm(false)
+		}
 	case "t":
 		if m.focus == focusWebsites {
 			website, ok := m.selectedWebsite()
@@ -196,13 +212,6 @@ func (m appModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				m = m.askConfirm(confirmState{action: "suspended", domain: subscription.Name, title: "Suspend subscription", lines: []string{"Subscription: " + subscription.Name, "Websites will be unavailable until resumed."}})
 			} else if subscription.Status == "suspended" {
 				m = m.askConfirm(confirmState{action: "active", domain: subscription.Name, title: "Resume subscription", lines: []string{"Subscription: " + subscription.Name, "Restore normal service."}})
-			}
-		}
-	case "a":
-		if m.focus == focusSubscriptions {
-			subscription, ok := m.selectedSubscription()
-			if ok && subscription.Status != "archived" {
-				m = m.askConfirm(confirmState{action: "archived", domain: subscription.Name, title: "Archive subscription", lines: []string{"Subscription: " + subscription.Name, "Archiving is required before permanent deletion."}})
 			}
 		}
 	case "right", "tab":

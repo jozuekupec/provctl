@@ -34,6 +34,9 @@ func (m appModel) View() string {
 	if m.websiteCreateForm.open {
 		return m.overlayCenter(m.websiteCreateFormPopup(), view)
 	}
+	if m.aliasForm.open {
+		return m.overlayCenter(m.aliasFormPopup(), view)
+	}
 	if m.settings.open {
 		return m.overlayCenter(m.settingsPopup(), view)
 	}
@@ -229,7 +232,7 @@ func (m appModel) keybar() string {
 	case focusSubscriptions:
 		return "←/→ panels · ↑/↓ select · s suspend/resume · a archive · d delete · , settings · esc back"
 	case focusWebsites:
-		return "←/→ panels · ↑/↓ select · n create · p PHP · e toggle · E root · t TLS · l/L logs · , settings · esc subscriptions"
+		return "←/→ panels · ↑/↓ select · n create · a/A aliases · p PHP · e toggle · E root · t TLS · l/L logs · , settings · esc subscriptions"
 	case focusDetail:
 		return "←/→ panels · ↑/↓ scroll · b databases · esc subscriptions · ? help"
 	case focusLogs:
