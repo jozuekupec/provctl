@@ -22,9 +22,52 @@ func newWebsiteCommand() *cobra.Command {
 	command.AddCommand(newWebsiteShowCommand())
 	command.AddCommand(newWebsiteSetEnabledCommand("enable", true))
 	command.AddCommand(newWebsiteSetEnabledCommand("disable", false))
+	command.AddCommand(newWebsiteDocumentRootCommand())
 	command.AddCommand(newWebsiteDeleteCommand())
 	command.AddCommand(newWebsiteLogsCommand())
 	command.AddCommand(newWebsiteAliasCommand())
+	return command
+}
+
+func newWebsiteDocumentRootCommand() *cobra.Command {
+	var configPath string
+	var dryRun bool
+	command := &cobra.Command{Use: "docroot", Short: "manage website document roots"}
+	set := &cobra.Command{Use: "set <subscription> <domain> <path>", Short: "change a static or PHP-FPM website document root", Args: cobra.ExactArgs(3), RunE: func(command *cobra.Command, args []string) error {
+		cfg, err := config.Load(configPath)
+		if err != nil {
+			return fmt.Errorf("load configuration: %w", err)
+		}
+		ctx := context.Background()
+		if dryRun {
+			runtime, err := service.NewReadOnlyWebsiteRuntime(ctx, cfg)
+			if err != nil {
+				return fmt.Errorf("open website state: %w", err)
+			}
+			defer runtime.Close()
+			operation, err := runtime.Service.PrepareSetDocumentRoot(ctx, args[0], args[1], args[2])
+			if err != nil {
+				return err
+			}
+			return writePlan(command, operation)
+		}
+		runtime, err := service.NewProductionWebsiteRuntime(ctx, cfg)
+		if err != nil {
+			return fmt.Errorf("open website state: %w", err)
+		}
+		defer runtime.Close()
+		lockCtx, cancel := context.WithTimeout(ctx, time.Duration(cfg.Limits.LockTimeoutSeconds)*time.Second)
+		defer cancel()
+		operationID, err := runtime.Service.SetDocumentRoot(lockCtx, args[0], args[1], args[2])
+		if err != nil {
+			return err
+		}
+		_, err = fmt.Fprintf(command.OutOrStdout(), "Changed document root for website %q in subscription %q (operation %d).\n", args[1], args[0], operationID)
+		return err
+	}}
+	set.Flags().StringVar(&configPath, "config", meta.ConfigFile, "path to config.toml")
+	set.Flags().BoolVar(&dryRun, "dry-run", false, "show the operation plan without changing the system")
+	command.AddCommand(set)
 	return command
 }
 

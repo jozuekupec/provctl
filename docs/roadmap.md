@@ -385,6 +385,14 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   domain document-root form exists yet; when the planned domain create/edit
   form is added, it must reuse this picker and retain service-layer boundary
   validation rather than treating the UI picker as authorization.
+  **Redesign block 10 in progress:** the required service foundation for the
+  future domain form is now present. `website docroot set` builds a journalled
+  operation which rejects traversal, missing paths, non-directories and any
+  path escaping the resolved subscription home. It explicitly does not move
+  data; it renders and applies the Apache replacement before writing SQLite,
+  with rollback to the previous vhost/root. Focused service, SQLite and CLI
+  tests cover the path validation and persisted state. The next part is the
+  TUI domain create/edit form, including reuse of the picker for its root.
   Původní návrh je zaznamenán v [tui-design.md](tui-design.md) a
   cíleně přebírá konzistentní Bubble Tea vzor z projektu `depo`: hodnotový
   model, `Deps`, samostatné routing/render/keys/theme a I/O jen přes `tea.Cmd`.

@@ -183,6 +183,23 @@ func (repository *Repository) SetWebsiteEnabled(ctx context.Context, websiteID i
 	return nil
 }
 
+// SetWebsiteDocumentRoot persists a vhost root after its generated Apache
+// configuration was successfully applied.
+func (repository *Repository) SetWebsiteDocumentRoot(ctx context.Context, websiteID int64, documentRoot string) error {
+	result, err := repository.DB.ExecContext(ctx, `UPDATE websites SET document_root = ?, updated_at = ? WHERE id = ?`, nullable(documentRoot), time.Now().UTC().Format(time.RFC3339), websiteID)
+	if err != nil {
+		return fmt.Errorf("update website document root: %w", err)
+	}
+	count, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("count website document root update: %w", err)
+	}
+	if count != 1 {
+		return fmt.Errorf("website %d not found", websiteID)
+	}
+	return nil
+}
+
 // UpdateWebsitePHPVersion records the runtime selected for one PHP-FPM website.
 func (repository *Repository) UpdateWebsitePHPVersion(ctx context.Context, websiteID int64, version string) error {
 	result, err := repository.DB.ExecContext(ctx, `UPDATE websites SET php_version = ?, updated_at = ? WHERE id = ?`, nullable(version), time.Now().UTC().Format(time.RFC3339), websiteID)

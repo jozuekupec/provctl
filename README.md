@@ -40,6 +40,11 @@ public Let's Encrypt issuance also needs public DNS and reachable HTTP port 80.
 For filesystem paths, Enter opens a directory or file picker; use Enter to
 open a directory, Space to select it, and confirm the selected absolute path.
 
+For scripted document-root changes, use `sudo provctl website docroot set
+<subscription> <domain> <absolute-path>`. The target must already exist and,
+after symlinks are resolved, remain inside the subscription home; the command
+does not move data.
+
 ## Install from the APT repository
 
 The following endpoint is the planned release destination; its first public

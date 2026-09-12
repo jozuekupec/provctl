@@ -25,6 +25,7 @@ type WebsiteStore interface {
 	CertificateByWebsite(context.Context, int64) (domain.Certificate, error)
 	DeleteCertificateByWebsite(context.Context, int64) error
 	SetWebsiteEnabled(context.Context, int64, bool) error
+	SetWebsiteDocumentRoot(context.Context, int64, string) error
 	SetWebsiteSSL(context.Context, int64, bool, bool) error
 	AddWebsiteAlias(context.Context, int64, string) error
 	RemoveWebsiteAlias(context.Context, int64, string) error
@@ -331,6 +332,116 @@ func (service WebsiteService) SetEnabled(ctx context.Context, subscriptionName, 
 		return 0, err
 	}
 	return service.Executor.Run(ctx, operation)
+}
+
+// SetDocumentRoot changes the rendered root of a static or PHP-FPM website.
+// It never moves data: the selected directory must already exist inside the
+// subscription home after symlinks are resolved.
+func (service WebsiteService) SetDocumentRoot(ctx context.Context, subscriptionName, primaryDomain, documentRoot string) (int64, error) {
+	operation, err := service.PrepareSetDocumentRoot(ctx, subscriptionName, primaryDomain, documentRoot)
+	if err != nil {
+		return 0, err
+	}
+	return service.Executor.Run(ctx, operation)
+}
+
+// PrepareSetDocumentRoot validates a root, renders a replacement vhost and
+// records the root only after Apache has accepted the replacement.
+func (service WebsiteService) PrepareSetDocumentRoot(ctx context.Context, subscriptionName, primaryDomain, documentRoot string) (plan.Plan, error) {
+	if service.FS == nil || service.Apache == nil {
+		return plan.Plan{}, fmt.Errorf("filesystem and Apache vhost applier are required")
+	}
+	if err := domain.ValidateSubscriptionName(subscriptionName); err != nil {
+		return plan.Plan{}, err
+	}
+	if err := domain.ValidateDomain(primaryDomain); err != nil {
+		return plan.Plan{}, err
+	}
+	subscription, err := service.Store.SubscriptionByName(ctx, subscriptionName)
+	if err != nil {
+		return plan.Plan{}, err
+	}
+	website, err := service.websiteByDomain(ctx, subscription, primaryDomain)
+	if err != nil {
+		return plan.Plan{}, err
+	}
+	if website.Type != domain.WebsiteStatic && website.Type != domain.WebsitePHPFPM {
+		return plan.Plan{}, fmt.Errorf("website type %q does not have a document root", website.Type)
+	}
+	resolvedRoot, err := validateWebsiteDocumentRoot(service.FS, subscription.Home, documentRoot)
+	if err != nil {
+		return plan.Plan{}, err
+	}
+	if filepath.Clean(website.DocumentRoot) == resolvedRoot {
+		return plan.Plan{}, fmt.Errorf("website %q already uses document root %q", primaryDomain, resolvedRoot)
+	}
+	updated := website
+	updated.DocumentRoot = resolvedRoot
+	contents, err := service.RenderVHost(subscriptionName, updated)
+	if err != nil {
+		return plan.Plan{}, err
+	}
+	vhostPath := filepath.Join(service.Config.Apache.SitesAvailable, meta.FilePrefix+subscriptionName+"-"+primaryDomain+".conf")
+	var undoApache func(context.Context) error
+	steps := []plan.Step{{Name: "update Apache document root", Preview: "write " + vhostPath, Do: func(ctx context.Context) error {
+		var applyErr error
+		undoApache, applyErr = service.Apache.Apply(ctx, vhostPath, contents)
+		return applyErr
+	}, Undo: func(ctx context.Context) error {
+		if undoApache == nil {
+			return nil
+		}
+		return undoApache(ctx)
+	}}, {Name: "record website document root", Preview: "set document root in SQLite", Do: func(ctx context.Context) error {
+		return service.Store.SetWebsiteDocumentRoot(ctx, website.ID, resolvedRoot)
+	}, Undo: func(ctx context.Context) error {
+		return service.Store.SetWebsiteDocumentRoot(ctx, website.ID, website.DocumentRoot)
+	}}}
+	return plan.Plan{Action: "website.set-document-root", Target: subscriptionName + "/" + primaryDomain, Steps: steps}, nil
+}
+
+func (service WebsiteService) websiteByDomain(ctx context.Context, subscription domain.Subscription, primaryDomain string) (domain.Website, error) {
+	websites, err := service.List(ctx, subscription.ID)
+	if err != nil {
+		return domain.Website{}, err
+	}
+	for _, website := range websites {
+		if website.PrimaryDomain == primaryDomain {
+			return website, nil
+		}
+	}
+	return domain.Website{}, fmt.Errorf("website %q not found in subscription %q", primaryDomain, subscription.Name)
+}
+
+func validateWebsiteDocumentRoot(fs system.FS, home, documentRoot string) (string, error) {
+	if documentRoot == "" || !filepath.IsAbs(documentRoot) {
+		return "", fmt.Errorf("document root must be an absolute path")
+	}
+	for _, component := range strings.FieldsFunc(documentRoot, func(r rune) bool { return r == '/' || r == '\\' }) {
+		if component == ".." {
+			return "", fmt.Errorf("document root must not contain parent traversal")
+		}
+	}
+	resolvedHome, err := fs.EvalSymlinks(filepath.Clean(home))
+	if err != nil {
+		return "", fmt.Errorf("resolve subscription home: %w", err)
+	}
+	resolvedRoot, err := fs.EvalSymlinks(filepath.Clean(documentRoot))
+	if err != nil {
+		return "", fmt.Errorf("resolve document root: %w", err)
+	}
+	info, err := fs.Stat(resolvedRoot)
+	if err != nil {
+		return "", fmt.Errorf("inspect document root: %w", err)
+	}
+	if !info.IsDir() {
+		return "", fmt.Errorf("document root %q is not a directory", documentRoot)
+	}
+	relative, err := filepath.Rel(resolvedHome, resolvedRoot)
+	if err != nil || relative == "." || relative == ".." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) || filepath.IsAbs(relative) {
+		return "", fmt.Errorf("document root %q must be inside subscription home", documentRoot)
+	}
+	return resolvedRoot, nil
 }
 
 // Delete removes generated Apache artifacts and the website record. Site data

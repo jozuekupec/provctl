@@ -32,6 +32,16 @@ type websiteStore struct {
 	websites     []domain.Website
 }
 
+type documentRootStore struct {
+	websiteStore
+	root string
+}
+
+func (store *documentRootStore) SetWebsiteDocumentRoot(_ context.Context, _ int64, root string) error {
+	store.root = root
+	return nil
+}
+
 func (store websiteStore) SubscriptionByName(context.Context, string) (domain.Subscription, error) {
 	return store.subscription, nil
 }
@@ -41,11 +51,12 @@ func (websiteStore) DeleteWebsite(context.Context, int64) error                 
 func (websiteStore) CertificateByWebsite(context.Context, int64) (domain.Certificate, error) {
 	return domain.Certificate{}, errors.New("certificate not found")
 }
-func (websiteStore) DeleteCertificateByWebsite(context.Context, int64) error { return nil }
-func (websiteStore) SetWebsiteEnabled(context.Context, int64, bool) error    { return nil }
-func (websiteStore) SetWebsiteSSL(context.Context, int64, bool, bool) error  { return nil }
-func (websiteStore) AddWebsiteAlias(context.Context, int64, string) error    { return nil }
-func (websiteStore) RemoveWebsiteAlias(context.Context, int64, string) error { return nil }
+func (websiteStore) DeleteCertificateByWebsite(context.Context, int64) error     { return nil }
+func (websiteStore) SetWebsiteEnabled(context.Context, int64, bool) error        { return nil }
+func (websiteStore) SetWebsiteDocumentRoot(context.Context, int64, string) error { return nil }
+func (websiteStore) SetWebsiteSSL(context.Context, int64, bool, bool) error      { return nil }
+func (websiteStore) AddWebsiteAlias(context.Context, int64, string) error        { return nil }
+func (websiteStore) RemoveWebsiteAlias(context.Context, int64, string) error     { return nil }
 func (store websiteStore) ListWebsites(context.Context, int64) ([]domain.Website, error) {
 	return store.websites, nil
 }
@@ -131,6 +142,40 @@ func TestWebsiteService_PrepareCreateStaticRejectsWebsiteQuota(t *testing.T) {
 	_, err := service.PrepareCreateStatic(context.Background(), "acme", "static.example.test")
 	if err == nil || !strings.Contains(err.Error(), "website quota") {
 		t.Fatalf("PrepareCreateStatic() error = %v, want quota error", err)
+	}
+}
+
+func TestWebsiteService_SetDocumentRootAppliesApacheBeforePersisting(t *testing.T) {
+	fs := &subscriptionFS{directories: map[string]bool{"/vhosts/acme": true, "/vhosts/acme/sites/example.test/new-public": true}}
+	store := &documentRootStore{websiteStore: websiteStore{subscription: domain.Subscription{ID: 1, Name: "acme", Home: "/vhosts/acme"}, websites: []domain.Website{{ID: 4, SubscriptionID: 1, Type: domain.WebsiteStatic, PrimaryDomain: "example.test", DocumentRoot: "/vhosts/acme/sites/example.test/public"}}}}
+	service := WebsiteService{FS: fs, Store: store, Apache: websiteApache{}, Executor: plan.Executor{Journal: &subscriptionJournal{}, Locker: subscriptionLocker{}}, Config: config.Config{Paths: config.Paths{ACMEChallenge: "/var/lib/provctl/acme-challenge"}, Apache: config.Apache{SitesAvailable: "/etc/apache2/sites-available", ProxyTimeout: 60}}}
+	operation, err := service.PrepareSetDocumentRoot(context.Background(), "acme", "example.test", "/vhosts/acme/sites/example.test/new-public")
+	if err != nil {
+		t.Fatalf("PrepareSetDocumentRoot() error = %v", err)
+	}
+	if got, want := operation.Action, "website.set-document-root"; got != want {
+		t.Errorf("action = %q, want %q", got, want)
+	}
+	if store.root != "" {
+		t.Fatalf("prepare persisted root = %q", store.root)
+	}
+	if _, err := service.Executor.Run(context.Background(), operation); err != nil {
+		t.Fatalf("run document root plan: %v", err)
+	}
+	if got, want := store.root, "/vhosts/acme/sites/example.test/new-public"; got != want {
+		t.Errorf("stored root = %q, want %q", got, want)
+	}
+}
+
+func TestValidateWebsiteDocumentRootRejectsTraversalAndOutsideHome(t *testing.T) {
+	fs := &subscriptionFS{directories: map[string]bool{"/vhosts/acme": true, "/vhosts/acme/public": true, "/srv/public": true}}
+	for _, root := range []string{"/vhosts/acme/sites/../public", "/srv/public", "/vhosts/acme/missing"} {
+		if _, err := validateWebsiteDocumentRoot(fs, "/vhosts/acme", root); err == nil {
+			t.Errorf("validateWebsiteDocumentRoot(%q) succeeded", root)
+		}
+	}
+	if got, err := validateWebsiteDocumentRoot(fs, "/vhosts/acme", "/vhosts/acme/public"); err != nil || got != "/vhosts/acme/public" {
+		t.Fatalf("valid root = %q, %v", got, err)
 	}
 }
 
