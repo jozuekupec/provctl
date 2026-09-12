@@ -235,6 +235,9 @@ func TestModel_PHPVersionPickerChangesSelectedDomain(t *testing.T) {
 	if m.phpPicker.loading || len(m.phpPicker.items) != 2 {
 		t.Fatalf("loaded PHP picker = %#v", m.phpPicker)
 	}
+	if m.phpPicker.cursor != 0 || !strings.Contains(m.phpPickerPopup(), "selected") {
+		t.Fatalf("PHP picker does not mark the current domain version: %#v\n%s", m.phpPicker, m.phpPickerPopup())
+	}
 	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
 	m = updated.(appModel)
 	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
@@ -264,6 +267,77 @@ func TestModel_PHPVersionPickerRejectsCurrentVersionWithoutMutation(t *testing.T
 	m = updated.(appModel)
 	if m.phpPicker.open || m.confirm.action != "" || !strings.Contains(m.status, "already uses PHP-FPM 8.4") {
 		t.Fatalf("current PHP selection = picker:%v confirm:%#v status:%q", m.phpPicker.open, m.confirm, m.status)
+	}
+}
+
+func TestModel_SubscriptionMetadataDoesNotPresentPHPVersion(t *testing.T) {
+	m := New(Deps{})
+	m.items = []domain.Subscription{{ID: 1, Name: "acme", Home: "/vhosts/acme", PHPVersion: "8.4"}}
+	if got := m.subscriptionMetadata(); strings.Contains(got, "PHP") {
+		t.Fatalf("subscription metadata presents a domain-scoped PHP version: %q", got)
+	}
+	if got := m.renderSubscriptions(1); strings.Contains(got, "8.4") {
+		t.Fatalf("subscription row presents a domain-scoped PHP version: %q", got)
+	}
+}
+
+func TestModel_ProgressUsesModalAndPreservesOutputPanel(t *testing.T) {
+	m := New(Deps{})
+	m.ready, m.width, m.height, m.workspace = true, 100, 28, true
+	m.items = []domain.Subscription{{ID: 1, Name: "acme"}}
+	m.websites, m.showWebsites = []domain.Website{{PrimaryDomain: "app.example.test"}}, true
+	m.output = outputState{}.append("previous operation")
+	m.progress = progressState{title: "Switch PHP-FPM", active: true, steps: []progressStep{{label: "replace domain PHP-FPM pool", state: stepRunning}, {label: "regenerate Apache vhost", state: stepPending}}}
+
+	view := m.View()
+	if !strings.Contains(view, "Switch PHP-FPM") || !strings.Contains(view, "replace domain PHP-FPM pool") {
+		t.Fatalf("progress modal missing from view:\n%s", view)
+	}
+	if strings.Contains(m.outputLines(3), "replace domain PHP-FPM pool") || !strings.Contains(m.outputLines(3), "previous operation") {
+		t.Fatalf("progress leaked into persistent output: %#v", m.output)
+	}
+}
+
+func TestModel_PHPChangeStreamsApplyAndRefreshSteps(t *testing.T) {
+	m := New(Deps{
+		SetWebsitePHP: func(context.Context, string, string, service.PHPSetOptions) (int64, error) { return 1, nil },
+		LoadWebsites: func(context.Context, int64) ([]domain.Website, error) {
+			return []domain.Website{{ID: 1, PrimaryDomain: "app.example.test", Type: domain.WebsitePHPFPM, PHPVersion: "8.3"}}, nil
+		},
+	})
+	m.items = []domain.Subscription{{ID: 1, Name: "acme"}}
+	m.websites, m.workspace, m.showWebsites = []domain.Website{{ID: 1, PrimaryDomain: "app.example.test", Type: domain.WebsitePHPFPM, PHPVersion: "8.4"}}, true, true
+
+	command := m.changeWebsitePHPCmd(confirmState{domain: "8.3"})
+	updated, next := m.Update(command())
+	m = updated.(appModel)
+	if !m.progress.active || m.progress.steps[0].state != stepPending {
+		t.Fatalf("progress start = %#v", m.progress)
+	}
+	updated, next = m.Update(next())
+	m = updated.(appModel)
+	if m.progress.steps[0].state != stepRunning {
+		t.Fatalf("apply step = %#v", m.progress.steps)
+	}
+	updated, next = m.Update(next())
+	m = updated.(appModel)
+	if m.progress.steps[0].state != stepDone || m.progress.steps[1].state != stepPending {
+		t.Fatalf("apply completion = %#v", m.progress.steps)
+	}
+	updated, next = m.Update(next())
+	m = updated.(appModel)
+	if m.progress.steps[1].state != stepRunning {
+		t.Fatalf("refresh start = %#v", m.progress.steps)
+	}
+	updated, next = m.Update(next())
+	m = updated.(appModel)
+	if m.progress.steps[1].state != stepDone {
+		t.Fatalf("refresh completion = %#v", m.progress.steps)
+	}
+	updated, _ = m.Update(next())
+	m = updated.(appModel)
+	if m.progress.active || m.websites[0].PHPVersion != "8.3" {
+		t.Fatalf("final PHP refresh = progress:%#v websites:%#v", m.progress, m.websites)
 	}
 }
 

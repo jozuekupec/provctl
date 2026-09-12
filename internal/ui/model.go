@@ -67,6 +67,7 @@ type websitePHPChangedMsg struct {
 	err             error
 	subscription    string
 	domain, version string
+	items           []domain.Website
 }
 type healthLoadedMsg struct {
 	checks     []service.Check
@@ -165,7 +166,7 @@ func (m appModel) changeWebsite(ctx context.Context, confirm confirmState) tea.M
 }
 
 func (m appModel) changeWebsiteCmd(confirm confirmState) tea.Cmd {
-	return steppedCmd("Update website", []string{"apply generated configuration"}, func(ctx context.Context) tea.Msg { return m.changeWebsite(ctx, confirm) })
+	return steppedCmd("Update website", []string{"apply generated configuration"}, func(ctx context.Context, _ func(int)) tea.Msg { return m.changeWebsite(ctx, confirm) })
 }
 
 func (m appModel) changeWebsiteTLS(ctx context.Context, confirm confirmState) tea.Msg {
@@ -179,11 +180,7 @@ func (m appModel) changeWebsiteTLS(ctx context.Context, confirm confirmState) te
 }
 
 func (m appModel) changeWebsiteTLSCmd(confirm confirmState) tea.Cmd {
-	steps := []string{"apply TLS configuration"}
-	if confirm.enabled {
-		steps = []string{"request TLS certificate", "apply TLS configuration"}
-	}
-	return steppedCmd("Update TLS", steps, func(ctx context.Context) tea.Msg { return m.changeWebsiteTLS(ctx, confirm) })
+	return steppedCmd("Update TLS", []string{"apply TLS configuration"}, func(ctx context.Context, _ func(int)) tea.Msg { return m.changeWebsiteTLS(ctx, confirm) })
 }
 
 func (m appModel) changeSubscription(ctx context.Context, confirm confirmState) tea.Msg {
@@ -196,7 +193,7 @@ func (m appModel) changeSubscription(ctx context.Context, confirm confirmState) 
 }
 
 func (m appModel) changeSubscriptionCmd(confirm confirmState) tea.Cmd {
-	return steppedCmd("Update subscription", []string{"apply subscription state"}, func(ctx context.Context) tea.Msg { return m.changeSubscription(ctx, confirm) })
+	return steppedCmd("Update subscription", []string{"apply subscription state"}, func(ctx context.Context, _ func(int)) tea.Msg { return m.changeSubscription(ctx, confirm) })
 }
 
 func (m appModel) deleteSubscription(ctx context.Context, confirm confirmState) tea.Msg {
@@ -209,7 +206,7 @@ func (m appModel) deleteSubscription(ctx context.Context, confirm confirmState) 
 }
 
 func (m appModel) deleteSubscriptionCmd(confirm confirmState) tea.Cmd {
-	return steppedCmd("Delete subscription", []string{"remove subscription and managed resources"}, func(ctx context.Context) tea.Msg { return m.deleteSubscription(ctx, confirm) })
+	return steppedCmd("Delete subscription", []string{"remove subscription and managed resources"}, func(ctx context.Context, _ func(int)) tea.Msg { return m.deleteSubscription(ctx, confirm) })
 }
 
 func (m appModel) loadPHPVersions(ctx context.Context, generation uint64) tea.Msg {
@@ -220,19 +217,24 @@ func (m appModel) loadPHPVersions(ctx context.Context, generation uint64) tea.Ms
 	return phpVersionsLoadedMsg{items: items, err: err, generation: generation}
 }
 
-func (m appModel) changeWebsitePHP(ctx context.Context, confirm confirmState) tea.Msg {
+func (m appModel) changeWebsitePHP(ctx context.Context, confirm confirmState, report func(int)) tea.Msg {
 	subscription, subscriptionOK := m.selectedSubscription()
 	website, websiteOK := m.selectedWebsite()
 	if m.deps.SetWebsitePHP == nil || !subscriptionOK || !websiteOK {
 		return websitePHPChangedMsg{err: context.Canceled}
 	}
 	_, err := m.deps.SetWebsitePHP(ctx, subscription.Name, website.PrimaryDomain, service.PHPSetOptions{Version: confirm.domain})
-	return websitePHPChangedMsg{err: err, subscription: subscription.Name, domain: website.PrimaryDomain, version: confirm.domain}
+	if err != nil || m.deps.LoadWebsites == nil {
+		return websitePHPChangedMsg{err: err, subscription: subscription.Name, domain: website.PrimaryDomain, version: confirm.domain}
+	}
+	report(1)
+	items, err := m.deps.LoadWebsites(ctx, subscription.ID)
+	return websitePHPChangedMsg{err: err, subscription: subscription.Name, domain: website.PrimaryDomain, version: confirm.domain, items: items}
 }
 
 func (m appModel) changeWebsitePHPCmd(confirm confirmState) tea.Cmd {
-	return steppedCmd("Switch PHP-FPM", []string{"replace domain PHP-FPM pool", "regenerate Apache vhost"}, func(ctx context.Context) tea.Msg {
-		return m.changeWebsitePHP(ctx, confirm)
+	return steppedCmd("Switch PHP-FPM", []string{"apply domain PHP-FPM configuration", "refresh domain list"}, func(ctx context.Context, report func(int)) tea.Msg {
+		return m.changeWebsitePHP(ctx, confirm, report)
 	})
 }
 

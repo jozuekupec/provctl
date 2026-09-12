@@ -46,7 +46,7 @@ func (m appModel) detail() string {
 	for _, database := range m.databases {
 		names = append(names, database.Name)
 	}
-	return fmt.Sprintf("Subscription: %s\nStatus: %s\nUser: %s\nHome: %s\nPHP: %s\nWebsites: %d\nDatabases: %s", subscription.Name, subscription.Status, subscription.UnixUser, subscription.Home, subscription.PHPVersion, len(m.websites), strings.Join(names, ", "))
+	return fmt.Sprintf("Subscription: %s\nStatus: %s\nUser: %s\nHome: %s\nWebsites: %d\nDatabases: %s", subscription.Name, subscription.Status, subscription.UnixUser, subscription.Home, len(m.websites), strings.Join(names, ", "))
 }
 
 func valueOrDash(value string) string {

@@ -27,6 +27,9 @@ func (m appModel) View() string {
 	if m.confirm.action != "" {
 		return m.overlayCenter(m.confirmPopup(), view)
 	}
+	if m.progress.active {
+		return m.overlayCenter(m.progressPopup(), view)
+	}
 	return view
 }
 
@@ -42,9 +45,6 @@ func (m appModel) renderWorkspace() string {
 		panel(m.websitePanelTitle(), m.renderWebsites(layout.domains-2), layout.leftWidth, layout.domains, m.focus == focusWebsites),
 	}, "\n")
 	output := m.outputLines(layout.output - 2)
-	if m.progress.active {
-		output = m.progress.render()
-	}
 	right := strings.Join([]string{
 		panel("Detail", m.detailLines(layout.detail-2), layout.rightWidth, layout.detail, m.focus == focusDetail),
 		panel("Logs", m.logsLines(layout.logs-2), layout.rightWidth, layout.logs, m.focus == focusLogs),
@@ -104,7 +104,7 @@ func (m appModel) renderSubscriptions(rows int) string {
 	lines := make([]string, 0, end-start)
 	for index := start; index < end; index++ {
 		item := items[index]
-		line := fmt.Sprintf("  %-18s %-10s %s", item.Name, item.Status, valueOrDash(item.PHPVersion))
+		line := fmt.Sprintf("  %-24s %s", item.Name, item.Status)
 		if index == m.cursor {
 			line = selectedStyle.Render("> " + strings.TrimPrefix(line, "  "))
 		}
@@ -148,7 +148,7 @@ func (m appModel) subscriptionMetadata() string {
 	}
 	return strings.Join([]string{
 		"Name: " + s.Name, "Status: " + s.Status, "User: " + s.UnixUser,
-		"Home: " + valueOrDash(s.Home), "PHP-FPM: " + valueOrDash(s.PHPVersion),
+		"Home: " + valueOrDash(s.Home),
 		"SSH: " + valueOrDash(s.SSHAccess),
 	}, "\n")
 }

@@ -347,6 +347,12 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   SQLite, TUI and CLI tests passed. The standard `make test` reached `vet` and
   `staticcheck`; its race phase exceeds the current command-runner reporting
   window and must be rerun in a normal terminal before release.
+  **Redesign block 8 in progress:** subscription-level metadata and list rows
+  no longer present PHP-FPM as a subscription property; it is shown only on a
+  selected domain. The PHP version picker marks and initially selects the
+  current version for that domain, independently of whether each installed
+  PHP-FPM service is active. Running mutations now render their checklist in
+  a centred progress popup; Output remains the persistent operation log.
   Původní návrh je zaznamenán v [tui-design.md](tui-design.md) a
   cíleně přebírá konzistentní Bubble Tea vzor z projektu `depo`: hodnotový
   model, `Deps`, samostatné routing/render/keys/theme a I/O jen přes `tea.Cmd`.

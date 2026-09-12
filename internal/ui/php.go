@@ -6,7 +6,7 @@ import (
 )
 
 func (m appModel) phpPickerPopup() string {
-	width := min(58, max(38, m.width-12))
+	width := min(68, max(44, m.width-12))
 	height := min(16, max(10, m.height-8))
 	lines := []string{"Choose an installed PHP-FPM version."}
 	if m.phpPicker.loading {
@@ -15,12 +15,16 @@ func (m appModel) phpPickerPopup() string {
 		lines = append(lines, "", "No installed PHP-FPM versions found.")
 	} else {
 		lines = append(lines, "")
+		website, _ := m.selectedWebsite()
 		for index, item := range m.phpPicker.items {
 			state := "inactive"
 			if item.Active {
 				state = "active"
 			}
-			line := fmt.Sprintf("  PHP-FPM %-6s %s", item.Version, state)
+			if item.Version == website.PHPVersion {
+				state += " · selected"
+			}
+			line := fmt.Sprintf("  PHP %-4s %s", item.Version, state)
 			if index == m.phpPicker.cursor {
 				line = selectedStyle.Render("> " + strings.TrimPrefix(line, "  "))
 			}

@@ -126,6 +126,14 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.phpPicker.items = append([]service.PHPFPMVersion(nil), msg.items...)
 		m.phpPicker.cursor = clamp(m.phpPicker.cursor, len(m.phpPicker.items))
+		if website, ok := m.selectedWebsite(); ok {
+			for index, item := range m.phpPicker.items {
+				if item.Version == website.PHPVersion {
+					m.phpPicker.cursor = index
+					break
+				}
+			}
+		}
 		if len(m.phpPicker.items) == 0 {
 			m.status = "no installed PHP-FPM versions found"
 		}
@@ -139,6 +147,12 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.status = "domain " + msg.domain + " now uses PHP-FPM " + msg.version + "; refreshing…"
 		m.output = m.output.append("domain " + msg.subscription + "/" + msg.domain + " PHP-FPM=" + msg.version)
+		if msg.items != nil {
+			m.websites = append([]domain.Website(nil), msg.items...)
+			m.websiteCursor = clamp(m.websiteCursor, len(m.visibleWebsites()))
+			m.status = "domain " + msg.domain + " now uses PHP-FPM " + msg.version
+			return m, nil
+		}
 		m, command := m.startWebsites()
 		return m, command
 	case healthLoadedMsg:
