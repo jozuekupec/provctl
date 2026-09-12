@@ -82,37 +82,39 @@ func (output outputState) append(line string) outputState {
 }
 
 type appModel struct {
-	deps          Deps
-	width, height int
-	ready         bool
-	items         []domain.Subscription
-	cursor        int
-	websites      []domain.Website
-	databases     []domain.Database
-	websiteCursor int
-	showWebsites  bool
-	workspace     bool
-	focus         focus
-	output        outputState
-	logs          outputState
-	status        string
-	confirm       confirmState
-	progress      progressState
-	detailScroll  int
-	outputScroll  int
-	subscriptions opSlot
-	websitesLoad  opSlot
-	databasesLoad opSlot
-	healthLoad    opSlot
-	logsLoad      opSlot
+	deps               Deps
+	width, height      int
+	ready              bool
+	items              []domain.Subscription
+	cursor             int
+	websites           []domain.Website
+	databases          []domain.Database
+	websiteCursor      int
+	showWebsites       bool
+	workspace          bool
+	focus              focus
+	output             outputState
+	logs               outputState
+	subscriptionFilter filterState
+	websiteFilter      filterState
+	status             string
+	confirm            confirmState
+	progress           progressState
+	detailScroll       int
+	outputScroll       int
+	subscriptions      opSlot
+	websitesLoad       opSlot
+	databasesLoad      opSlot
+	healthLoad         opSlot
+	logsLoad           opSlot
 }
 
 func (m appModel) changeWebsite(ctx context.Context, confirm confirmState) tea.Msg {
-	if m.deps.SetWebsiteEnabled == nil || len(m.items) == 0 || len(m.websites) == 0 {
+	website, websiteOK := m.selectedWebsite()
+	subscription, subscriptionOK := m.selectedSubscription()
+	if m.deps.SetWebsiteEnabled == nil || !subscriptionOK || !websiteOK {
 		return websiteChangedMsg{err: context.Canceled}
 	}
-	website := m.websites[clamp(m.websiteCursor, len(m.websites))]
-	subscription := m.items[clamp(m.cursor, len(m.items))]
 	_, err := m.deps.SetWebsiteEnabled(ctx, subscription.Name, website.PrimaryDomain, confirm.enabled)
 	return websiteChangedMsg{err: err, enabled: confirm.enabled, domain: website.PrimaryDomain}
 }
@@ -122,10 +124,10 @@ func (m appModel) changeWebsiteCmd(confirm confirmState) tea.Cmd {
 }
 
 func (m appModel) changeSubscription(ctx context.Context, confirm confirmState) tea.Msg {
-	if m.deps.SetSubscriptionStatus == nil || len(m.items) == 0 {
+	subscription, ok := m.selectedSubscription()
+	if m.deps.SetSubscriptionStatus == nil || !ok {
 		return subscriptionChangedMsg{err: context.Canceled}
 	}
-	subscription := m.items[clamp(m.cursor, len(m.items))]
 	_, err := m.deps.SetSubscriptionStatus(ctx, subscription.Name, confirm.action)
 	return subscriptionChangedMsg{err: err, name: subscription.Name, status: confirm.action}
 }
@@ -135,43 +137,44 @@ func (m appModel) changeSubscriptionCmd(confirm confirmState) tea.Cmd {
 }
 
 func (m appModel) loadHealth(ctx context.Context, generation uint64) tea.Msg {
-	if m.deps.RunHealth == nil || len(m.items) == 0 {
+	subscription, ok := m.selectedSubscription()
+	if m.deps.RunHealth == nil || !ok {
 		return healthLoadedMsg{err: context.Canceled, generation: generation}
 	}
-	subscription := m.items[clamp(m.cursor, len(m.items))]
 	checks, err := m.deps.RunHealth(ctx, subscription.Name, "")
 	return healthLoadedMsg{checks: checks, err: err, generation: generation}
 }
 
 func (m appModel) loadWebsites(ctx context.Context, generation uint64) tea.Msg {
-	if m.deps.LoadWebsites == nil || len(m.items) == 0 {
+	subscription, ok := m.selectedSubscription()
+	if m.deps.LoadWebsites == nil || !ok {
 		return websitesLoadedMsg{err: context.Canceled, generation: generation}
 	}
-	items, err := m.deps.LoadWebsites(ctx, m.items[clamp(m.cursor, len(m.items))].ID)
+	items, err := m.deps.LoadWebsites(ctx, subscription.ID)
 	return websitesLoadedMsg{items: items, err: err, generation: generation}
 }
 
 func (m appModel) loadDatabases(ctx context.Context, generation uint64) tea.Msg {
-	if m.deps.LoadDatabases == nil || len(m.items) == 0 {
+	subscription, ok := m.selectedSubscription()
+	if m.deps.LoadDatabases == nil || !ok {
 		return databasesLoadedMsg{err: context.Canceled, generation: generation}
 	}
-	subscription := m.items[clamp(m.cursor, len(m.items))]
 	items, err := m.deps.LoadDatabases(ctx, subscription.Name)
 	return databasesLoadedMsg{items: items, err: err, generation: generation}
 }
 
 func (m appModel) loadWebsiteLogs(ctx context.Context, generation uint64, errorLog bool) tea.Msg {
-	if m.deps.ReadWebsiteLogs == nil || len(m.items) == 0 || len(m.websites) == 0 {
+	subscription, subscriptionOK := m.selectedSubscription()
+	website, websiteOK := m.selectedWebsite()
+	if m.deps.ReadWebsiteLogs == nil || !subscriptionOK || !websiteOK {
 		return websiteLogsLoadedMsg{err: context.Canceled, generation: generation}
 	}
-	subscription := m.items[clamp(m.cursor, len(m.items))]
-	website := m.websites[clamp(m.websiteCursor, len(m.websites))]
 	contents, err := m.deps.ReadWebsiteLogs(ctx, subscription.Name, website.PrimaryDomain, errorLog, 100)
 	return websiteLogsLoadedMsg{contents: contents, err: err, generation: generation}
 }
 
 func New(deps Deps) appModel {
-	return appModel{deps: deps, focus: focusSubscriptions, status: "loading subscriptions…"}
+	return appModel{deps: deps, focus: focusSubscriptions, status: "loading subscriptions…", subscriptionFilter: newFilter(), websiteFilter: newFilter()}
 }
 
 func (m appModel) Init() tea.Cmd {
@@ -223,10 +226,11 @@ func (m appModel) clearSelectionDetails() appModel {
 }
 
 func (m appModel) selectedSubscriptionID() int64 {
-	if len(m.items) == 0 {
+	subscription, ok := m.selectedSubscription()
+	if !ok {
 		return 0
 	}
-	return m.items[clamp(m.cursor, len(m.items))].ID
+	return subscription.ID
 }
 
 func clamp(cursor, length int) int {

@@ -5,6 +5,9 @@ import tea "github.com/charmbracelet/bubbletea"
 // handleKey routes a key by the current interaction mode. Keeping this apart
 // from Update makes the value-model message router easy to audit and test.
 func (m appModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if m.subscriptionFilter.active || m.websiteFilter.active {
+		return m.handleFilterKey(msg)
+	}
 	if !m.workspace {
 		return m.handlePickerKey(msg)
 	}
@@ -44,7 +47,7 @@ func (m appModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, tea.Quit
 	case "j", "down":
 		if m.focus == focusWebsites {
-			next := clamp(m.websiteCursor+1, len(m.websites))
+			next := clamp(m.websiteCursor+1, len(m.visibleWebsites()))
 			if next != m.websiteCursor {
 				m.websiteCursor = next
 				m.logsLoad.invalidate()
@@ -54,7 +57,7 @@ func (m appModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		} else if m.focus == focusOutput {
 			m.outputScroll++
 		} else {
-			next := clamp(m.cursor+1, len(m.items))
+			next := clamp(m.cursor+1, len(m.visibleSubscriptions()))
 			if next != m.cursor {
 				m.cursor = next
 				m = m.clearSelectionDetails()
@@ -62,7 +65,7 @@ func (m appModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	case "k", "up":
 		if m.focus == focusWebsites {
-			next := clamp(m.websiteCursor-1, len(m.websites))
+			next := clamp(m.websiteCursor-1, len(m.visibleWebsites()))
 			if next != m.websiteCursor {
 				m.websiteCursor = next
 				m.logsLoad.invalidate()
@@ -72,7 +75,7 @@ func (m appModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		} else if m.focus == focusOutput {
 			m.outputScroll = max(0, m.outputScroll-1)
 		} else {
-			next := clamp(m.cursor-1, len(m.items))
+			next := clamp(m.cursor-1, len(m.visibleSubscriptions()))
 			if next != m.cursor {
 				m.cursor = next
 				m = m.clearSelectionDetails()
@@ -82,6 +85,11 @@ func (m appModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.status = "loading subscriptions…"
 		m, command := m.startSubscriptions()
 		return m, command
+	case "/":
+		if m.focus == focusWebsites {
+			m.websiteFilter.active = true
+			m.websiteFilter.input.Focus()
+		}
 	case "h":
 		m.status = "running health checks…"
 		m, command := m.startHealth()
@@ -111,14 +119,20 @@ func (m appModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "o":
 		m.focus = focusOutput
 	case "e":
-		if m.showWebsites && len(m.websites) > 0 {
-			website := m.websites[clamp(m.websiteCursor, len(m.websites))]
+		if m.showWebsites {
+			website, ok := m.selectedWebsite()
+			if !ok {
+				break
+			}
 			m.confirm = confirmState{action: "set-enabled", enabled: !website.Enabled, domain: website.PrimaryDomain}
 			m.status = "confirm with y; esc cancels"
 		}
 	case "s":
-		if !m.showWebsites && len(m.items) > 0 {
-			subscription := m.items[clamp(m.cursor, len(m.items))]
+		if !m.showWebsites {
+			subscription, ok := m.selectedSubscription()
+			if !ok {
+				break
+			}
 			if subscription.Status == "active" {
 				m.confirm = confirmState{action: "suspended", domain: subscription.Name}
 			} else if subscription.Status == "suspended" {
@@ -138,14 +152,40 @@ func (m appModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+func (m appModel) handleFilterKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	filter := &m.subscriptionFilter
+	if m.websiteFilter.active {
+		filter = &m.websiteFilter
+	}
+	switch msg.String() {
+	case "esc":
+		filter.input.SetValue("")
+		filter.active = false
+	case "enter":
+		filter.active = false
+	default:
+		input, _ := filter.input.Update(msg)
+		filter.input = input
+	}
+	if m.subscriptionFilter.active || m.websiteFilter.active {
+		return m, nil
+	}
+	m.cursor = clamp(m.cursor, len(m.visibleSubscriptions()))
+	m.websiteCursor = clamp(m.websiteCursor, len(m.visibleWebsites()))
+	return m, nil
+}
+
 func (m appModel) handlePickerKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "q", "ctrl+c":
 		return m, tea.Quit
 	case "j", "down":
-		m.cursor = clamp(m.cursor+1, len(m.items))
+		m.cursor = clamp(m.cursor+1, len(m.visibleSubscriptions()))
 	case "k", "up":
-		m.cursor = clamp(m.cursor-1, len(m.items))
+		m.cursor = clamp(m.cursor-1, len(m.visibleSubscriptions()))
+	case "/":
+		m.subscriptionFilter.active = true
+		m.subscriptionFilter.input.Focus()
 	case "r":
 		m.status = "loading subscriptions…"
 		m, command := m.startSubscriptions()

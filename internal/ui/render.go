@@ -69,13 +69,17 @@ func joinColumns(left, right string) string {
 }
 
 func (m appModel) renderSubscriptions(rows int) string {
-	if len(m.items) == 0 {
+	items := m.visibleSubscriptions()
+	if len(items) == 0 {
+		if m.subscriptionFilter.query() != "" {
+			return "No matching subscriptions."
+		}
 		return "No subscriptions."
 	}
-	start, end := listWindow(m.cursor, len(m.items), rows)
+	start, end := listWindow(m.cursor, len(items), rows)
 	lines := make([]string, 0, end-start)
 	for index := start; index < end; index++ {
-		item := m.items[index]
+		item := items[index]
 		line := fmt.Sprintf("  %-18s %-10s %s", item.Name, item.Status, valueOrDash(item.PHPVersion))
 		if index == m.cursor {
 			line = selectedStyle.Render("> " + strings.TrimPrefix(line, "  "))
@@ -89,13 +93,17 @@ func (m appModel) renderWebsites(rows int) string {
 	if !m.showWebsites {
 		return "Enter opens websites for the selected subscription."
 	}
-	if len(m.websites) == 0 {
+	websites := m.visibleWebsites()
+	if len(websites) == 0 {
+		if m.websiteFilter.query() != "" {
+			return "No matching domains."
+		}
 		return "No websites."
 	}
-	start, end := listWindow(m.websiteCursor, len(m.websites), rows)
+	start, end := listWindow(m.websiteCursor, len(websites), rows)
 	lines := make([]string, 0, end-start)
 	for index := start; index < end; index++ {
-		website := m.websites[index]
+		website := websites[index]
 		state := "off"
 		if website.Enabled {
 			state = "on"
@@ -110,10 +118,10 @@ func (m appModel) renderWebsites(rows int) string {
 }
 
 func (m appModel) subscriptionMetadata() string {
-	if len(m.items) == 0 {
+	s, ok := m.selectedSubscription()
+	if !ok {
 		return "No subscription selected."
 	}
-	s := m.items[clamp(m.cursor, len(m.items))]
 	return strings.Join([]string{
 		"Name: " + s.Name, "Status: " + s.Status, "User: " + s.UnixUser,
 		"Home: " + valueOrDash(s.Home), "PHP-FPM: " + valueOrDash(s.PHPVersion),
@@ -162,6 +170,12 @@ func (m appModel) confirmationText() string {
 }
 
 func (m appModel) keybar() string {
+	if m.subscriptionFilter.active {
+		return m.subscriptionFilter.input.View() + "  enter apply • esc clear"
+	}
+	if m.websiteFilter.active {
+		return m.websiteFilter.input.View() + "  enter apply • esc clear"
+	}
 	if !m.workspace {
 		return "↑/↓ select • enter open • / filter • n new • e edit • s suspend/resume • a archive • d delete • ? help • q quit"
 	}
