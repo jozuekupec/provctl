@@ -298,6 +298,33 @@ func TestModel_AliasFormAppliesAndRefreshes(t *testing.T) {
 	}
 }
 
+func TestModel_TargetFormUpdatesRedirect(t *testing.T) {
+	var target string
+	var code int
+	m := New(Deps{
+		SetWebsiteTarget: func(_ context.Context, _, _, value string, redirectCode int) (int64, error) {
+			target, code = value, redirectCode
+			return 1, nil
+		},
+		LoadWebsites: func(context.Context, int64) ([]domain.Website, error) {
+			return []domain.Website{{PrimaryDomain: "go.example.test", Type: domain.WebsiteRedirect, Target: "https://new.example.test", RedirectCode: 302}}, nil
+		},
+	})
+	m.items = []domain.Subscription{{ID: 1, Name: "acme"}}
+	m.websites = []domain.Website{{PrimaryDomain: "go.example.test", Type: domain.WebsiteRedirect, Target: "https://old.example.test", RedirectCode: 301}}
+	m.workspace, m.showWebsites, m.focus = true, true, focusWebsites
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("T")})
+	m = updated.(appModel)
+	m.targetForm.input.SetValue("https://new.example.test")
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyRight})
+	updated, _ = updated.(appModel).Update(tea.KeyMsg{Type: tea.KeyCtrlS})
+	updated, command := updated.(appModel).Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("y")})
+	m = runProgress(t, updated.(appModel), command)
+	if target != "https://new.example.test" || code != 302 || m.websites[0].RedirectCode != 302 {
+		t.Fatalf("target/code = %q/%d; domains=%#v", target, code, m.websites)
+	}
+}
+
 func TestModel_LoadWebsitesForSelectedSubscription(t *testing.T) {
 	m := New(Deps{LoadWebsites: func(_ context.Context, id int64) ([]domain.Website, error) {
 		if id != 7 {
