@@ -346,13 +346,14 @@ func pathWithin(root, path string) bool {
 func (service SubscriptionService) adoptPlan(store subscriptionAdoptStore, renewalManager RenewalManager, subscription domain.Subscription, options SubscriptionAdoptOptions, source, siteRoot, documentRoot string, renewals []RenewalLineage) plan.Plan {
 	websiteService := WebsiteService{FS: service.FS, Apache: service.Apache, PHPFPM: service.PHPFPM, Version: PHPFPMVersion{Version: subscription.PHPVersion, Binary: filepath.Join("/usr/sbin", "php-fpm"+subscription.PHPVersion), Service: "php" + subscription.PHPVersion + "-fpm.service"}, Config: service.Config}
 	logDir := filepath.Join(meta.LogDir, subscription.Name, options.Domain)
-	fpmLogDir := filepath.Join(meta.LogDir, subscription.Name)
-	fpmErrorLog := filepath.Join(fpmLogDir, "php-fpm-error.log")
-	poolPath := filepath.Join("/etc/php", subscription.PHPVersion, "fpm", "pool.d", meta.FilePrefix+subscription.Name+".conf")
-	socket := filepath.Join("/run/php", meta.FilePrefix+subscription.Name+".sock")
+	fpmLogDir := phpLogDir(subscription.Name, options.Domain)
+	fpmErrorLog := phpErrorLog(subscription.Name, options.Domain)
+	poolVersion := PHPFPMVersion{Version: subscription.PHPVersion, Binary: filepath.Join("/usr/sbin", "php-fpm"+subscription.PHPVersion), Service: "php" + subscription.PHPVersion + "-fpm.service"}
+	poolPath := phpPoolPath(poolVersion, subscription.Name, options.Domain)
+	socket := phpSocket(subscription.Name, options.Domain)
 	vhostPath := filepath.Join(service.Config.Apache.SitesAvailable, meta.FilePrefix+subscription.Name+"-"+options.Domain+".conf")
 	enabledPath := filepath.Join(service.Config.Apache.SitesEnabled, filepath.Base(vhostPath))
-	poolContents, _ := render.RenderPHPFPMPool(render.PHPFPMPool{Name: subscription.Name, Home: subscription.Home, Socket: socket, MaxChildren: subscription.PHPMaxChildren, MemoryLimit: subscription.PHPMemoryLimit, UploadMax: subscription.PHPUploadMax, MaxExecTime: subscription.PHPMaxExecTime, PhpErrorLog: fpmErrorLog})
+	poolContents, _ := render.RenderPHPFPMPool(render.PHPFPMPool{Name: phpPoolName(subscription.Name, options.Domain), User: subscription.UnixUser, Home: subscription.Home, Socket: socket, MaxChildren: subscription.PHPMaxChildren, MemoryLimit: subscription.PHPMemoryLimit, UploadMax: subscription.PHPUploadMax, MaxExecTime: subscription.PHPMaxExecTime, PhpErrorLog: fpmErrorLog})
 	vhostContents, _ := render.RenderApachePHPFPMHTTP(render.ApacheHTTPVHost{Subscription: subscription.Name, PrimaryDomain: options.Domain, DocumentRoot: documentRoot, AcmeChallengeRoot: service.Config.Paths.ACMEChallenge, FPMSocket: socket, ProxyTimeout: service.Config.Apache.ProxyTimeout, LogDir: logDir})
 	website := domain.Website{SubscriptionID: subscription.ID, Type: domain.WebsitePHPFPM, PrimaryDomain: options.Domain, DocumentRoot: documentRoot, PHPVersion: subscription.PHPVersion, Enabled: true}
 	if len(renewals) == 1 {

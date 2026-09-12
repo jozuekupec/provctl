@@ -1,6 +1,10 @@
 package ui
 
-import tea "github.com/charmbracelet/bubbletea"
+import (
+	tea "github.com/charmbracelet/bubbletea"
+
+	"provctl/internal/domain"
+)
 
 // handleKey routes a key by the current interaction mode. Keeping this apart
 // from Update makes the value-model message router easy to audit and test.
@@ -95,8 +99,10 @@ func (m appModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m, command := m.startHealth()
 		return m, command
 	case "p":
-		if m.focus == focusSubscriptions {
-			if _, ok := m.selectedSubscription(); !ok {
+		if m.focus == focusWebsites {
+			website, ok := m.selectedWebsite()
+			if !ok || website.Type != domain.WebsitePHPFPM {
+				m.status = "select a PHP-FPM domain to change its PHP version"
 				break
 			}
 			m.phpPicker = phpPickerState{open: true, loading: true}
@@ -250,14 +256,6 @@ func (m appModel) handlePickerKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	case "d":
 		m = m.askDeleteSubscription()
-	case "p":
-		if _, ok := m.selectedSubscription(); !ok {
-			return m, nil
-		}
-		m.phpPicker = phpPickerState{open: true, loading: true}
-		m.status = "loading installed PHP-FPM versions…"
-		m, command := m.startPHPVersions()
-		return m, command
 	case "enter":
 		if len(m.visibleSubscriptions()) == 0 {
 			return m, nil
@@ -291,20 +289,22 @@ func (m appModel) handlePHPPickerKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		version := m.phpPicker.items[m.phpPicker.cursor].Version
-		subscription, ok := m.selectedSubscription()
-		if !ok {
+		subscription, subscriptionOK := m.selectedSubscription()
+		website, websiteOK := m.selectedWebsite()
+		if !subscriptionOK || !websiteOK || website.Type != domain.WebsitePHPFPM {
 			m.phpPicker = phpPickerState{}
 			return m, nil
 		}
-		if subscription.PHPVersion == version {
-			m.phpPicker, m.status = phpPickerState{}, "subscription already uses PHP-FPM "+version
+		if website.PHPVersion == version {
+			m.phpPicker, m.status = phpPickerState{}, "domain already uses PHP-FPM "+version
 			return m, nil
 		}
 		m.phpPicker = phpPickerState{}
 		m = m.askConfirm(confirmState{action: "set-php", domain: version, title: "Switch PHP-FPM", lines: []string{
 			"Subscription: " + subscription.Name,
-			"PHP-FPM: " + valueOrDash(subscription.PHPVersion) + " → " + version,
-			"The subscription pool and PHP-FPM vhosts will be updated.",
+			"Domain: " + website.PrimaryDomain,
+			"PHP-FPM: " + valueOrDash(website.PHPVersion) + " → " + version,
+			"Only this domain's PHP-FPM pool and vhost will be updated.",
 		}})
 	}
 	return m, nil

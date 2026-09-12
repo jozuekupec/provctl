@@ -204,7 +204,7 @@ func (service BackupService) restoreFiles(ctx context.Context, archivePath strin
 	if len(sshKeys) > 0 && service.FS == nil {
 		return 0, fmt.Errorf("restore filesystem is required for SSH keys")
 	}
-	if restoredPHPVersion(websites) != "" && service.PHPFPM == nil {
+	if hasPHPFPMWebsite(websites) && service.PHPFPM == nil {
 		return 0, fmt.Errorf("restore PHP-FPM pool applier is required for PHP websites")
 	}
 	archive := filepath.Join(archivePath, "files.tar.zst")
@@ -259,8 +259,10 @@ func (service BackupService) restoreFiles(ctx context.Context, archivePath strin
 		password := passwords[database.Name]
 		steps = append(steps, service.restoreDatabaseSteps(archivePath, subscription, database, password)...)
 	}
-	if version := restoredPHPVersion(websites); version != "" {
-		steps = append(steps, service.restorePHPFPMSteps(subscription, version)...)
+	for _, website := range websites {
+		if website.Type == domain.WebsitePHPFPM {
+			steps = append(steps, service.restorePHPFPMSteps(subscription, website)...)
+		}
 	}
 	for _, website := range websites {
 		steps = append(steps, service.restoreWebsiteSteps(subscription, website)...)
@@ -274,23 +276,14 @@ func (service BackupService) restoreFiles(ctx context.Context, archivePath strin
 	return service.Executor.Run(ctx, plan.Plan{Action: "backup.restore", Target: subscription.Name, Steps: steps})
 }
 
-func restoredPHPVersion(websites []domain.Website) string {
-	for _, website := range websites {
-		if website.Type == domain.WebsitePHPFPM {
-			return website.PHPVersion
-		}
-	}
-	return ""
-}
-
-func (service BackupService) restorePHPFPMSteps(subscription domain.Subscription, version string) []plan.Step {
+func (service BackupService) restorePHPFPMSteps(subscription domain.Subscription, website domain.Website) []plan.Step {
 	websites := WebsiteService{FS: service.FS}
-	poolVersion := PHPFPMVersion{Version: version, Binary: filepath.Join("/usr/sbin", "php-fpm"+version), Service: "php" + version + "-fpm.service"}
-	poolPath := filepath.Join("/etc/php", version, "fpm", "pool.d", meta.FilePrefix+subscription.Name+".conf")
-	socket := filepath.Join("/run/php", meta.FilePrefix+subscription.Name+".sock")
-	logDir := filepath.Join(meta.LogDir, subscription.Name)
-	errorLog := filepath.Join(logDir, "php-fpm-error.log")
-	contents, renderErr := render.RenderPHPFPMPool(render.PHPFPMPool{Name: subscription.Name, Home: subscription.Home, Socket: socket, MaxChildren: subscription.PHPMaxChildren, MemoryLimit: subscription.PHPMemoryLimit, UploadMax: subscription.PHPUploadMax, MaxExecTime: subscription.PHPMaxExecTime, PhpErrorLog: errorLog})
+	poolVersion := PHPFPMVersion{Version: website.PHPVersion, Binary: filepath.Join("/usr/sbin", "php-fpm"+website.PHPVersion), Service: "php" + website.PHPVersion + "-fpm.service"}
+	poolPath := phpPoolPath(poolVersion, subscription.Name, website.PrimaryDomain)
+	socket := phpSocket(subscription.Name, website.PrimaryDomain)
+	logDir := phpLogDir(subscription.Name, website.PrimaryDomain)
+	errorLog := phpErrorLog(subscription.Name, website.PrimaryDomain)
+	contents, renderErr := render.RenderPHPFPMPool(render.PHPFPMPool{Name: phpPoolName(subscription.Name, website.PrimaryDomain), User: subscription.UnixUser, Home: subscription.Home, Socket: socket, MaxChildren: subscription.PHPMaxChildren, MemoryLimit: subscription.PHPMemoryLimit, UploadMax: subscription.PHPUploadMax, MaxExecTime: subscription.PHPMaxExecTime, PhpErrorLog: errorLog})
 	var undoPool func(context.Context) error
 	return []plan.Step{{Name: "create restored PHP-FPM log directory", Preview: "create " + logDir, Do: websites.createOwnedDirectory(logDir, 0, subscription.UnixUID, 0o750), Undo: func(context.Context) error { return service.FS.Remove(logDir) }}, {Name: "create restored PHP-FPM error log", Preview: "create " + errorLog, Do: websites.createPHPErrorLog(errorLog, subscription.UnixUID), Undo: func(context.Context) error { return service.FS.Remove(errorLog) }}, {Name: "install restored PHP-FPM pool", Preview: "write and validate " + poolPath, Do: func(ctx context.Context) error {
 		if renderErr != nil {

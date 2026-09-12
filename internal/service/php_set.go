@@ -21,17 +21,15 @@ import (
 type PHPSettingsStore interface {
 	SubscriptionByName(context.Context, string) (domain.Subscription, error)
 	ListWebsites(context.Context, int64) ([]domain.Website, error)
-	UpdatePHPSettings(context.Context, domain.Subscription) error
+	UpdateWebsitePHPVersion(context.Context, int64, string) error
 }
 
-// PHPSetOptions holds optional pool limits supplied by the CLI.
+// PHPSetOptions holds the requested per-domain runtime settings.
 type PHPSetOptions struct {
-	Version     string
-	MaxChildren int
-	MemoryLimit string
+	Version string
 }
 
-// PHPService changes a subscription pool while preserving a rollback path.
+// PHPService changes one website's PHP-FPM pool while preserving a rollback path.
 type PHPService struct {
 	FS       system.FS
 	Systemd  system.Systemd
@@ -88,8 +86,8 @@ func (service PHPService) ListVersions(ctx context.Context) ([]PHPFPMVersion, er
 	return DiscoverPHPFPM(ctx, service.FS, service.Systemd)
 }
 
-func (service PHPService) Set(ctx context.Context, subscriptionName string, options PHPSetOptions) (int64, error) {
-	operation, err := service.PrepareSet(ctx, subscriptionName, options)
+func (service PHPService) Set(ctx context.Context, subscriptionName, primaryDomain string, options PHPSetOptions) (int64, error) {
+	operation, err := service.PrepareSet(ctx, subscriptionName, primaryDomain, options)
 	if err != nil {
 		return 0, err
 	}
@@ -97,8 +95,11 @@ func (service PHPService) Set(ctx context.Context, subscriptionName string, opti
 }
 
 // PrepareSet reads all state and builds a change plan without writing anything.
-func (service PHPService) PrepareSet(ctx context.Context, subscriptionName string, options PHPSetOptions) (plan.Plan, error) {
+func (service PHPService) PrepareSet(ctx context.Context, subscriptionName, primaryDomain string, options PHPSetOptions) (plan.Plan, error) {
 	if err := domain.ValidateSubscriptionName(subscriptionName); err != nil {
+		return plan.Plan{}, err
+	}
+	if err := domain.ValidateDomain(primaryDomain); err != nil {
 		return plan.Plan{}, err
 	}
 	if !phpVersion.MatchString(options.Version) {
@@ -117,9 +118,6 @@ func (service PHPService) PrepareSet(ctx context.Context, subscriptionName strin
 	if subscription.Status != "active" {
 		return plan.Plan{}, fmt.Errorf("subscription %q is %s", subscriptionName, subscription.Status)
 	}
-	if subscription.PHPVersion == options.Version && options.MaxChildren == 0 && options.MemoryLimit == "" {
-		return plan.Plan{}, fmt.Errorf("subscription %q already uses PHP-FPM %s", subscriptionName, options.Version)
-	}
 	versions, err := service.ListVersions(ctx)
 	if err != nil {
 		return plan.Plan{}, err
@@ -128,68 +126,88 @@ func (service PHPService) PrepareSet(ctx context.Context, subscriptionName strin
 	if err != nil {
 		return plan.Plan{}, err
 	}
-	oldVersion, err := SelectPHPFPM(subscription.PHPVersion, versions)
-	if err != nil {
-		return plan.Plan{}, fmt.Errorf("find current PHP-FPM version: %w", err)
-	}
 	websites, err := service.Store.ListWebsites(ctx, subscription.ID)
 	if err != nil {
 		return plan.Plan{}, fmt.Errorf("list subscription websites: %w", err)
 	}
-	phpSites := 0
-	for _, website := range websites {
-		if website.Type == domain.WebsitePHPFPM {
-			phpSites++
+	var website domain.Website
+	for _, candidate := range websites {
+		if candidate.PrimaryDomain == primaryDomain {
+			website = candidate
+			break
 		}
 	}
-	if phpSites == 0 {
-		return plan.Plan{}, fmt.Errorf("subscription %q has no PHP-FPM websites", subscriptionName)
+	if website.ID == 0 {
+		return plan.Plan{}, fmt.Errorf("website %q not found in subscription %q", primaryDomain, subscriptionName)
 	}
-	desired := subscription
+	if website.Type != domain.WebsitePHPFPM {
+		return plan.Plan{}, fmt.Errorf("website %q is %s, not PHP-FPM", primaryDomain, website.Type)
+	}
+	if website.PHPVersion == options.Version {
+		return plan.Plan{}, fmt.Errorf("website %q already uses PHP-FPM %s", primaryDomain, options.Version)
+	}
+	oldVersion, err := SelectPHPFPM(website.PHPVersion, versions)
+	if err != nil {
+		return plan.Plan{}, fmt.Errorf("find current PHP-FPM version: %w", err)
+	}
+	desired := website
 	desired.PHPVersion = newVersion.Version
-	if options.MaxChildren != 0 {
-		if options.MaxChildren < 1 {
-			return plan.Plan{}, fmt.Errorf("max children must be positive")
-		}
-		desired.PHPMaxChildren = options.MaxChildren
-	}
-	if options.MemoryLimit != "" {
-		desired.PHPMemoryLimit = options.MemoryLimit
-	}
-	poolContents, err := render.RenderPHPFPMPool(render.PHPFPMPool{Name: desired.Name, Home: desired.Home, Socket: phpSocket(desired.Name), MaxChildren: desired.PHPMaxChildren, MemoryLimit: desired.PHPMemoryLimit, UploadMax: desired.PHPUploadMax, MaxExecTime: desired.PHPMaxExecTime, PhpErrorLog: filepath.Join(meta.LogDir, desired.Name, "php-fpm-error.log")})
+	poolContents, err := render.RenderPHPFPMPool(render.PHPFPMPool{Name: phpPoolName(subscription.Name, primaryDomain), User: subscription.UnixUser, Home: subscription.Home, Socket: phpSocket(subscription.Name, primaryDomain), MaxChildren: subscription.PHPMaxChildren, MemoryLimit: subscription.PHPMemoryLimit, UploadMax: subscription.PHPUploadMax, MaxExecTime: subscription.PHPMaxExecTime, PhpErrorLog: phpErrorLog(subscription.Name, primaryDomain)})
 	if err != nil {
 		return plan.Plan{}, err
 	}
-	return service.setPlan(subscription, desired, websites, oldVersion, newVersion, poolContents)
+	return service.setPlan(subscription, website, desired, oldVersion, newVersion, poolContents)
 }
 
-func phpSocket(subscription string) string {
-	return filepath.Join("/run/php", meta.FilePrefix+subscription+".sock")
+func phpPoolName(subscription, primaryDomain string) string {
+	return meta.FilePrefix + subscription + "-" + primaryDomain
 }
 
-func phpPoolPath(version PHPFPMVersion, subscription string) string {
-	return filepath.Join("/etc/php", version.Version, "fpm", "pool.d", meta.FilePrefix+subscription+".conf")
+func phpSocket(subscription, primaryDomain string) string {
+	return filepath.Join("/run/php", phpPoolName(subscription, primaryDomain)+".sock")
 }
 
-func (service PHPService) setPlan(previous, desired domain.Subscription, websites []domain.Website, oldVersion, newVersion PHPFPMVersion, poolContents []byte) (plan.Plan, error) {
-	newPoolPath, oldPoolPath := phpPoolPath(newVersion, desired.Name), phpPoolPath(oldVersion, desired.Name)
-	socket := phpSocket(desired.Name)
-	steps := make([]plan.Step, 0, len(websites)+3)
+func phpPoolPath(version PHPFPMVersion, subscription, primaryDomain string) string {
+	return filepath.Join("/etc/php", version.Version, "fpm", "pool.d", phpPoolName(subscription, primaryDomain)+".conf")
+}
+
+func phpErrorLog(subscription, primaryDomain string) string {
+	return filepath.Join(phpLogDir(subscription, primaryDomain), "php-fpm-error.log")
+}
+
+func phpLogDir(subscription, primaryDomain string) string {
+	return filepath.Join(meta.LogDir, subscription, "fpm", primaryDomain)
+}
+
+func (service PHPService) setPlan(subscription domain.Subscription, previous, desired domain.Website, oldVersion, newVersion PHPFPMVersion, poolContents []byte) (plan.Plan, error) {
+	newPoolPath, oldPoolPath := phpPoolPath(newVersion, subscription.Name, desired.PrimaryDomain), phpPoolPath(oldVersion, subscription.Name, desired.PrimaryDomain)
+	socket := phpSocket(subscription.Name, desired.PrimaryDomain)
+	steps := make([]plan.Step, 0, 5)
 	if oldVersion.Version != newVersion.Version {
-		var undoOldPool func(context.Context) error
-		steps = append(steps, plan.Step{Name: "remove previous PHP-FPM pool", Preview: fmt.Sprintf("remove %s; validate %s -t; reload %s", oldPoolPath, oldVersion.Binary, oldVersion.Service), Do: func(ctx context.Context) error {
-			var err error
-			undoOldPool, err = service.PHPFPM.RemovePool(ctx, oldVersion, oldPoolPath)
-			return err
-		}, Undo: func(ctx context.Context) error {
-			if undoOldPool == nil {
-				return nil
+		oldPoolExists := service.FS == nil
+		if service.FS != nil {
+			if _, err := service.FS.Stat(oldPoolPath); err == nil {
+				oldPoolExists = true
+			} else if !errors.Is(err, os.ErrNotExist) {
+				return plan.Plan{}, fmt.Errorf("inspect existing PHP-FPM pool %q: %w", oldPoolPath, err)
 			}
-			return undoOldPool(ctx)
-		}})
-		steps = append(steps, plan.Step{Name: "wait for PHP-FPM socket release", Preview: "wait for " + socket + " to be released by " + oldVersion.Service, Do: func(ctx context.Context) error {
-			return waitForSocketRelease(ctx, service.FS, socket)
-		}, Undo: func(context.Context) error { return nil }})
+		}
+		if oldPoolExists {
+			var undoOldPool func(context.Context) error
+			steps = append(steps, plan.Step{Name: "remove previous PHP-FPM pool", Preview: fmt.Sprintf("remove %s; validate %s -t; reload %s", oldPoolPath, oldVersion.Binary, oldVersion.Service), Do: func(ctx context.Context) error {
+				var err error
+				undoOldPool, err = service.PHPFPM.RemovePool(ctx, oldVersion, oldPoolPath)
+				return err
+			}, Undo: func(ctx context.Context) error {
+				if undoOldPool == nil {
+					return nil
+				}
+				return undoOldPool(ctx)
+			}})
+			steps = append(steps, plan.Step{Name: "wait for PHP-FPM socket release", Preview: "wait for " + socket + " to be released by " + oldVersion.Service, Do: func(ctx context.Context) error {
+				return waitForSocketRelease(ctx, service.FS, socket)
+			}, Undo: func(context.Context) error { return nil }})
+		}
 	}
 	var undoNewPool func(context.Context) error
 	steps = append(steps, plan.Step{Name: "install new PHP-FPM pool", Preview: fmt.Sprintf("write %s; validate %s -t; reload %s", newPoolPath, newVersion.Binary, newVersion.Service), Do: func(ctx context.Context) error {
@@ -202,31 +220,28 @@ func (service PHPService) setPlan(previous, desired domain.Subscription, website
 		}
 		return undoNewPool(ctx)
 	}})
-	for _, website := range websites {
-		website := website
-		contents, err := (WebsiteService{Config: service.Config}).RenderVHost(desired.Name, website)
-		if err != nil {
-			return plan.Plan{}, err
-		}
-		path := filepath.Join(service.Config.Apache.SitesAvailable, meta.FilePrefix+desired.Name+"-"+website.PrimaryDomain+".conf")
-		var undoApache func(context.Context) error
-		steps = append(steps, plan.Step{Name: "regenerate Apache vhost " + website.PrimaryDomain, Preview: "write " + path, Do: func(ctx context.Context) error {
-			var applyErr error
-			undoApache, applyErr = service.Apache.Apply(ctx, path, contents)
-			return applyErr
-		}, Undo: func(ctx context.Context) error {
-			if undoApache == nil {
-				return nil
-			}
-			return undoApache(ctx)
-		}})
+	contents, err := (WebsiteService{Config: service.Config}).RenderVHost(subscription.Name, desired)
+	if err != nil {
+		return plan.Plan{}, err
 	}
-	steps = append(steps, plan.Step{Name: "record PHP-FPM settings in SQLite", Preview: "update subscription and PHP-FPM website versions in SQLite", Do: func(ctx context.Context) error {
-		return service.Store.UpdatePHPSettings(ctx, desired)
+	path := filepath.Join(service.Config.Apache.SitesAvailable, meta.FilePrefix+subscription.Name+"-"+desired.PrimaryDomain+".conf")
+	var undoApache func(context.Context) error
+	steps = append(steps, plan.Step{Name: "regenerate Apache vhost " + desired.PrimaryDomain, Preview: "write " + path, Do: func(ctx context.Context) error {
+		var applyErr error
+		undoApache, applyErr = service.Apache.Apply(ctx, path, contents)
+		return applyErr
 	}, Undo: func(ctx context.Context) error {
-		return service.Store.UpdatePHPSettings(ctx, previous)
+		if undoApache == nil {
+			return nil
+		}
+		return undoApache(ctx)
 	}})
-	return plan.Plan{Action: "php.set", Target: desired.Name, Steps: steps}, nil
+	steps = append(steps, plan.Step{Name: "record PHP-FPM version in SQLite", Preview: "update PHP-FPM website version in SQLite", Do: func(ctx context.Context) error {
+		return service.Store.UpdateWebsitePHPVersion(ctx, desired.ID, desired.PHPVersion)
+	}, Undo: func(ctx context.Context) error {
+		return service.Store.UpdateWebsitePHPVersion(ctx, previous.ID, previous.PHPVersion)
+	}})
+	return plan.Plan{Action: "php.set", Target: subscription.Name + "/" + desired.PrimaryDomain, Steps: steps}, nil
 }
 
 func waitForSocketRelease(ctx context.Context, fs system.FS, socket string) error {

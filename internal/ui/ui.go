@@ -130,16 +130,16 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.status = "no installed PHP-FPM versions found"
 		}
 		return m, nil
-	case subscriptionPHPChangedMsg:
+	case websitePHPChangedMsg:
 		m.progress.active = false
 		if msg.err != nil {
 			m.status = "PHP version change failed: " + msg.err.Error()
 			m.output = m.output.append(m.status)
 			return m, nil
 		}
-		m.status = "subscription " + msg.name + " now uses PHP-FPM " + msg.version + "; refreshing…"
-		m.output = m.output.append("subscription " + msg.name + " PHP-FPM=" + msg.version)
-		m, command := m.startSubscriptions()
+		m.status = "domain " + msg.domain + " now uses PHP-FPM " + msg.version + "; refreshing…"
+		m.output = m.output.append("domain " + msg.subscription + "/" + msg.domain + " PHP-FPM=" + msg.version)
+		m, command := m.startWebsites()
 		return m, command
 	case healthLoadedMsg:
 		if m.healthLoad.stale(msg.generation) {

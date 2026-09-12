@@ -14,7 +14,7 @@ import (
 )
 
 func newPHPCommand() *cobra.Command {
-	command := &cobra.Command{Use: "php", Short: "manage PHP-FPM versions and pools"}
+	command := &cobra.Command{Use: "php", Short: "manage per-domain PHP-FPM versions and pools"}
 	command.AddCommand(newPHPListVersionsCommand(), newPHPSetCommand())
 	return command
 }
@@ -55,10 +55,9 @@ func newPHPListVersionsCommand() *cobra.Command {
 }
 
 func newPHPSetCommand() *cobra.Command {
-	var configPath, version, memoryLimit string
-	var maxChildren int
+	var configPath, version string
 	var dryRun bool
-	command := &cobra.Command{Use: "set <subscription>", Short: "change a subscription PHP-FPM version", Args: cobra.ExactArgs(1), RunE: func(command *cobra.Command, args []string) error {
+	command := &cobra.Command{Use: "set <subscription> <domain>", Short: "change one domain PHP-FPM version", Args: cobra.ExactArgs(2), RunE: func(command *cobra.Command, args []string) error {
 		if strings.TrimSpace(version) == "" {
 			return fmt.Errorf("--version is required")
 		}
@@ -67,14 +66,14 @@ func newPHPSetCommand() *cobra.Command {
 			return fmt.Errorf("load configuration: %w", err)
 		}
 		ctx := context.Background()
-		options := service.PHPSetOptions{Version: version, MaxChildren: maxChildren, MemoryLimit: memoryLimit}
+		options := service.PHPSetOptions{Version: version}
 		if dryRun {
 			runtime, err := service.NewReadOnlyPHPRuntime(ctx, cfg)
 			if err != nil {
 				return fmt.Errorf("open PHP state: %w", err)
 			}
 			defer runtime.Close()
-			operation, err := runtime.Service.PrepareSet(ctx, args[0], options)
+			operation, err := runtime.Service.PrepareSet(ctx, args[0], args[1], options)
 			if err != nil {
 				return err
 			}
@@ -87,17 +86,15 @@ func newPHPSetCommand() *cobra.Command {
 		defer runtime.Close()
 		lockCtx, cancel := context.WithTimeout(ctx, time.Duration(cfg.Limits.LockTimeoutSeconds)*time.Second)
 		defer cancel()
-		operationID, err := runtime.Service.Set(lockCtx, args[0], options)
+		operationID, err := runtime.Service.Set(lockCtx, args[0], args[1], options)
 		if err != nil {
 			return err
 		}
-		_, err = fmt.Fprintf(command.OutOrStdout(), "Changed PHP-FPM version for subscription %q to %s (operation %d).\n", args[0], version, operationID)
+		_, err = fmt.Fprintf(command.OutOrStdout(), "Changed PHP-FPM version for %q/%q to %s (operation %d).\n", args[0], args[1], version, operationID)
 		return err
 	}}
 	command.Flags().StringVar(&configPath, "config", meta.ConfigFile, "path to config.toml")
 	command.Flags().StringVar(&version, "version", "", "installed PHP-FPM version in major.minor form")
-	command.Flags().IntVar(&maxChildren, "max-children", 0, "override the pool pm.max_children limit")
-	command.Flags().StringVar(&memoryLimit, "memory-limit", "", "override the pool PHP memory limit")
 	command.Flags().BoolVar(&dryRun, "dry-run", false, "show the operation plan without changing the system")
 	return command
 }

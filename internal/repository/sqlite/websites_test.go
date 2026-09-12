@@ -193,7 +193,7 @@ func TestRepository_PreservesAdoptedCertificateLineage(t *testing.T) {
 	}
 }
 
-func TestRepository_UpdatePHPSettingsMirrorsPHPFPMWebsites(t *testing.T) {
+func TestRepository_UpdatePHPSettingsKeepsExistingPHPFPMWebsiteVersions(t *testing.T) {
 	repository, err := Open(context.Background(), filepath.Join(t.TempDir(), "provctl.db"))
 	if err != nil {
 		t.Fatal(err)
@@ -227,7 +227,7 @@ func TestRepository_UpdatePHPSettingsMirrorsPHPFPMWebsites(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if websites[0].PHPVersion != "8.4" || websites[1].PHPVersion != "" {
+	if websites[0].PHPVersion != "8.3" || websites[1].PHPVersion != "" {
 		t.Errorf("website versions = %#v", websites)
 	}
 }

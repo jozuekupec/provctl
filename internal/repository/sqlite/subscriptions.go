@@ -134,8 +134,8 @@ func (repository *Repository) SetSubscriptionStatus(ctx context.Context, id int6
 	return nil
 }
 
-// UpdatePHPSettings atomically records a subscription PHP version and mirrors
-// it to every PHP-FPM website owned by that subscription.
+// UpdatePHPSettings records the PHP-FPM default used when creating new domains.
+// Existing domains retain their independently selected PHP version.
 func (repository *Repository) UpdatePHPSettings(ctx context.Context, subscription domain.Subscription) error {
 	transaction, err := repository.DB.BeginTx(ctx, nil)
 	if err != nil {
@@ -153,9 +153,6 @@ func (repository *Repository) UpdatePHPSettings(ctx context.Context, subscriptio
 	}
 	if rows != 1 {
 		return fmt.Errorf("subscription %q not found", subscription.Name)
-	}
-	if _, err := transaction.ExecContext(ctx, `UPDATE websites SET php_version = ?, updated_at = ? WHERE subscription_id = ? AND type = 'php-fpm'`, nullable(subscription.PHPVersion), now, subscription.ID); err != nil {
-		return fmt.Errorf("update PHP-FPM website versions: %w", err)
 	}
 	if err := transaction.Commit(); err != nil {
 		return fmt.Errorf("commit PHP settings update: %w", err)

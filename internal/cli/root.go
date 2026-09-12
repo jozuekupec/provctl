@@ -85,7 +85,7 @@ func NewRootCommand() *cobra.Command {
 			}
 			return sslRuntime.Service.Disable(ctx, subscription, domain)
 		}
-		_, err = ui.Program(ui.Deps{LoadSubscriptions: runtime.Service.List, LoadWebsites: websiteRuntime.Service.List, LoadDatabases: databaseRuntime.Service.ListForSubscription, ReadWebsiteLogs: websiteRuntime.Service.ReadLogs, SetWebsiteEnabled: websiteWriteRuntime.Service.SetEnabled, SetWebsiteTLS: setWebsiteTLS, SetSubscriptionStatus: subscriptionWriteRuntime.Service.SetStatus, DeleteSubscription: subscriptionWriteRuntime.Service.Delete, LoadPHPVersions: phpReadRuntime.Service.ListVersions, SetSubscriptionPHP: phpWriteRuntime.Service.Set, RunHealth: healthRuntime.Service.Run}).Run()
+		_, err = ui.Program(ui.Deps{LoadSubscriptions: runtime.Service.List, LoadWebsites: websiteRuntime.Service.List, LoadDatabases: databaseRuntime.Service.ListForSubscription, ReadWebsiteLogs: websiteRuntime.Service.ReadLogs, SetWebsiteEnabled: websiteWriteRuntime.Service.SetEnabled, SetWebsiteTLS: setWebsiteTLS, SetSubscriptionStatus: subscriptionWriteRuntime.Service.SetStatus, DeleteSubscription: subscriptionWriteRuntime.Service.Delete, LoadPHPVersions: phpReadRuntime.Service.ListVersions, SetWebsitePHP: phpWriteRuntime.Service.Set, RunHealth: healthRuntime.Service.Run}).Run()
 		return err
 	}
 	root.AddCommand(newDoctorCommand())

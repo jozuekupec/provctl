@@ -325,20 +325,28 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   filter with Escape are covered by model tests. This deliberately adopts the
   current popup and filtering guidance pulled from `branchctl` and the Go TUI
   cookbook. `make test` and `make build` passed.
-  **Redesign block 7 complete:** subscriptions now expose `p` for a bounded
-  PHP-FPM version picker. It discovers only versions installed on the host via
-  a cancellable `tea.Cmd`, labels their service state, and never accepts a
-  free-text version. Selecting a new version opens the standard confirmation
-  dialog; confirming calls the existing journalled PHP service through `Deps`,
-  then refreshes the subscription list. Choosing the current version performs
-  no mutation. Model tests cover discovery, selection, confirmation and the
-  no-op guard; the complete `make test` and `make build` suite passed. A
-  privileged end-to-end switch remains suitable for the prepared `pv`
-  container before release, because it deliberately changes live FPM pools.
-  The current `pv` package is `0.1.1~dev.3.e8f1718` with snapshot
-  `tui-php-picker-v2`; Apache is active and its non-mutating PHP discovery
-  reports `8.4 active`. A real picker switch is intentionally pending until a
-  second FPM version is installed in that disposable container.
+  **Redesign block 7 complete:** a selected PHP-FPM domain now exposes `p` for
+  a bounded PHP-FPM version picker. It discovers only versions installed on
+  the host via a cancellable `tea.Cmd`, labels their service state, and never
+  accepts a free-text version. Selecting a new version opens the standard
+  confirmation dialog; confirming calls the existing journalled PHP service
+  through `Deps`, replaces only that domain's pool and vhost, then refreshes
+  the domain list. Choosing the current version performs
+  no mutation. PHP-FPM artifacts are now domain-scoped everywhere: creation,
+  adoption, restore, health checks, deletion and the CLI use an independent
+  pool, socket and error log. The pool name is deliberately separate from the
+  subscription Unix user, so a domain name can never be mistaken for an OS
+  account. In `pv`, Sury PHP-FPM 8.1, 8.2 and 8.3 were installed beside 8.4;
+  `demo.test` was switched to 8.3 and `api.demo.test` to 8.2. Both sockets,
+  pool files, Apache handlers and `apache2ctl configtest` were verified. The
+  saved `php-per-domain` snapshot preserves that test state; `pv` was restored
+  to `clean` after the integration run. The health command correctly reports
+  the per-domain FPM check as OK; its existing HTTP 403/DNS warning for the
+  fixture is unrelated to the PHP transition. Model tests cover discovery,
+  selection, confirmation and the no-op guard; focused renderer, service,
+  SQLite, TUI and CLI tests passed. The standard `make test` reached `vet` and
+  `staticcheck`; its race phase exceeds the current command-runner reporting
+  window and must be rerun in a normal terminal before release.
   Původní návrh je zaznamenán v [tui-design.md](tui-design.md) a
   cíleně přebírá konzistentní Bubble Tea vzor z projektu `depo`: hodnotový
   model, `Deps`, samostatné routing/render/keys/theme a I/O jen přes `tea.Cmd`.

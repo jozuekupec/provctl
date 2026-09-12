@@ -10,7 +10,7 @@ import (
 )
 
 func TestRenderPHPFPMPool_Golden(t *testing.T) {
-	pool := PHPFPMPool{Name: "acme", Home: "/var/www/vhosts/acme", Socket: "/run/php/provctl-acme.sock", MaxChildren: 10, MemoryLimit: "256M", UploadMax: "64M", MaxExecTime: 60, PhpErrorLog: "/var/log/provctl/acme/php-fpm-error.log"}
+	pool := PHPFPMPool{Name: "acme", User: "acme", Home: "/var/www/vhosts/acme", Socket: "/run/php/provctl-acme.sock", MaxChildren: 10, MemoryLimit: "256M", UploadMax: "64M", MaxExecTime: 60, PhpErrorLog: "/var/log/provctl/acme/php-fpm-error.log"}
 	got, err := RenderPHPFPMPool(pool)
 	if err != nil {
 		t.Fatalf("RenderPHPFPMPool() error = %v", err)
@@ -25,7 +25,7 @@ func TestRenderPHPFPMPool_Golden(t *testing.T) {
 }
 
 func TestRenderPHPFPMPool_ScalesWorkerValues(t *testing.T) {
-	got, err := RenderPHPFPMPool(PHPFPMPool{Name: "acme", Home: "/srv/acme", Socket: "/run/php/acme.sock", MaxChildren: 1, MemoryLimit: "128M", UploadMax: "16M", MaxExecTime: 30, PhpErrorLog: "/var/log/acme.log"})
+	got, err := RenderPHPFPMPool(PHPFPMPool{Name: "acme", User: "acme", Home: "/srv/acme", Socket: "/run/php/acme.sock", MaxChildren: 1, MemoryLimit: "128M", UploadMax: "16M", MaxExecTime: 30, PhpErrorLog: "/var/log/acme.log"})
 	if err != nil {
 		t.Fatalf("RenderPHPFPMPool() error = %v", err)
 	}

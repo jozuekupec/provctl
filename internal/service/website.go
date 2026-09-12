@@ -286,7 +286,7 @@ func (service WebsiteService) RenderVHost(subscriptionName string, website domai
 	case domain.WebsiteRedirect:
 		httpContents, err = render.RenderApacheRedirectHTTP(render.ApacheRedirectVHost{PrimaryDomain: website.PrimaryDomain, Aliases: website.Aliases, Target: website.Target, RedirectCode: website.RedirectCode, AcmeChallengeRoot: service.Config.Paths.ACMEChallenge, LogDir: logDir, ForceHTTPS: website.ForceHTTPS})
 	case domain.WebsitePHPFPM:
-		httpContents, err = render.RenderApachePHPFPMHTTP(render.ApacheHTTPVHost{Subscription: subscriptionName, PrimaryDomain: website.PrimaryDomain, Aliases: website.Aliases, DocumentRoot: website.DocumentRoot, AcmeChallengeRoot: service.Config.Paths.ACMEChallenge, FPMSocket: filepath.Join("/run/php", meta.FilePrefix+subscriptionName+".sock"), ProxyTimeout: service.Config.Apache.ProxyTimeout, LogDir: logDir, ForceHTTPS: website.ForceHTTPS})
+		httpContents, err = render.RenderApachePHPFPMHTTP(render.ApacheHTTPVHost{Subscription: subscriptionName, PrimaryDomain: website.PrimaryDomain, Aliases: website.Aliases, DocumentRoot: website.DocumentRoot, AcmeChallengeRoot: service.Config.Paths.ACMEChallenge, FPMSocket: phpSocket(subscriptionName, website.PrimaryDomain), ProxyTimeout: service.Config.Apache.ProxyTimeout, LogDir: logDir, ForceHTTPS: website.ForceHTTPS})
 	default:
 		return nil, fmt.Errorf("unsupported website type %q", website.Type)
 	}
@@ -318,7 +318,7 @@ func (service WebsiteService) renderTLSVHost(subscriptionName string, website do
 	case domain.WebsiteRedirect:
 		return render.RenderApacheRedirectTLS(render.ApacheRedirectTLSVHost{PrimaryDomain: website.PrimaryDomain, Aliases: website.Aliases, Target: website.Target, RedirectCode: website.RedirectCode, CertificateFile: certificateFile, CertificateKey: certificateKey, LogDir: logDir})
 	case domain.WebsitePHPFPM:
-		return render.RenderApachePHPFPMTLS(render.ApacheTLSVHost{Subscription: subscriptionName, PrimaryDomain: website.PrimaryDomain, Aliases: website.Aliases, DocumentRoot: website.DocumentRoot, CertificateFile: certificateFile, CertificateKey: certificateKey, FPMSocket: filepath.Join("/run/php", meta.FilePrefix+subscriptionName+".sock"), ProxyTimeout: service.Config.Apache.ProxyTimeout, LogDir: logDir})
+		return render.RenderApachePHPFPMTLS(render.ApacheTLSVHost{Subscription: subscriptionName, PrimaryDomain: website.PrimaryDomain, Aliases: website.Aliases, DocumentRoot: website.DocumentRoot, CertificateFile: certificateFile, CertificateKey: certificateKey, FPMSocket: phpSocket(subscriptionName, website.PrimaryDomain), ProxyTimeout: service.Config.Apache.ProxyTimeout, LogDir: logDir})
 	default:
 		return nil, fmt.Errorf("unsupported website type %q", website.Type)
 	}
@@ -377,6 +377,14 @@ func (service WebsiteService) PrepareDelete(ctx context.Context, subscriptionNam
 		undoApache, err = service.Apache.RemoveVHost(ctx, vhostPath, enabledPath)
 		return err
 	}, Undo: func(ctx context.Context) error { return undoApache(ctx) }}}
+	if website.Type == domain.WebsitePHPFPM && website.PHPVersion != "" && service.PHPFPM != nil {
+		version := PHPFPMVersion{Version: website.PHPVersion, Binary: filepath.Join("/usr/sbin", "php-fpm"+website.PHPVersion), Service: "php" + website.PHPVersion + "-fpm.service"}
+		poolPath := phpPoolPath(version, subscriptionName, website.PrimaryDomain)
+		steps = append(steps, plan.Step{Name: "remove domain PHP-FPM pool", Preview: "remove " + poolPath, Do: func(ctx context.Context) error {
+			_, err := service.PHPFPM.RemovePool(ctx, version, poolPath)
+			return err
+		}})
+	}
 	if hasCertificate {
 		if certificate.Managed {
 			steps = append(steps, plan.Step{Name: "delete Certbot certificate", Preview: "certbot delete --cert-name " + certificate.Lineage, Do: func(ctx context.Context) error {
@@ -627,17 +635,17 @@ func (service WebsiteService) PrepareCreatePHPFPM(ctx context.Context, subscript
 	}
 	siteRoot := filepath.Join(subscription.Home, "sites", primaryDomain)
 	logDir := filepath.Join(meta.LogDir, subscription.Name, primaryDomain)
-	fpmLogDir := filepath.Join(meta.LogDir, subscription.Name)
-	fpmErrorLog := filepath.Join(fpmLogDir, "php-fpm-error.log")
-	socket := filepath.Join("/run/php", meta.FilePrefix+subscription.Name+".sock")
-	poolPath := filepath.Join("/etc/php", service.Version.Version, "fpm", "pool.d", meta.FilePrefix+subscription.Name+".conf")
+	fpmLogDir := phpLogDir(subscription.Name, primaryDomain)
+	fpmErrorLog := phpErrorLog(subscription.Name, primaryDomain)
+	socket := phpSocket(subscription.Name, primaryDomain)
+	poolPath := phpPoolPath(service.Version, subscription.Name, primaryDomain)
 	vhostPath := filepath.Join(service.Config.Apache.SitesAvailable, meta.FilePrefix+subscription.Name+"-"+primaryDomain+".conf")
 	enabledPath := filepath.Join(service.Config.Apache.SitesEnabled, filepath.Base(vhostPath))
 	contents, err := render.RenderApachePHPFPMHTTP(render.ApacheHTTPVHost{Subscription: subscription.Name, PrimaryDomain: primaryDomain, DocumentRoot: filepath.Join(siteRoot, "public"), AcmeChallengeRoot: service.Config.Paths.ACMEChallenge, FPMSocket: socket, ProxyTimeout: service.Config.Apache.ProxyTimeout, LogDir: logDir})
 	if err != nil {
 		return plan.Plan{}, err
 	}
-	poolContents, err := render.RenderPHPFPMPool(render.PHPFPMPool{Name: subscription.Name, Home: subscription.Home, Socket: socket, MaxChildren: subscription.PHPMaxChildren, MemoryLimit: subscription.PHPMemoryLimit, UploadMax: subscription.PHPUploadMax, MaxExecTime: subscription.PHPMaxExecTime, PhpErrorLog: fpmErrorLog})
+	poolContents, err := render.RenderPHPFPMPool(render.PHPFPMPool{Name: phpPoolName(subscription.Name, primaryDomain), User: subscription.UnixUser, Home: subscription.Home, Socket: socket, MaxChildren: subscription.PHPMaxChildren, MemoryLimit: subscription.PHPMemoryLimit, UploadMax: subscription.PHPUploadMax, MaxExecTime: subscription.PHPMaxExecTime, PhpErrorLog: fpmErrorLog})
 	if err != nil {
 		return plan.Plan{}, err
 	}

@@ -394,13 +394,26 @@ func (service SubscriptionService) deletePlan(subscription domain.Subscription, 
 			return service.Store.DeleteCertificatesBySubscription(ctx, subscription.ID)
 		}},
 	)
-	if service.PHPFPM != nil && subscription.PHPVersion != "" && hasPHPFPMWebsite(websites) {
-		version := PHPFPMVersion{Version: subscription.PHPVersion, Binary: filepath.Join("/usr/sbin", "php-fpm"+subscription.PHPVersion), Service: "php" + subscription.PHPVersion + "-fpm.service"}
-		poolPath := filepath.Join("/etc/php", subscription.PHPVersion, "fpm", "pool.d", meta.FilePrefix+subscription.Name+".conf")
-		steps = append(steps, plan.Step{Name: "remove PHP-FPM pool", Preview: "remove " + poolPath, Do: func(ctx context.Context) error {
-			_, err := service.PHPFPM.RemovePool(ctx, version, poolPath)
-			return err
-		}})
+	if service.PHPFPM != nil {
+		for _, website := range websites {
+			if website.Type != domain.WebsitePHPFPM {
+				continue
+			}
+			website := website
+			versionName := website.PHPVersion
+			if versionName == "" {
+				versionName = subscription.PHPVersion
+			}
+			if versionName == "" {
+				continue
+			}
+			version := PHPFPMVersion{Version: versionName, Binary: filepath.Join("/usr/sbin", "php-fpm"+versionName), Service: "php" + versionName + "-fpm.service"}
+			poolPath := phpPoolPath(version, subscription.Name, website.PrimaryDomain)
+			steps = append(steps, plan.Step{Name: "remove PHP-FPM pool", Preview: "remove " + poolPath, Do: func(ctx context.Context) error {
+				_, err := service.PHPFPM.RemovePool(ctx, version, poolPath)
+				return err
+			}})
+		}
 	}
 	steps = append(steps,
 		plan.Step{Name: "remove subscription home", Preview: fmt.Sprintf("remove recursively %s", subscription.Home), Do: func(context.Context) error { return service.FS.RemoveAll(subscription.Home) }},

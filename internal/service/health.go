@@ -241,7 +241,7 @@ func (service HealthService) checkFPM(ctx context.Context, prefix string, subscr
 	if err != nil || !active {
 		return Check{Name: prefix + " PHP-FPM", Status: CheckFail, Detail: "PHP-FPM service is inactive", Hint: "start php" + version + "-fpm"}
 	}
-	socket := phpSocket(subscription.Name)
+	socket := phpSocket(subscription.Name, website.PrimaryDomain)
 	info, err := service.FS.Stat(socket)
 	if err != nil || info.Mode()&os.ModeSocket == 0 {
 		return Check{Name: prefix + " PHP-FPM", Status: CheckFail, Detail: "pool socket is unavailable", Hint: "restart php" + version + "-fpm"}

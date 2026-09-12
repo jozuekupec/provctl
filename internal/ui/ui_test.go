@@ -211,19 +211,20 @@ func TestModel_TLSToggleCallsDependency(t *testing.T) {
 	}
 }
 
-func TestModel_PHPVersionPickerUsesInstalledVersionsAndConfirmsChange(t *testing.T) {
-	var changedName, changedVersion string
+func TestModel_PHPVersionPickerChangesSelectedDomain(t *testing.T) {
+	var changedSubscription, changedDomain, changedVersion string
 	m := New(Deps{
 		LoadPHPVersions: func(context.Context) ([]service.PHPFPMVersion, error) {
 			return []service.PHPFPMVersion{{Version: "8.3", Active: true}, {Version: "8.4", Active: true}}, nil
 		},
-		SetSubscriptionPHP: func(_ context.Context, name string, options service.PHPSetOptions) (int64, error) {
-			changedName, changedVersion = name, options.Version
+		SetWebsitePHP: func(_ context.Context, subscription, domain string, options service.PHPSetOptions) (int64, error) {
+			changedSubscription, changedDomain, changedVersion = subscription, domain, options.Version
 			return 1, nil
 		},
 	})
-	m.items = []domain.Subscription{{Name: "acme", Status: "active", PHPVersion: "8.3"}}
-	m.workspace = true
+	m.items = []domain.Subscription{{ID: 1, Name: "acme", Status: "active"}}
+	m.workspace, m.showWebsites, m.focus = true, true, focusWebsites
+	m.websites = []domain.Website{{ID: 1, PrimaryDomain: "app.example.test", Type: domain.WebsitePHPFPM, PHPVersion: "8.3"}}
 	updated, command := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("p")})
 	m = updated.(appModel)
 	if !m.phpPicker.open || !m.phpPicker.loading {
@@ -243,8 +244,8 @@ func TestModel_PHPVersionPickerUsesInstalledVersionsAndConfirmsChange(t *testing
 	}
 	updated, command = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("y")})
 	_ = runProgress(t, updated.(appModel), command)
-	if changedName != "acme" || changedVersion != "8.4" {
-		t.Fatalf("SetSubscriptionPHP(%q, %q), want acme, 8.4", changedName, changedVersion)
+	if changedSubscription != "acme" || changedDomain != "app.example.test" || changedVersion != "8.4" {
+		t.Fatalf("SetWebsitePHP(%q, %q, %q), want acme, app.example.test, 8.4", changedSubscription, changedDomain, changedVersion)
 	}
 }
 
@@ -252,7 +253,9 @@ func TestModel_PHPVersionPickerRejectsCurrentVersionWithoutMutation(t *testing.T
 	m := New(Deps{LoadPHPVersions: func(context.Context) ([]service.PHPFPMVersion, error) {
 		return []service.PHPFPMVersion{{Version: "8.4", Active: true}}, nil
 	}})
-	m.items = []domain.Subscription{{Name: "acme", Status: "active", PHPVersion: "8.4"}}
+	m.items = []domain.Subscription{{ID: 1, Name: "acme", Status: "active"}}
+	m.workspace, m.showWebsites, m.focus = true, true, focusWebsites
+	m.websites = []domain.Website{{ID: 1, PrimaryDomain: "app.example.test", Type: domain.WebsitePHPFPM, PHPVersion: "8.4"}}
 	updated, command := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("p")})
 	m = updated.(appModel)
 	updated, _ = m.Update(command())

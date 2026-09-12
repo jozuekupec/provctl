@@ -92,7 +92,7 @@ func (websitePHPFPM) RemovePool(context.Context, PHPFPMVersion, string) (func(co
 func TestWebsiteService_PrepareCreatePHPFPMBuildsPlanWithoutChanges(t *testing.T) {
 	fs := &subscriptionFS{directories: map[string]bool{}}
 	service := WebsiteService{
-		FS: fs, Store: websiteStore{subscription: domain.Subscription{ID: 1, Name: "acme", UnixUID: 5000, Home: "/vhosts/acme", Status: "active", PHPMaxChildren: 10, PHPMemoryLimit: "256M", PHPUploadMax: "64M", PHPMaxExecTime: 60}}, Apache: websiteApache{}, PHPFPM: websitePHPFPM{}, Version: PHPFPMVersion{Version: "7.9", Binary: "/usr/sbin/php-fpm7.9", Service: "php7.9-fpm.service"},
+		FS: fs, Store: websiteStore{subscription: domain.Subscription{ID: 1, Name: "acme", UnixUser: "acme", UnixUID: 5000, Home: "/vhosts/acme", Status: "active", PHPMaxChildren: 10, PHPMemoryLimit: "256M", PHPUploadMax: "64M", PHPMaxExecTime: 60}}, Apache: websiteApache{}, PHPFPM: websitePHPFPM{}, Version: PHPFPMVersion{Version: "7.9", Binary: "/usr/sbin/php-fpm7.9", Service: "php7.9-fpm.service"},
 		Executor: plan.Executor{Journal: &subscriptionJournal{}, Locker: subscriptionLocker{}},
 		Config:   config.Config{Paths: config.Paths{ACMEChallenge: "/var/lib/provctl/acme-challenge"}, Apache: config.Apache{SitesAvailable: "/etc/apache2/sites-available", SitesEnabled: "/etc/apache2/sites-enabled", ProxyTimeout: 60}},
 	}

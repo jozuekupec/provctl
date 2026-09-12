@@ -553,7 +553,7 @@ Trik, jak vynutit selhání bez zásahu do kódu: podstrč vadnou šablonu do ov
 ./scripts/e2.sh sh 'test -f /etc/apache2/sites-available/mujweb.conf && echo "OK: cizí soubor nedotčen"'
 ```
 
-### T13 — změna PHP verze
+### T13 — změna PHP verze per doménu
 
 Vyžaduje dvě nainstalované verze. Pokud standardní Debian 13 obsahuje jen jednu,
 dočasně přidej v testovacím kontejneru repozitář Sury a druhou FPM verzi; po
@@ -563,11 +563,20 @@ testovací závislost se nesmí promítnout do balíčku `provctl`.
 
 ```bash
 ./scripts/e2.sh sh 'provctl php list-versions'
-./scripts/e2.sh sh 'provctl php set acme --version <druhá_verze>'
-./scripts/e2.sh sh 'curl -s -H "Host: example.test" http://127.0.0.1/'      # HELLO-<nová verze>
-./scripts/e2.sh sh 'ls /etc/php/*/fpm/pool.d/ | grep provctl-acme'          # pool jen na jednom místě
+./scripts/e2.sh sh 'provctl website create acme api.example.test --type php-fpm'
+./scripts/e2.sh sh 'provctl php set acme example.test --version <verze-A>'
+./scripts/e2.sh sh 'provctl php set acme api.example.test --version <verze-B>'
+./scripts/e2.sh sh 'test -S /run/php/provctl-acme-example.test.sock'
+./scripts/e2.sh sh 'test -S /run/php/provctl-acme-api.example.test.sock'
+./scripts/e2.sh sh 'grep -F provctl-acme-example.test.sock /etc/apache2/sites-available/provctl-acme-example.test.conf'
+./scripts/e2.sh sh 'grep -F provctl-acme-api.example.test.sock /etc/apache2/sites-available/provctl-acme-api.example.test.conf'
+./scripts/e2.sh sh 'apache2ctl configtest'
 ./scripts/e2.sh sh 'provctl reconcile --dry-run; echo "exit=$?"'            # čekáme 0
 ```
+
+**Očekávané:** každá doména používá nezávislý pool a socket odpovídající
+vybrané verzi; změna jedné domény nepřepíše druhou. Oba vhosty míří na své
+sockety a `apache2ctl configtest` projde.
 
 ### T14 — zámek a souběh
 

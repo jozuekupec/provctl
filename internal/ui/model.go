@@ -21,7 +21,7 @@ type Deps struct {
 	SetSubscriptionStatus func(context.Context, string, string) (int64, error)
 	DeleteSubscription    func(context.Context, string, bool) (int64, error)
 	LoadPHPVersions       func(context.Context) ([]service.PHPFPMVersion, error)
-	SetSubscriptionPHP    func(context.Context, string, service.PHPSetOptions) (int64, error)
+	SetWebsitePHP         func(context.Context, string, string, service.PHPSetOptions) (int64, error)
 	RunHealth             func(context.Context, string, string) ([]service.Check, error)
 }
 type websitesLoadedMsg struct {
@@ -63,10 +63,10 @@ type phpVersionsLoadedMsg struct {
 	err        error
 	generation uint64
 }
-type subscriptionPHPChangedMsg struct {
-	err     error
-	name    string
-	version string
+type websitePHPChangedMsg struct {
+	err             error
+	subscription    string
+	domain, version string
 }
 type healthLoadedMsg struct {
 	checks     []service.Check
@@ -220,18 +220,19 @@ func (m appModel) loadPHPVersions(ctx context.Context, generation uint64) tea.Ms
 	return phpVersionsLoadedMsg{items: items, err: err, generation: generation}
 }
 
-func (m appModel) changeSubscriptionPHP(ctx context.Context, confirm confirmState) tea.Msg {
-	subscription, ok := m.selectedSubscription()
-	if m.deps.SetSubscriptionPHP == nil || !ok {
-		return subscriptionPHPChangedMsg{err: context.Canceled}
+func (m appModel) changeWebsitePHP(ctx context.Context, confirm confirmState) tea.Msg {
+	subscription, subscriptionOK := m.selectedSubscription()
+	website, websiteOK := m.selectedWebsite()
+	if m.deps.SetWebsitePHP == nil || !subscriptionOK || !websiteOK {
+		return websitePHPChangedMsg{err: context.Canceled}
 	}
-	_, err := m.deps.SetSubscriptionPHP(ctx, subscription.Name, service.PHPSetOptions{Version: confirm.domain})
-	return subscriptionPHPChangedMsg{err: err, name: subscription.Name, version: confirm.domain}
+	_, err := m.deps.SetWebsitePHP(ctx, subscription.Name, website.PrimaryDomain, service.PHPSetOptions{Version: confirm.domain})
+	return websitePHPChangedMsg{err: err, subscription: subscription.Name, domain: website.PrimaryDomain, version: confirm.domain}
 }
 
-func (m appModel) changeSubscriptionPHPCmd(confirm confirmState) tea.Cmd {
-	return steppedCmd("Switch PHP-FPM", []string{"apply PHP-FPM version change"}, func(ctx context.Context) tea.Msg {
-		return m.changeSubscriptionPHP(ctx, confirm)
+func (m appModel) changeWebsitePHPCmd(confirm confirmState) tea.Cmd {
+	return steppedCmd("Switch PHP-FPM", []string{"replace domain PHP-FPM pool", "regenerate Apache vhost"}, func(ctx context.Context) tea.Msg {
+		return m.changeWebsitePHP(ctx, confirm)
 	})
 }
 
