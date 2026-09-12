@@ -386,6 +386,9 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   dosavadní CI běhy jsou zelené. Repo ale zatím nemá žádný GitHub Release;
   produkční podpis, Pages deployment APT obsahu a instalace skutečným APT
   klientem proto čekají na push aktuální větve a první záměrný release tag.
+  Před tímto pushem `go mod tidy` odhalil a opravil metadata dvou přímo
+  importovaných Bubble Tea závislostí (`lipgloss`, `x/ansi`); CI už po tidy
+  nemá měnit `go.mod`.
   E1 install/purge nyní prošel také přes `piuparts 1.6.0` v čerstvém Debian
   13 chrootu uvnitř `pv`; log končil `PASS: All tests`. Reprodukovatelný
   `scripts/tests/t05-piuparts.sh` instaluje E1 nástroje pouze do `pv`, testuje
