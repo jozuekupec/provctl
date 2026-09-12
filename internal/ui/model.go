@@ -17,6 +17,7 @@ type Deps struct {
 	LoadDatabases         func(context.Context, string) ([]domain.Database, error)
 	ReadWebsiteLogs       func(context.Context, string, string, bool, int) (string, error)
 	SetWebsiteEnabled     func(context.Context, string, string, bool) (int64, error)
+	SetWebsiteTLS         func(context.Context, string, string, bool) error
 	SetSubscriptionStatus func(context.Context, string, string) (int64, error)
 	DeleteSubscription    func(context.Context, string, bool) (int64, error)
 	RunHealth             func(context.Context, string, string) ([]service.Check, error)
@@ -38,6 +39,11 @@ type subscriptionsLoadedMsg struct {
 	generation uint64
 }
 type websiteChangedMsg struct {
+	err     error
+	enabled bool
+	domain  string
+}
+type websiteTLSChangedMsg struct {
 	err     error
 	enabled bool
 	domain  string
@@ -139,6 +145,24 @@ func (m appModel) changeWebsite(ctx context.Context, confirm confirmState) tea.M
 
 func (m appModel) changeWebsiteCmd(confirm confirmState) tea.Cmd {
 	return steppedCmd("Update website", []string{"apply generated configuration"}, func(ctx context.Context) tea.Msg { return m.changeWebsite(ctx, confirm) })
+}
+
+func (m appModel) changeWebsiteTLS(ctx context.Context, confirm confirmState) tea.Msg {
+	website, websiteOK := m.selectedWebsite()
+	subscription, subscriptionOK := m.selectedSubscription()
+	if m.deps.SetWebsiteTLS == nil || !subscriptionOK || !websiteOK {
+		return websiteTLSChangedMsg{err: context.Canceled}
+	}
+	err := m.deps.SetWebsiteTLS(ctx, subscription.Name, website.PrimaryDomain, confirm.enabled)
+	return websiteTLSChangedMsg{err: err, enabled: confirm.enabled, domain: website.PrimaryDomain}
+}
+
+func (m appModel) changeWebsiteTLSCmd(confirm confirmState) tea.Cmd {
+	steps := []string{"apply TLS configuration"}
+	if confirm.enabled {
+		steps = []string{"request TLS certificate", "apply TLS configuration"}
+	}
+	return steppedCmd("Update TLS", steps, func(ctx context.Context) tea.Msg { return m.changeWebsiteTLS(ctx, confirm) })
 }
 
 func (m appModel) changeSubscription(ctx context.Context, confirm confirmState) tea.Msg {

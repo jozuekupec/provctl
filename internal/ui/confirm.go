@@ -56,6 +56,8 @@ func (m appModel) runConfirmed() (tea.Model, tea.Cmd) {
 		return m, m.changeSubscriptionCmd(confirm)
 	case "delete":
 		return m, m.deleteSubscriptionCmd(confirm)
+	case "set-tls":
+		return m, m.changeWebsiteTLSCmd(confirm)
 	default:
 		return m, m.changeWebsiteCmd(confirm)
 	}

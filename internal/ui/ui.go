@@ -76,6 +76,17 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.output = m.output.append("website " + msg.domain + " enabled=" + fmt.Sprint(msg.enabled))
 		m, command := m.startWebsites()
 		return m, command
+	case websiteTLSChangedMsg:
+		m.progress.active = false
+		if msg.err != nil {
+			m.status = "TLS change failed: " + msg.err.Error()
+			m.output = m.output.append(m.status)
+			return m, nil
+		}
+		m.status = "TLS for " + msg.domain + " updated; refreshing…"
+		m.output = m.output.append("TLS for " + msg.domain + " enabled=" + fmt.Sprint(msg.enabled))
+		m, command := m.startWebsites()
+		return m, command
 	case subscriptionChangedMsg:
 		m.progress.active = false
 		if msg.err != nil {

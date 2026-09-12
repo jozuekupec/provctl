@@ -305,6 +305,15 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   Output and back, so subscription actions are reachable from the workspace.
   Model tests cover archive, typed deletion, and panel navigation; `make test`
   passed.
+  **Redesign block 5 complete:** selected domains can now toggle TLS through
+  `t`. The confirmation dialog clearly states that certificate issuance needs
+  public DNS and HTTP reachability; the actual operation calls the existing
+  SSL service with its DNS/preflight, Certbot and renewal safeguards rather
+  than duplicating them in the UI. Disabling TLS retains the certificate as the
+  CLI does. The production dependency is wired only through `Deps` and runs
+  through a Bubble Tea command; the model test verifies its target and enable
+  state. `make test` passed. A real public-domain issuance remains an E3/E5
+  follow-up, not a test to perform against the local `pv` container.
   Původní návrh je zaznamenán v [tui-design.md](tui-design.md) a
   cíleně přebírá konzistentní Bubble Tea vzor z projektu `depo`: hodnotový
   model, `Deps`, samostatné routing/render/keys/theme a I/O jen přes `tea.Cmd`.

@@ -190,6 +190,27 @@ func TestModel_FilteredWebsiteToggleUsesVisibleSelection(t *testing.T) {
 	}
 }
 
+func TestModel_TLSToggleCallsDependency(t *testing.T) {
+	var called bool
+	m := New(Deps{SetWebsiteTLS: func(_ context.Context, subscription, domain string, enabled bool) error {
+		called = subscription == "acme" && domain == "example.test" && enabled
+		return nil
+	}})
+	m.items = []domain.Subscription{{ID: 1, Name: "acme"}}
+	m.workspace, m.showWebsites, m.focus = true, true, focusWebsites
+	m.websites = []domain.Website{{PrimaryDomain: "example.test", SSLEnabled: false}}
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("t")})
+	m = updated.(appModel)
+	if m.confirm.action != "set-tls" || !m.confirm.enabled {
+		t.Fatalf("TLS confirmation = %#v", m.confirm)
+	}
+	updated, command := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("y")})
+	_ = runProgress(t, updated.(appModel), command)
+	if !called {
+		t.Fatal("SetWebsiteTLS was not called")
+	}
+}
+
 func TestModel_HelpOpensFiltersAndCloses(t *testing.T) {
 	m := New(Deps{})
 	m.ready, m.width, m.height = true, 100, 28

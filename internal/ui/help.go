@@ -65,6 +65,7 @@ func helpRows() []string {
 		"",
 		"Domains",
 		"e\tenable or disable selected domain",
+		"t\tenable or disable TLS for selected domain",
 		"l / L\tload access or error log",
 		"b\tload subscription databases",
 		"h\trun health checks",

@@ -54,6 +54,11 @@ func NewRootCommand() *cobra.Command {
 			return fmt.Errorf("open subscription mutation state: %w", err)
 		}
 		defer subscriptionWriteRuntime.Close()
+		sslRuntime, err := service.NewProductionSSLRuntime(context.Background(), cfg)
+		if err != nil {
+			return fmt.Errorf("open SSL mutation state: %w", err)
+		}
+		defer sslRuntime.Close()
 		healthRuntime, err := service.NewProductionHealthRuntime(context.Background(), cfg)
 		if err != nil {
 			return fmt.Errorf("open health state: %w", err)
@@ -64,7 +69,13 @@ func NewRootCommand() *cobra.Command {
 			return fmt.Errorf("open database TUI state: %w", err)
 		}
 		defer databaseRuntime.Close()
-		_, err = ui.Program(ui.Deps{LoadSubscriptions: runtime.Service.List, LoadWebsites: websiteRuntime.Service.List, LoadDatabases: databaseRuntime.Service.ListForSubscription, ReadWebsiteLogs: websiteRuntime.Service.ReadLogs, SetWebsiteEnabled: websiteWriteRuntime.Service.SetEnabled, SetSubscriptionStatus: subscriptionWriteRuntime.Service.SetStatus, DeleteSubscription: subscriptionWriteRuntime.Service.Delete, RunHealth: healthRuntime.Service.Run}).Run()
+		setWebsiteTLS := func(ctx context.Context, subscription, domain string, enabled bool) error {
+			if enabled {
+				return sslRuntime.Service.Enable(ctx, subscription, domain, false, true, true)
+			}
+			return sslRuntime.Service.Disable(ctx, subscription, domain)
+		}
+		_, err = ui.Program(ui.Deps{LoadSubscriptions: runtime.Service.List, LoadWebsites: websiteRuntime.Service.List, LoadDatabases: databaseRuntime.Service.ListForSubscription, ReadWebsiteLogs: websiteRuntime.Service.ReadLogs, SetWebsiteEnabled: websiteWriteRuntime.Service.SetEnabled, SetWebsiteTLS: setWebsiteTLS, SetSubscriptionStatus: subscriptionWriteRuntime.Service.SetStatus, DeleteSubscription: subscriptionWriteRuntime.Service.Delete, RunHealth: healthRuntime.Service.Run}).Run()
 		return err
 	}
 	root.AddCommand(newDoctorCommand())

@@ -126,6 +126,21 @@ func (m appModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				title: "Update domain", lines: []string{"Domain: " + website.PrimaryDomain, "Set enabled: " + map[bool]string{true: "yes", false: "no"}[!website.Enabled]},
 			})
 		}
+	case "t":
+		if m.focus == focusWebsites {
+			website, ok := m.selectedWebsite()
+			if !ok {
+				break
+			}
+			enabled := !website.SSLEnabled
+			lines := []string{"Domain: " + website.PrimaryDomain}
+			if enabled {
+				lines = append(lines, "Issue a certificate and redirect HTTP to HTTPS.", "Public DNS and HTTP reachability are required.")
+			} else {
+				lines = append(lines, "Disable TLS without deleting the certificate.")
+			}
+			m = m.askConfirm(confirmState{action: "set-tls", enabled: enabled, domain: website.PrimaryDomain, title: map[bool]string{true: "Enable TLS", false: "Disable TLS"}[enabled], lines: lines})
+		}
 	case "s":
 		if m.focus == focusSubscriptions {
 			subscription, ok := m.selectedSubscription()
