@@ -282,9 +282,20 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   height; the minimum terminal is now 80x24. `make test` passed after this
   change. Filtering, help, modal confirmation, forms, and new mutations remain
   in the next redesign blocks.
-  **Redesign block 2 started:** subscription and domain filters use Bubble Tea
+  **Redesign block 2 complete:** subscription and domain filters use Bubble Tea
   text input and derive selection, rendering, and service targets from the
-  same filtered list. The shared help and confirm overlay remain next.
+  same filtered list. `Esc` clears an applied domain filter before leaving the
+  workspace, and active inputs now return their Bubble Tea command and blur on
+  completion. A model test proves that an enable/disable action targets the
+  filtered domain without mutating the source list.
+  **Redesign block 3 complete:** `?` opens a centered, ANSI-safe Help overlay
+  with scroll and shortcut filtering; help owns keyboard input until closed.
+  Confirming a domain toggle or subscription state change is now a centered
+  modal dialog rather than a fragile status-line prompt. Its modal key routing
+  prevents background actions, has an explicit `y` confirmation rule, and any
+  other key cancels. The concise one-row keybar only advertises currently
+  implemented operations. Full `make test` (vet, staticcheck, race tests)
+  passed after this block.
   Původní návrh je zaznamenán v [tui-design.md](tui-design.md) a
   cíleně přebírá konzistentní Bubble Tea vzor z projektu `depo`: hodnotový
   model, `Deps`, samostatné routing/render/keys/theme a I/O jen přes `tea.Cmd`.

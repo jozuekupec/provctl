@@ -12,10 +12,19 @@ func (m appModel) View() string {
 	if m.width < minWidth || m.height < minHeight {
 		return fmt.Sprintf("provctl needs a terminal of at least %d×%d; current size is %d×%d", minWidth, minHeight, m.width, m.height)
 	}
+	var view string
 	if !m.workspace {
-		return m.renderPicker()
+		view = m.renderPicker()
+	} else {
+		view = m.renderWorkspace()
 	}
-	return m.renderWorkspace()
+	if m.help.open {
+		return m.overlayCenter(m.helpPopup(), view)
+	}
+	if m.confirm.action != "" {
+		return m.overlayCenter(m.confirmPopup(), view)
+	}
+	return view
 }
 
 func (m appModel) renderPicker() string {
@@ -45,9 +54,6 @@ func (m appModel) renderWorkspace() string {
 func (m appModel) renderFrame(body string) string {
 	status := dimStyle.Render(truncate(m.status, m.width))
 	keybar := keybarStyle.Render(truncate(m.keybar(), m.width))
-	if m.confirm.action != "" {
-		keybar = confirmStyle.Render(truncate(m.confirmationText(), m.width))
-	}
 	return strings.Join([]string{body, fit(status, m.width), fit(keybar, m.width)}, "\n")
 }
 
@@ -162,13 +168,6 @@ func window(contents string, rows, scroll int, fromBottom bool) string {
 	return strings.Join(lines[start:end], "\n")
 }
 
-func (m appModel) confirmationText() string {
-	if m.confirm.action == "active" || m.confirm.action == "suspended" {
-		return fmt.Sprintf("Set subscription %s to %s?  y confirm • esc cancel", m.confirm.domain, m.confirm.action)
-	}
-	return fmt.Sprintf("Set website %s enabled=%t?  y confirm • esc cancel", m.confirm.domain, m.confirm.enabled)
-}
-
 func (m appModel) keybar() string {
 	if m.subscriptionFilter.active {
 		return m.subscriptionFilter.input.View() + "  enter apply • esc clear"
@@ -177,18 +176,18 @@ func (m appModel) keybar() string {
 		return m.websiteFilter.input.View() + "  enter apply • esc clear"
 	}
 	if !m.workspace {
-		return "↑/↓ select • enter open • / filter • n new • e edit • s suspend/resume • a archive • d delete • ? help • q quit"
+		return "↑/↓ select · enter open · / filter · r refresh · ? help · q quit"
 	}
 	switch m.focus {
 	case focusSubscriptions:
-		return "← domains • ↑/↓ scroll • e edit • s suspend/resume • esc subscriptions • ? help"
+		return "←/→ panels · ↑/↓ select · s suspend/resume · esc subscriptions · ? help"
 	case focusWebsites:
-		return "←/→ panels • ↑/↓ select • e enable/disable • l access • L error • esc subscriptions • ? help"
+		return "←/→ panels · ↑/↓ select · e toggle · l/L logs · esc subscriptions · ? help"
 	case focusDetail:
-		return "← domains • ↑/↓ scroll • b databases • esc subscriptions • ? help"
+		return "←/→ panels · ↑/↓ scroll · b databases · esc subscriptions · ? help"
 	case focusLogs:
-		return "← domains • ↑/↓ scroll • l access • L error • esc subscriptions • ? help"
+		return "←/→ panels · ↑/↓ scroll · l/L logs · esc subscriptions · ? help"
 	default:
-		return "← domains • ↑/↓ scroll • h health • esc subscriptions • ? help"
+		return "←/→ panels · ↑/↓ scroll · h health · esc subscriptions · ? help"
 	}
 }

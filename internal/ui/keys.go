@@ -5,6 +5,12 @@ import tea "github.com/charmbracelet/bubbletea"
 // handleKey routes a key by the current interaction mode. Keeping this apart
 // from Update makes the value-model message router easy to audit and test.
 func (m appModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if m.help.open {
+		return m.handleHelpKey(msg)
+	}
+	if m.confirm.action != "" {
+		return m.handleConfirmKey(msg)
+	}
 	if m.subscriptionFilter.active || m.websiteFilter.active {
 		return m.handleFilterKey(msg)
 	}
@@ -26,23 +32,10 @@ func (m appModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	}
-	if m.confirm.action != "" {
-		switch msg.String() {
-		case "y":
-			m.status = "applying change…"
-			confirm := m.confirm
-			m.confirm = confirmState{}
-			if confirm.action == "active" || confirm.action == "suspended" {
-				return m, m.changeSubscriptionCmd(confirm)
-			}
-			return m, m.changeWebsiteCmd(confirm)
-		case "esc", "n", "q":
-			m.confirm, m.status = confirmState{}, "cancelled"
-			return m, nil
-		}
-		return m, nil
-	}
 	switch msg.String() {
+	case "?":
+		m.help.open, m.help.scroll, m.status = true, 0, ""
+		return m, nil
 	case "q", "ctrl+c":
 		return m, tea.Quit
 	case "j", "down":
@@ -124,8 +117,10 @@ func (m appModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			if !ok {
 				break
 			}
-			m.confirm = confirmState{action: "set-enabled", enabled: !website.Enabled, domain: website.PrimaryDomain}
-			m.status = "confirm with y; esc cancels"
+			m = m.askConfirm(confirmState{
+				action: "set-enabled", enabled: !website.Enabled, domain: website.PrimaryDomain,
+				title: "Update domain", lines: []string{"Domain: " + website.PrimaryDomain, "Set enabled: " + map[bool]string{true: "yes", false: "no"}[!website.Enabled]},
+			})
 		}
 	case "s":
 		if !m.showWebsites {
@@ -134,12 +129,9 @@ func (m appModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				break
 			}
 			if subscription.Status == "active" {
-				m.confirm = confirmState{action: "suspended", domain: subscription.Name}
+				m = m.askConfirm(confirmState{action: "suspended", domain: subscription.Name, title: "Suspend subscription", lines: []string{"Subscription: " + subscription.Name, "Websites will be unavailable until resumed."}})
 			} else if subscription.Status == "suspended" {
-				m.confirm = confirmState{action: "active", domain: subscription.Name}
-			}
-			if m.confirm.action != "" {
-				m.status = "confirm with y; esc cancels"
+				m = m.askConfirm(confirmState{action: "active", domain: subscription.Name, title: "Resume subscription", lines: []string{"Subscription: " + subscription.Name, "Restore normal service."}})
 			}
 		}
 	case "right", "tab":
@@ -147,6 +139,11 @@ func (m appModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "left", "shift+tab":
 		m.focus = focusLeft(m.focus)
 	case "esc":
+		if m.focus == focusWebsites && m.websiteFilter.query() != "" {
+			m.websiteFilter.input.SetValue("")
+			m.websiteCursor = 0
+			return m, nil
+		}
 		m.workspace, m.focus, m.status = false, focusSubscriptions, "subscription picker"
 	}
 	return m, nil
@@ -161,11 +158,16 @@ func (m appModel) handleFilterKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "esc":
 		filter.input.SetValue("")
 		filter.active = false
+		filter.input.Blur()
 	case "enter":
 		filter.active = false
+		filter.input.Blur()
 	default:
-		input, _ := filter.input.Update(msg)
+		input, command := filter.input.Update(msg)
 		filter.input = input
+		m.cursor = clamp(m.cursor, len(m.visibleSubscriptions()))
+		m.websiteCursor = clamp(m.websiteCursor, len(m.visibleWebsites()))
+		return m, command
 	}
 	if m.subscriptionFilter.active || m.websiteFilter.active {
 		return m, nil
@@ -186,12 +188,14 @@ func (m appModel) handlePickerKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "/":
 		m.subscriptionFilter.active = true
 		m.subscriptionFilter.input.Focus()
+	case "?":
+		m.help.open, m.help.scroll, m.status = true, 0, ""
 	case "r":
 		m.status = "loading subscriptions…"
 		m, command := m.startSubscriptions()
 		return m, command
 	case "enter":
-		if len(m.items) == 0 {
+		if len(m.visibleSubscriptions()) == 0 {
 			return m, nil
 		}
 		m.workspace, m.showWebsites, m.focus, m.status = true, true, focusWebsites, "loading domains…"

@@ -70,6 +70,14 @@ type confirmState struct {
 	action  string
 	enabled bool
 	domain  string
+	title   string
+	lines   []string
+}
+
+type helpState struct {
+	open   bool
+	scroll int
+	filter filterState
 }
 
 func (output outputState) append(line string) outputState {
@@ -97,6 +105,7 @@ type appModel struct {
 	logs               outputState
 	subscriptionFilter filterState
 	websiteFilter      filterState
+	help               helpState
 	status             string
 	confirm            confirmState
 	progress           progressState
@@ -174,7 +183,7 @@ func (m appModel) loadWebsiteLogs(ctx context.Context, generation uint64, errorL
 }
 
 func New(deps Deps) appModel {
-	return appModel{deps: deps, focus: focusSubscriptions, status: "loading subscriptions…", subscriptionFilter: newFilter(), websiteFilter: newFilter()}
+	return appModel{deps: deps, focus: focusSubscriptions, status: "loading subscriptions…", subscriptionFilter: newFilter(), websiteFilter: newFilter(), help: helpState{filter: newFilter()}}
 }
 
 func (m appModel) Init() tea.Cmd {

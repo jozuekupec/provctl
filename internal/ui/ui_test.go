@@ -168,6 +168,54 @@ func TestModel_ConfirmWebsiteToggleCallsDependency(t *testing.T) {
 	}
 }
 
+func TestModel_FilteredWebsiteToggleUsesVisibleSelection(t *testing.T) {
+	var changedDomain string
+	m := New(Deps{SetWebsiteEnabled: func(_ context.Context, _, domain string, _ bool) (int64, error) {
+		changedDomain = domain
+		return 1, nil
+	}})
+	m.items = []domain.Subscription{{ID: 1, Name: "acme"}}
+	m.workspace, m.showWebsites, m.focus = true, true, focusWebsites
+	m.websites = []domain.Website{{PrimaryDomain: "first.test", Enabled: true}, {PrimaryDomain: "second.test", Enabled: true}}
+	m.websiteFilter.input.SetValue("second")
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("e")})
+	m = updated.(appModel)
+	updated, command := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("y")})
+	m = runProgress(t, updated.(appModel), command)
+	if changedDomain != "second.test" {
+		t.Fatalf("changed domain = %q, want filtered selection", changedDomain)
+	}
+	if len(m.websites) != 2 {
+		t.Fatalf("filter mutated website source: %#v", m.websites)
+	}
+}
+
+func TestModel_HelpOpensFiltersAndCloses(t *testing.T) {
+	m := New(Deps{})
+	m.ready, m.width, m.height = true, 100, 28
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("?")})
+	m = updated.(appModel)
+	if !m.help.open || !strings.Contains(m.View(), "Help") {
+		t.Fatalf("help did not open: %#v", m.help)
+	}
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("/")})
+	m = updated.(appModel)
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("d")})
+	m = updated.(appModel)
+	if m.help.filter.query() != "d" {
+		t.Fatalf("help filter = %q", m.help.filter.query())
+	}
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	m = updated.(appModel)
+	if !m.help.open || m.help.filter.query() != "" {
+		t.Fatalf("escape did not clear active help filter: %#v", m.help)
+	}
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	if updated.(appModel).help.open {
+		t.Fatal("second escape did not close help")
+	}
+}
+
 func TestModel_ConfirmSubscriptionSuspendCallsDependency(t *testing.T) {
 	called := false
 	m := New(Deps{SetSubscriptionStatus: func(_ context.Context, name, status string) (int64, error) {

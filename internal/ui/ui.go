@@ -34,7 +34,8 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		selectedID := m.selectedSubscriptionID()
-		m.items, m.cursor = append([]domain.Subscription(nil), msg.items...), clamp(m.cursor, len(msg.items))
+		m.items = append([]domain.Subscription(nil), msg.items...)
+		m.cursor = clamp(m.cursor, len(m.visibleSubscriptions()))
 		if m.selectedSubscriptionID() != selectedID {
 			m = m.clearSelectionDetails()
 		}
@@ -50,7 +51,7 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.output = m.output.append(m.status)
 			return m, nil
 		}
-		m.websites, m.websiteCursor, m.status = append([]domain.Website(nil), msg.items...), 0, "e toggle • l access log • L error log • esc subscriptions • d detail • o output • q quit"
+		m.websites, m.websiteCursor, m.status = append([]domain.Website(nil), msg.items...), 0, "domains loaded"
 		m.output = m.output.append("websites loaded")
 	case databasesLoadedMsg:
 		if m.databasesLoad.stale(msg.generation) {
