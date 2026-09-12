@@ -128,6 +128,9 @@ func (m appModel) handleSettingsKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.settings, m.status = settingsState{}, "settings discarded"
 		return m, nil
 	case tea.KeyCtrlS, tea.KeyEnter:
+		if _, isPath := settingPathMode(m.activeSetting()); isPath && msg.Type == tea.KeyEnter {
+			return m.openPathPickerForSetting()
+		}
 		m.status = "saving settings…"
 		return m, m.saveSettingsCmd()
 	case tea.KeyTab, tea.KeyDown:
@@ -176,7 +179,11 @@ func (m appModel) settingsPopup() string {
 		}
 		body = append(body, line)
 	}
-	return popupBox(m, popupOpts{Size: popupLarge, Fit: fitFixed, Title: "Settings", Body: popupWrap(body, inner), Footer: []string{dimStyle.Render("⇧←/⇧→ scope · tab/↑/↓ field · ←/→ toggle · enter/ctrl+s save · esc cancel")}})
+	enterHint := "enter/ctrl+s save"
+	if _, isPath := settingPathMode(m.activeSetting()); isPath {
+		enterHint = "enter browse · ctrl+s save"
+	}
+	return popupBox(m, popupOpts{Size: popupLarge, Fit: fitFixed, Title: "Settings", Body: popupWrap(body, inner), Footer: []string{dimStyle.Render("⇧←/⇧→ scope · tab/↑/↓ field · ←/→ toggle · " + enterHint + " · esc cancel")}})
 }
 
 func (m appModel) settingsTabs() string {

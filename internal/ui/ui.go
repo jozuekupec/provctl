@@ -6,6 +6,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"provctl/internal/domain"
+	"provctl/internal/fsbrowse"
 	"provctl/internal/service"
 )
 
@@ -15,6 +16,24 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width, m.height, m.ready = msg.Width, msg.Height, true
 	case tea.KeyMsg:
 		return m.handleKey(msg)
+	case pathListedMsg:
+		if !m.pathPicker.open || msg.generation != m.pathPicker.generation {
+			return m, nil
+		}
+		m.pathPicker.loading = false
+		if msg.err != nil {
+			m.pathPicker.err = msg.err.Error()
+			return m, nil
+		}
+		entries := make([]pathEntry, 0, len(msg.entries)+1)
+		if _, hasParent := fsbrowse.Parent(msg.dir); hasParent {
+			entries = append(entries, pathEntry{Entry: fsbrowse.Entry{Name: "..", Dir: true}, parent: true})
+		}
+		for _, entry := range msg.entries {
+			entries = append(entries, pathEntry{Entry: entry})
+		}
+		m.pathPicker.dir, m.pathPicker.entries = msg.dir, entries
+		m.pathPicker.cursor = clamp(m.pathPicker.cursor, len(m.visiblePathEntries()))
 	case settingsSavedMsg:
 		if msg.err != nil {
 			m.status = "settings save failed: " + msg.err.Error()

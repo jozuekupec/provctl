@@ -69,6 +69,15 @@ reserved bottom block with a separating blank line; truncate or scroll body
 content, never the footer. Keep overlays ANSI-aware and test both exact frame
 geometry and the documented minimum terminal size.
 
+Every editable filesystem-path field must keep its direct text input and also
+use the shared `internal/ui` path picker on `Enter`. The picker performs
+filesystem access only through a dependency-backed `tea.Cmd`, returns absolute
+paths, treats `..` as a data row, navigates directories with `Enter`, and asks
+for a separate confirmation on `Space` or `Alt+Enter`; left/right and h/l do
+not navigate it. Reuse it for all future path fields, especially the domain
+document-root form. The picker is a convenience only: service-layer validation
+must still enforce the allowed document-root boundary.
+
 ## Testing Guidelines
 
 Use the standard `testing` package and `github.com/google/go-cmp`. Name tests `TestThing_Scenario` and prefer table-driven tests. Unit tests must run unprivileged, offline, and without Debian services; use `internal/system/fake` for filesystem, process, and rollback cases. Store renderer fixtures in `testdata/` and review golden-file diffs before committing. Run `make test` before every pull request.

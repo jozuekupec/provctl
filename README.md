@@ -37,6 +37,8 @@ without discarding comments or unknown administrator keys. Restart the TUI
 after saving non-TLS settings so its already-opened service runtimes reload
 them. Keep ACME staging enabled until certificate issuance has been verified;
 public Let's Encrypt issuance also needs public DNS and reachable HTTP port 80.
+For filesystem paths, Enter opens a directory or file picker; use Enter to
+open a directory, Space to select it, and confirm the selected absolute path.
 
 ## Install from the APT repository
 

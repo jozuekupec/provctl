@@ -9,6 +9,7 @@ import (
 
 	"provctl/internal/config"
 	"provctl/internal/domain"
+	"provctl/internal/fsbrowse"
 	"provctl/internal/service"
 )
 
@@ -25,6 +26,7 @@ type Deps struct {
 	SetWebsitePHP         func(context.Context, string, string, service.PHPSetOptions) (int64, error)
 	RunHealth             func(context.Context, string, string) ([]service.Check, error)
 	SaveConfig            func(context.Context, config.Config) error
+	BrowsePath            func(context.Context, string, fsbrowse.Mode) (string, []fsbrowse.Entry, error)
 	Config                config.Config
 }
 type websitesLoadedMsg struct {
@@ -86,6 +88,12 @@ type settingsSavedMsg struct {
 	cfg config.Config
 	err error
 }
+type pathListedMsg struct {
+	dir        string
+	entries    []fsbrowse.Entry
+	err        error
+	generation uint64
+}
 
 type focus int
 
@@ -130,6 +138,26 @@ type settingsState struct {
 	input  textinput.Model
 }
 
+// pathPickerState belongs to the picker, keeping its filter and asynchronous
+// generation separate from the settings form it temporarily overlays.
+type pathPickerState struct {
+	open       bool
+	field      int
+	mode       fsbrowse.Mode
+	dir        string
+	entries    []pathEntry
+	cursor     int
+	scroll     int
+	filter     filterState
+	loading    bool
+	generation uint64
+	err        string
+	confirm    string
+	confirmDir bool
+	pathInput  textinput.Model
+	enterPath  bool
+}
+
 func (output outputState) append(line string) outputState {
 	next := append([]string(nil), output.lines...)
 	next = append(next, line)
@@ -158,6 +186,7 @@ type appModel struct {
 	help               helpState
 	phpPicker          phpPickerState
 	settings           settingsState
+	pathPicker         pathPickerState
 	status             string
 	confirm            confirmState
 	progress           progressState

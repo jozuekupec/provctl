@@ -2,6 +2,8 @@ package ui
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -10,6 +12,7 @@ import (
 
 	"provctl/internal/config"
 	"provctl/internal/domain"
+	"provctl/internal/fsbrowse"
 	"provctl/internal/service"
 )
 
@@ -85,6 +88,87 @@ func TestModel_SettingsTabsFitMinimumTerminal(t *testing.T) {
 	for _, label := range settingTabLabels {
 		if !strings.Contains(tabs, label) {
 			t.Errorf("tab strip does not contain %q:\n%s", label, tabs)
+		}
+	}
+}
+
+func TestModel_PathPickerSelectsAbsoluteDirectoryForSetting(t *testing.T) {
+	root := t.TempDir()
+	selected := filepath.Join(root, "project")
+	if err := os.Mkdir(selected, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	m := New(Deps{
+		Config: config.Config{Paths: config.Paths{VHosts: root}},
+		BrowsePath: func(_ context.Context, path string, mode fsbrowse.Mode) (string, []fsbrowse.Entry, error) {
+			return fsbrowse.Browse(path, mode)
+		},
+	})
+	m.ready, m.width, m.height = true, 100, 28
+	m = m.openSettings()
+	m = m.changeSettingsScope(1) // Paths; VHosts is the first field.
+
+	updated, command := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	if command == nil {
+		t.Fatal("opening a path field did not return a listing command")
+	}
+	updated, _ = updated.(appModel).Update(command())
+	m = updated.(appModel)
+	if !m.pathPicker.open || len(m.pathPicker.entries) < 2 {
+		t.Fatalf("picker state = %#v", m.pathPicker)
+	}
+
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown}) // Skip synthetic parent.
+	updated, _ = updated.(appModel).Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(" ")})
+	m = updated.(appModel)
+	if m.pathPicker.confirm != selected {
+		t.Fatalf("confirmation path = %q, want %q", m.pathPicker.confirm, selected)
+	}
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = updated.(appModel)
+	if m.pathPicker.open || m.settings.values[1] != selected {
+		t.Fatalf("selected setting = %q, picker open = %t", m.settings.values[1], m.pathPicker.open)
+	}
+}
+
+func TestModel_PathPickerEnterNavigatesButDoesNotSelect(t *testing.T) {
+	root := t.TempDir()
+	child := filepath.Join(root, "child")
+	if err := os.Mkdir(child, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	m := New(Deps{
+		Config: config.Config{Paths: config.Paths{VHosts: root}},
+		BrowsePath: func(_ context.Context, path string, mode fsbrowse.Mode) (string, []fsbrowse.Entry, error) {
+			return fsbrowse.Browse(path, mode)
+		},
+	})
+	m = m.openSettings()
+	m = m.changeSettingsScope(1)
+	updated, command := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	updated, command = updated.(appModel).Update(command())
+	updated, command = updated.(appModel).Update(tea.KeyMsg{Type: tea.KeyDown})
+	updated, command = updated.(appModel).Update(tea.KeyMsg{Type: tea.KeyEnter})
+	if command == nil {
+		t.Fatal("enter on a directory did not navigate")
+	}
+	updated, _ = updated.(appModel).Update(command())
+	m = updated.(appModel)
+	if m.pathPicker.dir != child || m.pathPicker.confirm != "" || m.settings.values[1] != root {
+		t.Fatalf("after navigation: dir=%q confirm=%q value=%q", m.pathPicker.dir, m.pathPicker.confirm, m.settings.values[1])
+	}
+}
+
+func TestModel_PathPickerPopupFitsTerminal(t *testing.T) {
+	m := New(Deps{Config: config.Config{Paths: config.Paths{VHosts: "/does/not/exist"}}})
+	m.ready, m.width, m.height = true, 100, 28
+	m = m.openSettings()
+	m = m.changeSettingsScope(1)
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = updated.(appModel)
+	for index, line := range strings.Split(m.View(), "\n") {
+		if got := lipgloss.Width(line); got != m.width {
+			t.Fatalf("line %d width = %d, want %d: %q", index, got, m.width, line)
 		}
 	}
 }

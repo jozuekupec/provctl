@@ -21,6 +21,13 @@ func (m appModel) View() string {
 	if m.help.open {
 		return m.overlayCenter(m.helpPopup(), view)
 	}
+	if m.pathPicker.open {
+		view = m.overlayCenter(m.pathPickerPopup(), view)
+		if m.pathPicker.confirm != "" {
+			return m.overlayCenter(m.pathPickerConfirmPopup(), view)
+		}
+		return view
+	}
 	if m.settings.open {
 		return m.overlayCenter(m.settingsPopup(), view)
 	}

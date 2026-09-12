@@ -9,6 +9,9 @@ import (
 // handleKey routes a key by the current interaction mode. Keeping this apart
 // from Update makes the value-model message router easy to audit and test.
 func (m appModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if m.pathPicker.open {
+		return m.handlePathPickerKey(msg)
+	}
 	if m.settings.open {
 		return m.handleSettingsKey(msg)
 	}

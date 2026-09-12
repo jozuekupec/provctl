@@ -375,6 +375,16 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   the active scope has an open bottom edge and visually joins the form below;
   compact `DB` keeps the complete tab strip inside the 80-column minimum.
   A renderer test protects its width and border height.
+  **Redesign block 9 complete:** editable Settings path fields now share an
+  asynchronous file explorer derived from the cookbook/dbctl reference. It
+  keeps direct typing available while `Enter` opens a large bounded picker;
+  directories are opened with Enter, `Space`/`Alt+Enter` opens a separate
+  confirmation, and accepted values are absolute. The browser lists through a
+  dependency seam, so the value model performs no filesystem I/O, and model
+  tests cover navigation, selection and terminal-frame geometry. No editable
+  domain document-root form exists yet; when the planned domain create/edit
+  form is added, it must reuse this picker and retain service-layer boundary
+  validation rather than treating the UI picker as authorization.
   Původní návrh je zaznamenán v [tui-design.md](tui-design.md) a
   cíleně přebírá konzistentní Bubble Tea vzor z projektu `depo`: hodnotový
   model, `Deps`, samostatné routing/render/keys/theme a I/O jen přes `tea.Cmd`.
