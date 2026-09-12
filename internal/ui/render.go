@@ -39,14 +39,14 @@ func (m appModel) renderPicker() string {
 }
 
 func (m appModel) renderWorkspace() string {
-	layout := computeLayout(m.width, m.height)
+	layout := computeLayout(m.width, m.height, m.focus)
 	left := strings.Join([]string{
 		panel(m.subscriptionPanelTitle(), m.subscriptionMetadata(), layout.leftWidth, layout.metadata, m.focus == focusSubscriptions),
 		panel(m.websitePanelTitle(), m.renderWebsites(layout.domains-2), layout.leftWidth, layout.domains, m.focus == focusWebsites),
+		panel("Detail", m.detailLines(layout.detail-2), layout.leftWidth, layout.detail, m.focus == focusDetail),
 	}, "\n")
 	output := m.outputLines(layout.output - 2)
 	right := strings.Join([]string{
-		panel("Detail", m.detailLines(layout.detail-2), layout.rightWidth, layout.detail, m.focus == focusDetail),
 		panel("Logs", m.logsLines(layout.logs-2), layout.rightWidth, layout.logs, m.focus == focusLogs),
 		panel("Output", output, layout.rightWidth, layout.output, m.focus == focusOutput),
 	}, "\n")

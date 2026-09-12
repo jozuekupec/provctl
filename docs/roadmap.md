@@ -353,6 +353,12 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   current version for that domain, independently of whether each installed
   PHP-FPM service is active. Running mutations now render their checklist in
   a centred progress popup; Output remains the persistent operation log.
+  The workspace now follows the focused-panel sizing pattern used by
+  `branchctl`: Detail sits below the auto-sized Domains panel and has half the
+  left column at rest; Logs and Output split the right column equally. Focusing
+  Domains, Detail, Logs, or Output expands that panel while retaining a useful
+  minimum height for its sibling. Geometry tests preserve the exact terminal
+  frame and these sizing invariants.
   Původní návrh je zaznamenán v [tui-design.md](tui-design.md) a
   cíleně přebírá konzistentní Bubble Tea vzor z projektu `depo`: hodnotový
   model, `Deps`, samostatné routing/render/keys/theme a I/O jen přes `tea.Cmd`.
