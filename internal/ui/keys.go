@@ -5,6 +5,9 @@ import tea "github.com/charmbracelet/bubbletea"
 // handleKey routes a key by the current interaction mode. Keeping this apart
 // from Update makes the value-model message router easy to audit and test.
 func (m appModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if m.phpPicker.open {
+		return m.handlePHPPickerKey(msg)
+	}
 	if m.help.open {
 		return m.handleHelpKey(msg)
 	}
@@ -91,6 +94,16 @@ func (m appModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.status = "running health checks…"
 		m, command := m.startHealth()
 		return m, command
+	case "p":
+		if m.focus == focusSubscriptions {
+			if _, ok := m.selectedSubscription(); !ok {
+				break
+			}
+			m.phpPicker = phpPickerState{open: true, loading: true}
+			m.status = "loading installed PHP-FPM versions…"
+			m, command := m.startPHPVersions()
+			return m, command
+		}
 	case "b":
 		m.status = "loading databases…"
 		m, command := m.startDatabases()
@@ -237,6 +250,14 @@ func (m appModel) handlePickerKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	case "d":
 		m = m.askDeleteSubscription()
+	case "p":
+		if _, ok := m.selectedSubscription(); !ok {
+			return m, nil
+		}
+		m.phpPicker = phpPickerState{open: true, loading: true}
+		m.status = "loading installed PHP-FPM versions…"
+		m, command := m.startPHPVersions()
+		return m, command
 	case "enter":
 		if len(m.visibleSubscriptions()) == 0 {
 			return m, nil
@@ -244,6 +265,47 @@ func (m appModel) handlePickerKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.workspace, m.showWebsites, m.focus, m.status = true, true, focusWebsites, "loading domains…"
 		m, command := m.startWebsites()
 		return m, command
+	}
+	return m, nil
+}
+
+func (m appModel) handlePHPPickerKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if m.phpPicker.loading {
+		if msg.String() == "esc" || msg.String() == "q" {
+			m.phpVersionsLoad.invalidate()
+			m.phpPicker, m.status = phpPickerState{}, "cancelled"
+		}
+		return m, nil
+	}
+	switch msg.String() {
+	case "ctrl+c":
+		return m, tea.Quit
+	case "esc", "q":
+		m.phpPicker, m.status = phpPickerState{}, "cancelled"
+	case "j", "down":
+		m.phpPicker.cursor = clamp(m.phpPicker.cursor+1, len(m.phpPicker.items))
+	case "k", "up":
+		m.phpPicker.cursor = clamp(m.phpPicker.cursor-1, len(m.phpPicker.items))
+	case "enter":
+		if len(m.phpPicker.items) == 0 {
+			return m, nil
+		}
+		version := m.phpPicker.items[m.phpPicker.cursor].Version
+		subscription, ok := m.selectedSubscription()
+		if !ok {
+			m.phpPicker = phpPickerState{}
+			return m, nil
+		}
+		if subscription.PHPVersion == version {
+			m.phpPicker, m.status = phpPickerState{}, "subscription already uses PHP-FPM "+version
+			return m, nil
+		}
+		m.phpPicker = phpPickerState{}
+		m = m.askConfirm(confirmState{action: "set-php", domain: version, title: "Switch PHP-FPM", lines: []string{
+			"Subscription: " + subscription.Name,
+			"PHP-FPM: " + valueOrDash(subscription.PHPVersion) + " → " + version,
+			"The subscription pool and PHP-FPM vhosts will be updated.",
+		}})
 	}
 	return m, nil
 }

@@ -325,6 +325,16 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   filter with Escape are covered by model tests. This deliberately adopts the
   current popup and filtering guidance pulled from `branchctl` and the Go TUI
   cookbook. `make test` and `make build` passed.
+  **Redesign block 7 complete:** subscriptions now expose `p` for a bounded
+  PHP-FPM version picker. It discovers only versions installed on the host via
+  a cancellable `tea.Cmd`, labels their service state, and never accepts a
+  free-text version. Selecting a new version opens the standard confirmation
+  dialog; confirming calls the existing journalled PHP service through `Deps`,
+  then refreshes the subscription list. Choosing the current version performs
+  no mutation. Model tests cover discovery, selection, confirmation and the
+  no-op guard; the complete `make test` and `make build` suite passed. A
+  privileged end-to-end switch remains suitable for the prepared `pv`
+  container before release, because it deliberately changes live FPM pools.
   Původní návrh je zaznamenán v [tui-design.md](tui-design.md) a
   cíleně přebírá konzistentní Bubble Tea vzor z projektu `depo`: hodnotový
   model, `Deps`, samostatné routing/render/keys/theme a I/O jen přes `tea.Cmd`.

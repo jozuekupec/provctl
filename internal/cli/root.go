@@ -69,13 +69,23 @@ func NewRootCommand() *cobra.Command {
 			return fmt.Errorf("open database TUI state: %w", err)
 		}
 		defer databaseRuntime.Close()
+		phpReadRuntime, err := service.NewReadOnlyPHPRuntime(context.Background(), cfg)
+		if err != nil {
+			return fmt.Errorf("open PHP TUI state: %w", err)
+		}
+		defer phpReadRuntime.Close()
+		phpWriteRuntime, err := service.NewProductionPHPRuntime(context.Background(), cfg)
+		if err != nil {
+			return fmt.Errorf("open PHP mutation state: %w", err)
+		}
+		defer phpWriteRuntime.Close()
 		setWebsiteTLS := func(ctx context.Context, subscription, domain string, enabled bool) error {
 			if enabled {
 				return sslRuntime.Service.Enable(ctx, subscription, domain, false, true, true)
 			}
 			return sslRuntime.Service.Disable(ctx, subscription, domain)
 		}
-		_, err = ui.Program(ui.Deps{LoadSubscriptions: runtime.Service.List, LoadWebsites: websiteRuntime.Service.List, LoadDatabases: databaseRuntime.Service.ListForSubscription, ReadWebsiteLogs: websiteRuntime.Service.ReadLogs, SetWebsiteEnabled: websiteWriteRuntime.Service.SetEnabled, SetWebsiteTLS: setWebsiteTLS, SetSubscriptionStatus: subscriptionWriteRuntime.Service.SetStatus, DeleteSubscription: subscriptionWriteRuntime.Service.Delete, RunHealth: healthRuntime.Service.Run}).Run()
+		_, err = ui.Program(ui.Deps{LoadSubscriptions: runtime.Service.List, LoadWebsites: websiteRuntime.Service.List, LoadDatabases: databaseRuntime.Service.ListForSubscription, ReadWebsiteLogs: websiteRuntime.Service.ReadLogs, SetWebsiteEnabled: websiteWriteRuntime.Service.SetEnabled, SetWebsiteTLS: setWebsiteTLS, SetSubscriptionStatus: subscriptionWriteRuntime.Service.SetStatus, DeleteSubscription: subscriptionWriteRuntime.Service.Delete, LoadPHPVersions: phpReadRuntime.Service.ListVersions, SetSubscriptionPHP: phpWriteRuntime.Service.Set, RunHealth: healthRuntime.Service.Run}).Run()
 		return err
 	}
 	root.AddCommand(newDoctorCommand())

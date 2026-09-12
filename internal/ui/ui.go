@@ -6,6 +6,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"provctl/internal/domain"
+	"provctl/internal/service"
 )
 
 func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -109,6 +110,35 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.workspace, m.focus = false, focusSubscriptions
 		m.status = "subscription " + msg.name + " deleted; refreshing…"
 		m.output = m.output.append("subscription " + msg.name + " deleted")
+		m, command := m.startSubscriptions()
+		return m, command
+	case phpVersionsLoadedMsg:
+		if m.phpVersionsLoad.stale(msg.generation) {
+			return m, nil
+		}
+		m.phpVersionsLoad.finish(msg.generation)
+		m.phpPicker.loading = false
+		if msg.err != nil {
+			m.phpPicker.open = false
+			m.status = "PHP version load failed: " + msg.err.Error()
+			m.output = m.output.append(m.status)
+			return m, nil
+		}
+		m.phpPicker.items = append([]service.PHPFPMVersion(nil), msg.items...)
+		m.phpPicker.cursor = clamp(m.phpPicker.cursor, len(m.phpPicker.items))
+		if len(m.phpPicker.items) == 0 {
+			m.status = "no installed PHP-FPM versions found"
+		}
+		return m, nil
+	case subscriptionPHPChangedMsg:
+		m.progress.active = false
+		if msg.err != nil {
+			m.status = "PHP version change failed: " + msg.err.Error()
+			m.output = m.output.append(m.status)
+			return m, nil
+		}
+		m.status = "subscription " + msg.name + " now uses PHP-FPM " + msg.version + "; refreshing…"
+		m.output = m.output.append("subscription " + msg.name + " PHP-FPM=" + msg.version)
 		m, command := m.startSubscriptions()
 		return m, command
 	case healthLoadedMsg:

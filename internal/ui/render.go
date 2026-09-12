@@ -21,6 +21,9 @@ func (m appModel) View() string {
 	if m.help.open {
 		return m.overlayCenter(m.helpPopup(), view)
 	}
+	if m.phpPicker.open {
+		return m.overlayCenter(m.phpPickerPopup(), view)
+	}
 	if m.confirm.action != "" {
 		return m.overlayCenter(m.confirmPopup(), view)
 	}
@@ -208,7 +211,7 @@ func (m appModel) keybar() string {
 	}
 	switch m.focus {
 	case focusSubscriptions:
-		return "←/→ panels · ↑/↓ select · s suspend/resume · a archive · d delete · esc back"
+		return "←/→ panels · ↑/↓ select · p PHP · s suspend/resume · a archive · d delete · esc back"
 	case focusWebsites:
 		return "←/→ panels · ↑/↓ select · e toggle · t TLS · l/L logs · esc subscriptions"
 	case focusDetail:

@@ -68,6 +68,7 @@ func helpSections() []helpSection {
 			"s         suspend or resume selected subscription",
 			"a         archive selected subscription",
 			"d         permanently delete selected archived subscription",
+			"p         choose an installed PHP-FPM version",
 		}},
 		{title: "Domains", rows: []string{
 			"e         enable or disable selected domain",

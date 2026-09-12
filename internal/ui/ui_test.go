@@ -211,6 +211,59 @@ func TestModel_TLSToggleCallsDependency(t *testing.T) {
 	}
 }
 
+func TestModel_PHPVersionPickerUsesInstalledVersionsAndConfirmsChange(t *testing.T) {
+	var changedName, changedVersion string
+	m := New(Deps{
+		LoadPHPVersions: func(context.Context) ([]service.PHPFPMVersion, error) {
+			return []service.PHPFPMVersion{{Version: "8.3", Active: true}, {Version: "8.4", Active: true}}, nil
+		},
+		SetSubscriptionPHP: func(_ context.Context, name string, options service.PHPSetOptions) (int64, error) {
+			changedName, changedVersion = name, options.Version
+			return 1, nil
+		},
+	})
+	m.items = []domain.Subscription{{Name: "acme", Status: "active", PHPVersion: "8.3"}}
+	m.workspace = true
+	updated, command := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("p")})
+	m = updated.(appModel)
+	if !m.phpPicker.open || !m.phpPicker.loading {
+		t.Fatalf("PHP picker state = %#v", m.phpPicker)
+	}
+	updated, _ = m.Update(command())
+	m = updated.(appModel)
+	if m.phpPicker.loading || len(m.phpPicker.items) != 2 {
+		t.Fatalf("loaded PHP picker = %#v", m.phpPicker)
+	}
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
+	m = updated.(appModel)
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = updated.(appModel)
+	if m.confirm.action != "set-php" || m.confirm.domain != "8.4" {
+		t.Fatalf("PHP confirmation = %#v", m.confirm)
+	}
+	updated, command = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("y")})
+	_ = runProgress(t, updated.(appModel), command)
+	if changedName != "acme" || changedVersion != "8.4" {
+		t.Fatalf("SetSubscriptionPHP(%q, %q), want acme, 8.4", changedName, changedVersion)
+	}
+}
+
+func TestModel_PHPVersionPickerRejectsCurrentVersionWithoutMutation(t *testing.T) {
+	m := New(Deps{LoadPHPVersions: func(context.Context) ([]service.PHPFPMVersion, error) {
+		return []service.PHPFPMVersion{{Version: "8.4", Active: true}}, nil
+	}})
+	m.items = []domain.Subscription{{Name: "acme", Status: "active", PHPVersion: "8.4"}}
+	updated, command := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("p")})
+	m = updated.(appModel)
+	updated, _ = m.Update(command())
+	m = updated.(appModel)
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = updated.(appModel)
+	if m.phpPicker.open || m.confirm.action != "" || !strings.Contains(m.status, "already uses PHP-FPM 8.4") {
+		t.Fatalf("current PHP selection = picker:%v confirm:%#v status:%q", m.phpPicker.open, m.confirm, m.status)
+	}
+}
+
 func TestModel_HelpOpensFiltersAndCloses(t *testing.T) {
 	m := New(Deps{})
 	m.ready, m.width, m.height = true, 100, 28

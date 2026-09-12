@@ -20,6 +20,8 @@ type Deps struct {
 	SetWebsiteTLS         func(context.Context, string, string, bool) error
 	SetSubscriptionStatus func(context.Context, string, string) (int64, error)
 	DeleteSubscription    func(context.Context, string, bool) (int64, error)
+	LoadPHPVersions       func(context.Context) ([]service.PHPFPMVersion, error)
+	SetSubscriptionPHP    func(context.Context, string, service.PHPSetOptions) (int64, error)
 	RunHealth             func(context.Context, string, string) ([]service.Check, error)
 }
 type websitesLoadedMsg struct {
@@ -55,6 +57,16 @@ type subscriptionChangedMsg struct {
 type subscriptionDeletedMsg struct {
 	err  error
 	name string
+}
+type phpVersionsLoadedMsg struct {
+	items      []service.PHPFPMVersion
+	err        error
+	generation uint64
+}
+type subscriptionPHPChangedMsg struct {
+	err     error
+	name    string
+	version string
 }
 type healthLoadedMsg struct {
 	checks     []service.Check
@@ -95,6 +107,13 @@ type helpState struct {
 	filter filterState
 }
 
+type phpPickerState struct {
+	open    bool
+	loading bool
+	cursor  int
+	items   []service.PHPFPMVersion
+}
+
 func (output outputState) append(line string) outputState {
 	next := append([]string(nil), output.lines...)
 	next = append(next, line)
@@ -121,6 +140,7 @@ type appModel struct {
 	subscriptionFilter filterState
 	websiteFilter      filterState
 	help               helpState
+	phpPicker          phpPickerState
 	status             string
 	confirm            confirmState
 	progress           progressState
@@ -131,6 +151,7 @@ type appModel struct {
 	databasesLoad      opSlot
 	healthLoad         opSlot
 	logsLoad           opSlot
+	phpVersionsLoad    opSlot
 }
 
 func (m appModel) changeWebsite(ctx context.Context, confirm confirmState) tea.Msg {
@@ -189,6 +210,29 @@ func (m appModel) deleteSubscription(ctx context.Context, confirm confirmState) 
 
 func (m appModel) deleteSubscriptionCmd(confirm confirmState) tea.Cmd {
 	return steppedCmd("Delete subscription", []string{"remove subscription and managed resources"}, func(ctx context.Context) tea.Msg { return m.deleteSubscription(ctx, confirm) })
+}
+
+func (m appModel) loadPHPVersions(ctx context.Context, generation uint64) tea.Msg {
+	if m.deps.LoadPHPVersions == nil {
+		return phpVersionsLoadedMsg{err: context.Canceled, generation: generation}
+	}
+	items, err := m.deps.LoadPHPVersions(ctx)
+	return phpVersionsLoadedMsg{items: items, err: err, generation: generation}
+}
+
+func (m appModel) changeSubscriptionPHP(ctx context.Context, confirm confirmState) tea.Msg {
+	subscription, ok := m.selectedSubscription()
+	if m.deps.SetSubscriptionPHP == nil || !ok {
+		return subscriptionPHPChangedMsg{err: context.Canceled}
+	}
+	_, err := m.deps.SetSubscriptionPHP(ctx, subscription.Name, service.PHPSetOptions{Version: confirm.domain})
+	return subscriptionPHPChangedMsg{err: err, name: subscription.Name, version: confirm.domain}
+}
+
+func (m appModel) changeSubscriptionPHPCmd(confirm confirmState) tea.Cmd {
+	return steppedCmd("Switch PHP-FPM", []string{"apply PHP-FPM version change"}, func(ctx context.Context) tea.Msg {
+		return m.changeSubscriptionPHP(ctx, confirm)
+	})
 }
 
 func (m appModel) askDeleteSubscription() appModel {
@@ -282,6 +326,11 @@ func (m appModel) startHealth() (appModel, tea.Cmd) {
 func (m appModel) startWebsiteLogs(errorLog bool) (appModel, tea.Cmd) {
 	ctx, generation := m.logsLoad.start()
 	return m, func() tea.Msg { return m.loadWebsiteLogs(ctx, generation, errorLog) }
+}
+
+func (m appModel) startPHPVersions() (appModel, tea.Cmd) {
+	ctx, generation := m.phpVersionsLoad.start()
+	return m, func() tea.Msg { return m.loadPHPVersions(ctx, generation) }
 }
 
 func (m appModel) clearSelectionDetails() appModel {
