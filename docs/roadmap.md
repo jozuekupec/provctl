@@ -335,6 +335,10 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   no-op guard; the complete `make test` and `make build` suite passed. A
   privileged end-to-end switch remains suitable for the prepared `pv`
   container before release, because it deliberately changes live FPM pools.
+  The current `pv` package is `0.1.1~dev.3.e8f1718` with snapshot
+  `tui-php-picker-v2`; Apache is active and its non-mutating PHP discovery
+  reports `8.4 active`. A real picker switch is intentionally pending until a
+  second FPM version is installed in that disposable container.
   Původní návrh je zaznamenán v [tui-design.md](tui-design.md) a
   cíleně přebírá konzistentní Bubble Tea vzor z projektu `depo`: hodnotový
   model, `Deps`, samostatné routing/render/keys/theme a I/O jen přes `tea.Cmd`.
