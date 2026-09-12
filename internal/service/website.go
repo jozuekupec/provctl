@@ -26,6 +26,7 @@ type WebsiteStore interface {
 	DeleteCertificateByWebsite(context.Context, int64) error
 	SetWebsiteEnabled(context.Context, int64, bool) error
 	SetWebsiteDocumentRoot(context.Context, int64, string) error
+	SetWebsiteTarget(context.Context, int64, string, int) error
 	SetWebsiteSSL(context.Context, int64, bool, bool) error
 	AddWebsiteAlias(context.Context, int64, string) error
 	RemoveWebsiteAlias(context.Context, int64, string) error
@@ -343,6 +344,62 @@ func (service WebsiteService) SetDocumentRoot(ctx context.Context, subscriptionN
 		return 0, err
 	}
 	return service.Executor.Run(ctx, operation)
+}
+
+// SetTarget changes a proxy upstream or redirect destination without changing
+// its domain identity, aliases, or TLS lineage.
+func (service WebsiteService) SetTarget(ctx context.Context, subscriptionName, primaryDomain, target string, redirectCode int) (int64, error) {
+	operation, err := service.PrepareSetTarget(ctx, subscriptionName, primaryDomain, target, redirectCode)
+	if err != nil {
+		return 0, err
+	}
+	return service.Executor.Run(ctx, operation)
+}
+
+func (service WebsiteService) PrepareSetTarget(ctx context.Context, subscriptionName, primaryDomain, target string, redirectCode int) (plan.Plan, error) {
+	if service.Apache == nil {
+		return plan.Plan{}, fmt.Errorf("Apache vhost applier is required")
+	}
+	subscription, err := service.Store.SubscriptionByName(ctx, subscriptionName)
+	if err != nil {
+		return plan.Plan{}, err
+	}
+	website, err := service.websiteByDomain(ctx, subscription, primaryDomain)
+	if err != nil {
+		return plan.Plan{}, err
+	}
+	if website.Type != domain.WebsiteProxy && website.Type != domain.WebsiteRedirect {
+		return plan.Plan{}, fmt.Errorf("website type %q does not have a target", website.Type)
+	}
+	updated := website
+	updated.Target = target
+	if website.Type == domain.WebsiteRedirect {
+		updated.RedirectCode = redirectCode
+	}
+	if updated.Target == website.Target && updated.RedirectCode == website.RedirectCode {
+		return plan.Plan{}, fmt.Errorf("website %q target is unchanged", primaryDomain)
+	}
+	contents, err := service.RenderVHost(subscriptionName, updated)
+	if err != nil {
+		return plan.Plan{}, err
+	}
+	vhostPath := filepath.Join(service.Config.Apache.SitesAvailable, meta.FilePrefix+subscriptionName+"-"+primaryDomain+".conf")
+	var undoApache func(context.Context) error
+	steps := []plan.Step{{Name: "update Apache website target", Preview: "write " + vhostPath, Do: func(ctx context.Context) error {
+		var applyErr error
+		undoApache, applyErr = service.Apache.Apply(ctx, vhostPath, contents)
+		return applyErr
+	}, Undo: func(ctx context.Context) error {
+		if undoApache == nil {
+			return nil
+		}
+		return undoApache(ctx)
+	}}, {Name: "record website target", Preview: "set target in SQLite", Do: func(ctx context.Context) error {
+		return service.Store.SetWebsiteTarget(ctx, website.ID, updated.Target, updated.RedirectCode)
+	}, Undo: func(ctx context.Context) error {
+		return service.Store.SetWebsiteTarget(ctx, website.ID, website.Target, website.RedirectCode)
+	}}}
+	return plan.Plan{Action: "website.set-target", Target: subscriptionName + "/" + primaryDomain, Steps: steps}, nil
 }
 
 // PrepareSetDocumentRoot validates a root, renders a replacement vhost and

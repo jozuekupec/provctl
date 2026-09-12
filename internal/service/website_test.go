@@ -34,11 +34,18 @@ type websiteStore struct {
 
 type documentRootStore struct {
 	websiteStore
-	root string
+	root         string
+	target       string
+	redirectCode int
 }
 
 func (store *documentRootStore) SetWebsiteDocumentRoot(_ context.Context, _ int64, root string) error {
 	store.root = root
+	return nil
+}
+
+func (store *documentRootStore) SetWebsiteTarget(_ context.Context, _ int64, target string, redirectCode int) error {
+	store.target, store.redirectCode = target, redirectCode
 	return nil
 }
 
@@ -54,6 +61,7 @@ func (websiteStore) CertificateByWebsite(context.Context, int64) (domain.Certifi
 func (websiteStore) DeleteCertificateByWebsite(context.Context, int64) error     { return nil }
 func (websiteStore) SetWebsiteEnabled(context.Context, int64, bool) error        { return nil }
 func (websiteStore) SetWebsiteDocumentRoot(context.Context, int64, string) error { return nil }
+func (websiteStore) SetWebsiteTarget(context.Context, int64, string, int) error  { return nil }
 func (websiteStore) SetWebsiteSSL(context.Context, int64, bool, bool) error      { return nil }
 func (websiteStore) AddWebsiteAlias(context.Context, int64, string) error        { return nil }
 func (websiteStore) RemoveWebsiteAlias(context.Context, int64, string) error     { return nil }
@@ -176,6 +184,24 @@ func TestValidateWebsiteDocumentRootRejectsTraversalAndOutsideHome(t *testing.T)
 	}
 	if got, err := validateWebsiteDocumentRoot(fs, "/vhosts/acme", "/vhosts/acme/public"); err != nil || got != "/vhosts/acme/public" {
 		t.Fatalf("valid root = %q, %v", got, err)
+	}
+}
+
+func TestWebsiteService_SetTargetAppliesValidatedProxyBeforePersisting(t *testing.T) {
+	store := &documentRootStore{websiteStore: websiteStore{subscription: domain.Subscription{ID: 1, Name: "acme"}, websites: []domain.Website{{ID: 4, SubscriptionID: 1, Type: domain.WebsiteProxy, PrimaryDomain: "proxy.example.test", Target: "http://127.0.0.1:8080"}}}}
+	service := WebsiteService{Store: store, Apache: websiteApache{}, Executor: plan.Executor{Journal: &subscriptionJournal{}, Locker: subscriptionLocker{}}, Config: config.Config{Paths: config.Paths{ACMEChallenge: "/var/lib/provctl/acme-challenge"}, Apache: config.Apache{SitesAvailable: "/etc/apache2/sites-available", ProxyTimeout: 60}}}
+	operation, err := service.PrepareSetTarget(context.Background(), "acme", "proxy.example.test", "http://127.0.0.1:8081", 0)
+	if err != nil {
+		t.Fatalf("PrepareSetTarget() error = %v", err)
+	}
+	if _, err := service.Executor.Run(context.Background(), operation); err != nil {
+		t.Fatalf("run target plan: %v", err)
+	}
+	if got, want := store.target, "http://127.0.0.1:8081"; got != want {
+		t.Errorf("target = %q, want %q", got, want)
+	}
+	if _, err := service.PrepareSetTarget(context.Background(), "acme", "proxy.example.test", "https://outside.example:8443", 0); err == nil {
+		t.Fatal("unsafe proxy target was accepted")
 	}
 }
 

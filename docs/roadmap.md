@@ -410,6 +410,10 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   Certbot's complete-SAN reconciliation, preventing a database-only alias
   change from leaving a certificate stale. A model test covers the service
   target and refreshed aliases.
+  The service foundation for proxy and redirect editing is now journalled and
+  tested: it renders and applies the replacement Apache vhost before persisting
+  `target`/redirect code, with the renderer retaining host, port, URL and
+  redirect-code validation. The TUI form for this operation is the next step.
   Původní návrh je zaznamenán v [tui-design.md](tui-design.md) a
   cíleně přebírá konzistentní Bubble Tea vzor z projektu `depo`: hodnotový
   model, `Deps`, samostatné routing/render/keys/theme a I/O jen přes `tea.Cmd`.
