@@ -413,7 +413,9 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   The service foundation for proxy and redirect editing is now journalled and
   tested: it renders and applies the replacement Apache vhost before persisting
   `target`/redirect code, with the renderer retaining host, port, URL and
-  redirect-code validation. The TUI form for this operation is the next step.
+  redirect-code validation. The TUI form is now available via `T` for selected
+  proxy/redirect domains, with redirect code toggled between 301 and 302 and
+  the shared confirmation/progress flow.
   Původní návrh je zaznamenán v [tui-design.md](tui-design.md) a
   cíleně přebírá konzistentní Bubble Tea vzor z projektu `depo`: hodnotový
   model, `Deps`, samostatné routing/render/keys/theme a I/O jen přes `tea.Cmd`.

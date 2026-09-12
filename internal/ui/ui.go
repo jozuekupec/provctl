@@ -160,6 +160,17 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.websites = append([]domain.Website(nil), msg.items...)
 		}
 		return m, nil
+	case websiteTargetChangedMsg:
+		m.progress.active = false
+		if msg.err != nil {
+			m.status = "target change failed: " + msg.err.Error()
+			return m, nil
+		}
+		m.status = "target for " + msg.domain + " updated"
+		if msg.items != nil {
+			m.websites = append([]domain.Website(nil), msg.items...)
+		}
+		return m, nil
 	case subscriptionChangedMsg:
 		m.progress.active = false
 		if msg.err != nil {

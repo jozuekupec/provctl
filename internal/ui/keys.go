@@ -21,6 +21,9 @@ func (m appModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if m.aliasForm.open {
 		return m.handleAliasFormKey(msg)
 	}
+	if m.targetForm.open {
+		return m.handleTargetFormKey(msg)
+	}
 	if m.settings.open {
 		return m.handleSettingsKey(msg)
 	}
@@ -186,6 +189,10 @@ func (m appModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "A":
 		if m.focus == focusWebsites {
 			m = m.openAliasForm(false)
+		}
+	case "T":
+		if m.focus == focusWebsites {
+			m = m.openTargetForm()
 		}
 	case "t":
 		if m.focus == focusWebsites {

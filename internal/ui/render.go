@@ -37,6 +37,9 @@ func (m appModel) View() string {
 	if m.aliasForm.open {
 		return m.overlayCenter(m.aliasFormPopup(), view)
 	}
+	if m.targetForm.open {
+		return m.overlayCenter(m.targetFormPopup(), view)
+	}
 	if m.settings.open {
 		return m.overlayCenter(m.settingsPopup(), view)
 	}

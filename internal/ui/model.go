@@ -23,6 +23,7 @@ type Deps struct {
 	SetWebsiteDocumentRoot func(context.Context, string, string, string) (int64, error)
 	CreateWebsite          func(context.Context, string, string, domain.WebsiteType, string, int) (int64, error)
 	SetWebsiteAlias        func(context.Context, string, string, string, bool) (int64, error)
+	SetWebsiteTarget       func(context.Context, string, string, string, int) (int64, error)
 	SetSubscriptionStatus  func(context.Context, string, string) (int64, error)
 	DeleteSubscription     func(context.Context, string, bool) (int64, error)
 	LoadPHPVersions        func(context.Context) ([]service.PHPFPMVersion, error)
@@ -74,6 +75,11 @@ type websiteAliasChangedMsg struct {
 	domain string
 	alias  string
 	add    bool
+	items  []domain.Website
+}
+type websiteTargetChangedMsg struct {
+	err    error
+	domain string
 	items  []domain.Website
 }
 type subscriptionChangedMsg struct {
@@ -180,6 +186,12 @@ type aliasFormState struct {
 	domain string
 	input  textinput.Model
 }
+type targetFormState struct {
+	open    bool
+	website domain.Website
+	input   textinput.Model
+	code    int
+}
 
 type pathPickerTarget uint8
 
@@ -240,6 +252,7 @@ type appModel struct {
 	documentRootForm   documentRootFormState
 	websiteCreateForm  websiteCreateFormState
 	aliasForm          aliasFormState
+	targetForm         targetFormState
 	pathPicker         pathPickerState
 	status             string
 	confirm            confirmState
