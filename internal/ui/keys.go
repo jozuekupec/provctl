@@ -15,6 +15,9 @@ func (m appModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if m.documentRootForm.open {
 		return m.handleDocumentRootFormKey(msg)
 	}
+	if m.websiteCreateForm.open {
+		return m.handleWebsiteCreateFormKey(msg)
+	}
 	if m.settings.open {
 		return m.handleSettingsKey(msg)
 	}
@@ -163,6 +166,10 @@ func (m appModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "E":
 		if m.focus == focusWebsites {
 			m = m.openDocumentRootForm()
+		}
+	case "n":
+		if m.focus == focusWebsites {
+			m = m.openWebsiteCreateForm()
 		}
 	case "t":
 		if m.focus == focusWebsites {

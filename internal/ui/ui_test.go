@@ -222,6 +222,46 @@ func TestModel_DocumentRootFormFitsTerminal(t *testing.T) {
 	}
 }
 
+func TestModel_WebsiteCreateFormCreatesSelectedType(t *testing.T) {
+	var gotSubscription, gotDomain, gotTarget string
+	var gotType domain.WebsiteType
+	m := New(Deps{
+		CreateWebsite: func(_ context.Context, subscription, name string, kind domain.WebsiteType, target string, code int) (int64, error) {
+			gotSubscription, gotDomain, gotType, gotTarget = subscription, name, kind, target
+			if code != 301 {
+				t.Errorf("redirect code = %d", code)
+			}
+			return 1, nil
+		},
+		LoadWebsites: func(context.Context, int64) ([]domain.Website, error) {
+			return []domain.Website{{PrimaryDomain: "api.example.test", Type: domain.WebsiteProxy, Target: "http://127.0.0.1:8080"}}, nil
+		},
+	})
+	m.items = []domain.Subscription{{ID: 1, Name: "acme"}}
+	m.workspace, m.showWebsites, m.focus = true, true, focusWebsites
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("n")})
+	m = updated.(appModel)
+	if !m.websiteCreateForm.open {
+		t.Fatal("website create form did not open")
+	}
+	m.websiteCreateForm.domain.SetValue("api.example.test")
+	m.websiteCreateForm.typeIndex, m.websiteCreateForm.field = 2, 2
+	m.websiteCreateForm.target.SetValue("http://127.0.0.1:8080")
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyCtrlS})
+	m = updated.(appModel)
+	if m.websiteCreateForm.open || m.confirm.action != "create-website" {
+		t.Fatalf("form/confirmation = %#v / %#v", m.websiteCreateForm, m.confirm)
+	}
+	updated, command := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("y")})
+	m = runProgress(t, updated.(appModel), command)
+	if gotSubscription != "acme" || gotDomain != "api.example.test" || gotType != domain.WebsiteProxy || gotTarget != "http://127.0.0.1:8080" {
+		t.Fatalf("CreateWebsite(%q, %q, %q, %q)", gotSubscription, gotDomain, gotType, gotTarget)
+	}
+	if len(m.websites) != 1 || m.websites[0].PrimaryDomain != "api.example.test" {
+		t.Fatalf("refreshed domains = %#v", m.websites)
+	}
+}
+
 func TestModel_LoadWebsitesForSelectedSubscription(t *testing.T) {
 	m := New(Deps{LoadWebsites: func(_ context.Context, id int64) ([]domain.Website, error) {
 		if id != 7 {

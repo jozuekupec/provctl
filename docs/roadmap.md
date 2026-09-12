@@ -398,7 +398,13 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   Ctrl+S follows the standard confirmation, and the existing progress popup
   reports Apache apply plus refresh without changing focus. Its model tests
   cover modal flow, service target, refreshed result and exact terminal width.
-  Domain creation and the remaining editable domain fields still follow.
+  Domain creation is now available with `n` in the Domains panel: its modal
+  selects PHP-FPM, static, proxy or redirect and conditionally exposes a
+  target only for proxy/redirect. It uses the established confirmation and
+  progress pipeline and refreshes domains in place. Static/PHP-FPM creation
+  deliberately retains the safe default root; an administrator can then use
+  the explicit `E` root operation. Full editing of aliases, target and
+  redirect policy still follows.
   Původní návrh je zaznamenán v [tui-design.md](tui-design.md) a
   cíleně přebírá konzistentní Bubble Tea vzor z projektu `depo`: hodnotový
   model, `Deps`, samostatné routing/render/keys/theme a I/O jen přes `tea.Cmd`.

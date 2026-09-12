@@ -71,6 +71,7 @@ func helpSections() []helpSection {
 			"p         choose an installed PHP-FPM version",
 		}},
 		{title: "Domains", rows: []string{
+			"n         create a domain",
 			"e         enable or disable selected domain",
 			"E         edit selected domain document root",
 			"t         enable or disable TLS for selected domain",

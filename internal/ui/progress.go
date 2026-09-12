@@ -97,6 +97,8 @@ func operationFailed(message tea.Msg) bool {
 		return result.err != nil
 	case websiteDocumentRootChangedMsg:
 		return result.err != nil
+	case websiteCreatedMsg:
+		return result.err != nil
 	}
 	return true
 }

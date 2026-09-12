@@ -8,6 +8,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"provctl/internal/config"
+	"provctl/internal/domain"
 	"provctl/internal/fsbrowse"
 	"provctl/internal/meta"
 	"provctl/internal/service"
@@ -92,7 +93,19 @@ func NewRootCommand() *cobra.Command {
 			}
 			return sslRuntime.Service.Disable(ctx, subscription, domain)
 		}
-		_, err = ui.Program(ui.Deps{LoadSubscriptions: runtime.Service.List, LoadWebsites: websiteRuntime.Service.List, LoadDatabases: databaseRuntime.Service.ListForSubscription, ReadWebsiteLogs: websiteRuntime.Service.ReadLogs, SetWebsiteEnabled: websiteWriteRuntime.Service.SetEnabled, SetWebsiteTLS: setWebsiteTLS, SetWebsiteDocumentRoot: websiteWriteRuntime.Service.SetDocumentRoot, SetSubscriptionStatus: subscriptionWriteRuntime.Service.SetStatus, DeleteSubscription: subscriptionWriteRuntime.Service.Delete, LoadPHPVersions: phpReadRuntime.Service.ListVersions, SetWebsitePHP: phpWriteRuntime.Service.Set, RunHealth: healthRuntime.Service.Run, SaveConfig: func(_ context.Context, updated config.Config) error {
+		createWebsiteFromUI := func(ctx context.Context, subscription, name string, kind domain.WebsiteType, target string, redirectCode int) (int64, error) {
+			switch kind {
+			case domain.WebsiteStatic:
+				return websiteWriteRuntime.Service.CreateStatic(ctx, subscription, name)
+			case domain.WebsiteProxy:
+				return websiteWriteRuntime.Service.CreateProxy(ctx, subscription, name, target)
+			case domain.WebsiteRedirect:
+				return websiteWriteRuntime.Service.CreateRedirect(ctx, subscription, name, target, redirectCode)
+			default:
+				return websiteWriteRuntime.Service.CreatePHPFPM(ctx, subscription, name)
+			}
+		}
+		_, err = ui.Program(ui.Deps{LoadSubscriptions: runtime.Service.List, LoadWebsites: websiteRuntime.Service.List, LoadDatabases: databaseRuntime.Service.ListForSubscription, ReadWebsiteLogs: websiteRuntime.Service.ReadLogs, SetWebsiteEnabled: websiteWriteRuntime.Service.SetEnabled, SetWebsiteTLS: setWebsiteTLS, SetWebsiteDocumentRoot: websiteWriteRuntime.Service.SetDocumentRoot, CreateWebsite: createWebsiteFromUI, SetSubscriptionStatus: subscriptionWriteRuntime.Service.SetStatus, DeleteSubscription: subscriptionWriteRuntime.Service.Delete, LoadPHPVersions: phpReadRuntime.Service.ListVersions, SetWebsitePHP: phpWriteRuntime.Service.Set, RunHealth: healthRuntime.Service.Run, SaveConfig: func(_ context.Context, updated config.Config) error {
 			return config.Update(meta.ConfigFile, updated)
 		}, BrowsePath: func(_ context.Context, path string, mode fsbrowse.Mode) (string, []fsbrowse.Entry, error) {
 			return fsbrowse.Browse(path, mode)

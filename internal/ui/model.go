@@ -21,6 +21,7 @@ type Deps struct {
 	SetWebsiteEnabled      func(context.Context, string, string, bool) (int64, error)
 	SetWebsiteTLS          func(context.Context, string, string, bool) error
 	SetWebsiteDocumentRoot func(context.Context, string, string, string) (int64, error)
+	CreateWebsite          func(context.Context, string, string, domain.WebsiteType, string, int) (int64, error)
 	SetSubscriptionStatus  func(context.Context, string, string) (int64, error)
 	DeleteSubscription     func(context.Context, string, bool) (int64, error)
 	LoadPHPVersions        func(context.Context) ([]service.PHPFPMVersion, error)
@@ -60,6 +61,11 @@ type websiteDocumentRootChangedMsg struct {
 	err    error
 	domain string
 	root   string
+	items  []domain.Website
+}
+type websiteCreatedMsg struct {
+	err    error
+	domain string
 	items  []domain.Website
 }
 type subscriptionChangedMsg struct {
@@ -152,6 +158,14 @@ type documentRootFormState struct {
 	input   textinput.Model
 }
 
+type websiteCreateFormState struct {
+	open      bool
+	field     int
+	typeIndex int
+	domain    textinput.Model
+	target    textinput.Model
+}
+
 type pathPickerTarget uint8
 
 const (
@@ -209,6 +223,7 @@ type appModel struct {
 	phpPicker          phpPickerState
 	settings           settingsState
 	documentRootForm   documentRootFormState
+	websiteCreateForm  websiteCreateFormState
 	pathPicker         pathPickerState
 	status             string
 	confirm            confirmState

@@ -132,6 +132,20 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.websites = append([]domain.Website(nil), msg.items...)
 		}
 		return m, nil
+	case websiteCreatedMsg:
+		m.progress.active = false
+		if msg.err != nil {
+			m.status = "domain creation failed: " + msg.err.Error()
+			m.output = m.output.append(m.status)
+			return m, nil
+		}
+		m.status = "domain " + msg.domain + " created"
+		m.output = m.output.append("domain created: " + msg.domain)
+		if msg.items != nil {
+			m.websites = append([]domain.Website(nil), msg.items...)
+			m.websiteCursor = clamp(m.websiteCursor, len(m.visibleWebsites()))
+		}
+		return m, nil
 	case subscriptionChangedMsg:
 		m.progress.active = false
 		if msg.err != nil {
