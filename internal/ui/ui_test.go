@@ -306,13 +306,16 @@ func TestModel_PHPChangeStreamsApplyAndRefreshSteps(t *testing.T) {
 		},
 	})
 	m.items = []domain.Subscription{{ID: 1, Name: "acme"}}
-	m.websites, m.workspace, m.showWebsites = []domain.Website{{ID: 1, PrimaryDomain: "app.example.test", Type: domain.WebsitePHPFPM, PHPVersion: "8.4"}}, true, true
+	m.websites, m.workspace, m.showWebsites, m.focus = []domain.Website{{ID: 1, PrimaryDomain: "app.example.test", Type: domain.WebsitePHPFPM, PHPVersion: "8.4"}}, true, true, focusWebsites
 
 	command := m.changeWebsitePHPCmd(confirmState{domain: "8.3"})
 	updated, next := m.Update(command())
 	m = updated.(appModel)
 	if !m.progress.active || m.progress.steps[0].state != stepPending {
 		t.Fatalf("progress start = %#v", m.progress)
+	}
+	if m.focus != focusWebsites {
+		t.Fatalf("progress changed operation focus to %v", m.focus)
 	}
 	updated, next = m.Update(next())
 	m = updated.(appModel)
@@ -338,6 +341,9 @@ func TestModel_PHPChangeStreamsApplyAndRefreshSteps(t *testing.T) {
 	m = updated.(appModel)
 	if m.progress.active || m.websites[0].PHPVersion != "8.3" {
 		t.Fatalf("final PHP refresh = progress:%#v websites:%#v", m.progress, m.websites)
+	}
+	if m.focus != focusWebsites {
+		t.Fatalf("completed operation changed focus to %v", m.focus)
 	}
 }
 

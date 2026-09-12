@@ -359,6 +359,10 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   Domains, Detail, Logs, or Output expands that panel while retaining a useful
   minimum height for its sibling. Geometry tests preserve the exact terminal
   frame and these sizing invariants.
+  Progress overlays now preserve the originating panel's focus through both
+  completion and failure instead of moving focus to Output; Output remains a
+  passive operation history. TLS progress also correctly marks a failed SSL
+  service call as failed in the checklist.
   Původní návrh je zaznamenán v [tui-design.md](tui-design.md) a
   cíleně přebírá konzistentní Bubble Tea vzor z projektu `depo`: hodnotový
   model, `Deps`, samostatné routing/render/keys/theme a I/O jen přes `tea.Cmd`.

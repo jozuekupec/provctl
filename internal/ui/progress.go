@@ -89,6 +89,8 @@ func operationFailed(message tea.Msg) bool {
 	switch result := message.(type) {
 	case websiteChangedMsg:
 		return result.err != nil
+	case websiteTLSChangedMsg:
+		return result.err != nil
 	case subscriptionChangedMsg:
 		return result.err != nil
 	case websitePHPChangedMsg:

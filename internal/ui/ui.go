@@ -17,7 +17,9 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleKey(msg)
 	case progressStartMsg:
 		m.progress = progressState{title: msg.title, steps: append([]progressStep(nil), msg.steps...), active: true, ch: msg.ch, cancel: msg.cancel}
-		m.confirm, m.focus, m.status = confirmState{}, focusOutput, "applying change…"
+		// The progress overlay is modal; changing focus beneath it would make the
+		// user lose the panel from which the operation was started.
+		m.confirm, m.status = confirmState{}, "applying change…"
 		return m, waitProgress(msg.ch)
 	case progressStepMsg:
 		if msg.index >= 0 && msg.index < len(m.progress.steps) {
