@@ -363,6 +363,12 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   completion and failure instead of moving focus to Output; Output remains a
   passive operation history. TLS progress also correctly marks a failed SSL
   service call as failed in the checklist.
+  The TUI now has a `,` Settings popup, modelled after branchctl's focused
+  configuration editor. It edits the ACME contact e-mail and staging toggle,
+  saves them atomically while preserving the rest of `config.toml` (including
+  comments and a private ACME endpoint), and keeps the new value available to
+  the next TLS operation without restarting the TUI. Model and configuration
+  round-trip tests cover the interaction and preservation contract.
   Původní návrh je zaznamenán v [tui-design.md](tui-design.md) a
   cíleně přebírá konzistentní Bubble Tea vzor z projektu `depo`: hodnotový
   model, `Deps`, samostatné routing/render/keys/theme a I/O jen přes `tea.Cmd`.

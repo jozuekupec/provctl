@@ -30,6 +30,12 @@ in an uninitialized development checkout, the missing configuration error is
 expected. Use explicit subcommands for non-interactive administration, for
 example `sudo provctl subscription list`.
 
+Press `,` in either TUI screen to open **Settings · SSL**. It changes the ACME
+contact e-mail and the staging/production switch, then saves atomically with
+Enter (or Ctrl+S). Keep staging enabled until certificate issuance has been
+verified; public Let's Encrypt issuance also needs public DNS and reachable
+HTTP port 80.
+
 ## Install from the APT repository
 
 The following endpoint is the planned release destination; its first public

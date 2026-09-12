@@ -15,6 +15,15 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width, m.height, m.ready = msg.Width, msg.Height, true
 	case tea.KeyMsg:
 		return m.handleKey(msg)
+	case settingsSavedMsg:
+		if msg.err != nil {
+			m.status = "settings save failed: " + msg.err.Error()
+			return m, nil
+		}
+		m.deps.SSLSettings = SSLSettings{Email: strings.TrimSpace(m.settings.email.Value()), Staging: m.settings.staging}
+		m.settings, m.status = settingsState{}, "settings saved"
+		m.output = m.output.append("SSL settings saved")
+		return m, nil
 	case progressStartMsg:
 		m.progress = progressState{title: msg.title, steps: append([]progressStep(nil), msg.steps...), active: true, ch: msg.ch, cancel: msg.cancel}
 		// The progress overlay is modal; changing focus beneath it would make the

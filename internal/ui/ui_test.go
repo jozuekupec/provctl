@@ -25,6 +25,50 @@ func TestModel_LoadAndNavigateSubscriptions(t *testing.T) {
 	}
 }
 
+func TestModel_SettingsEditsAndSavesSSLConfiguration(t *testing.T) {
+	var got SSLSettings
+	m := New(Deps{
+		SSLSettings: SSLSettings{Email: "old@example.test", Staging: false},
+		SaveSSLSettings: func(_ context.Context, email string, staging bool) error {
+			got = SSLSettings{Email: email, Staging: staging}
+			return nil
+		},
+	})
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(",")})
+	m = updated.(appModel)
+	if !m.settings.open || m.settings.email.Value() != "old@example.test" {
+		t.Fatalf("settings = %#v, want opened with current values", m.settings)
+	}
+	m.settings.email.SetValue("ops@example.test")
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyTab})
+	m = updated.(appModel)
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyRight})
+	m = updated.(appModel)
+	updated, command := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	if command == nil {
+		t.Fatal("save did not return a command")
+	}
+	updated, _ = updated.(appModel).Update(command())
+	m = updated.(appModel)
+	if got != (SSLSettings{Email: "ops@example.test", Staging: true}) {
+		t.Fatalf("saved settings = %#v", got)
+	}
+	if m.settings.open || m.deps.SSLSettings != got || m.status != "settings saved" {
+		t.Fatalf("saved model = settings:%#v config:%#v status:%q", m.settings, m.deps.SSLSettings, m.status)
+	}
+}
+
+func TestModel_SettingsPopupFitsTerminal(t *testing.T) {
+	m := New(Deps{SSLSettings: SSLSettings{Email: "ops@example.test", Staging: true}})
+	m.ready, m.width, m.height = true, 100, 28
+	m = m.openSettings()
+	for index, line := range strings.Split(m.View(), "\n") {
+		if got := lipgloss.Width(line); got != m.width {
+			t.Fatalf("line %d width = %d, want %d: %q", index, got, m.width, line)
+		}
+	}
+}
+
 func TestModel_LoadWebsitesForSelectedSubscription(t *testing.T) {
 	m := New(Deps{LoadWebsites: func(_ context.Context, id int64) ([]domain.Website, error) {
 		if id != 7 {

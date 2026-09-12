@@ -54,11 +54,6 @@ func NewRootCommand() *cobra.Command {
 			return fmt.Errorf("open subscription mutation state: %w", err)
 		}
 		defer subscriptionWriteRuntime.Close()
-		sslRuntime, err := service.NewProductionSSLRuntime(context.Background(), cfg)
-		if err != nil {
-			return fmt.Errorf("open SSL mutation state: %w", err)
-		}
-		defer sslRuntime.Close()
 		healthRuntime, err := service.NewProductionHealthRuntime(context.Background(), cfg)
 		if err != nil {
 			return fmt.Errorf("open health state: %w", err)
@@ -80,12 +75,25 @@ func NewRootCommand() *cobra.Command {
 		}
 		defer phpWriteRuntime.Close()
 		setWebsiteTLS := func(ctx context.Context, subscription, domain string, enabled bool) error {
+			// Settings can change the ACME e-mail or environment while this TUI is
+			// running, so create the short-lived SSL runtime from the current file.
+			current, err := config.Load(meta.ConfigFile)
+			if err != nil {
+				return err
+			}
+			sslRuntime, err := service.NewProductionSSLRuntime(ctx, current)
+			if err != nil {
+				return err
+			}
+			defer sslRuntime.Close()
 			if enabled {
 				return sslRuntime.Service.Enable(ctx, subscription, domain, false, true, true)
 			}
 			return sslRuntime.Service.Disable(ctx, subscription, domain)
 		}
-		_, err = ui.Program(ui.Deps{LoadSubscriptions: runtime.Service.List, LoadWebsites: websiteRuntime.Service.List, LoadDatabases: databaseRuntime.Service.ListForSubscription, ReadWebsiteLogs: websiteRuntime.Service.ReadLogs, SetWebsiteEnabled: websiteWriteRuntime.Service.SetEnabled, SetWebsiteTLS: setWebsiteTLS, SetSubscriptionStatus: subscriptionWriteRuntime.Service.SetStatus, DeleteSubscription: subscriptionWriteRuntime.Service.Delete, LoadPHPVersions: phpReadRuntime.Service.ListVersions, SetWebsitePHP: phpWriteRuntime.Service.Set, RunHealth: healthRuntime.Service.Run}).Run()
+		_, err = ui.Program(ui.Deps{LoadSubscriptions: runtime.Service.List, LoadWebsites: websiteRuntime.Service.List, LoadDatabases: databaseRuntime.Service.ListForSubscription, ReadWebsiteLogs: websiteRuntime.Service.ReadLogs, SetWebsiteEnabled: websiteWriteRuntime.Service.SetEnabled, SetWebsiteTLS: setWebsiteTLS, SetSubscriptionStatus: subscriptionWriteRuntime.Service.SetStatus, DeleteSubscription: subscriptionWriteRuntime.Service.Delete, LoadPHPVersions: phpReadRuntime.Service.ListVersions, SetWebsitePHP: phpWriteRuntime.Service.Set, RunHealth: healthRuntime.Service.Run, SaveSSLSettings: func(_ context.Context, email string, staging bool) error {
+			return config.UpdateSSL(meta.ConfigFile, email, staging)
+		}, SSLSettings: ui.SSLSettings{Email: cfg.SSL.Email, Staging: cfg.SSL.Staging}}).Run()
 		return err
 	}
 	root.AddCommand(newDoctorCommand())

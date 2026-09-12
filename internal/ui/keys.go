@@ -9,6 +9,9 @@ import (
 // handleKey routes a key by the current interaction mode. Keeping this apart
 // from Update makes the value-model message router easy to audit and test.
 func (m appModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if m.settings.open {
+		return m.handleSettingsKey(msg)
+	}
 	if m.phpPicker.open {
 		return m.handlePHPPickerKey(msg)
 	}
@@ -40,6 +43,8 @@ func (m appModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	switch msg.String() {
+	case ",":
+		return m.openSettings(), nil
 	case "?":
 		m.help = helpState{open: true, filter: newFilter()}
 		m.status = ""
@@ -233,6 +238,8 @@ func (m appModel) handleFilterKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 func (m appModel) handlePickerKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
+	case ",":
+		return m.openSettings(), nil
 	case "q", "ctrl+c":
 		return m, tea.Quit
 	case "j", "down":

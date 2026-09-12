@@ -1,6 +1,8 @@
 package config
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -37,6 +39,33 @@ func TestDecode_SSLServer(t *testing.T) {
 	invalid := strings.Replace(defaultConfig, "server = \"\"", "server = \"http://pebble.test/dir\"", 1)
 	if _, err := Decode(strings.NewReader(invalid)); err == nil {
 		t.Fatal("Decode(invalid SSL server) error = nil, want error")
+	}
+}
+
+func TestUpdateSSL_PreservesOtherConfigurationAndComments(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.toml")
+	input := strings.Replace(defaultConfig, "email = \"\"", "email = \"\" # contact address", 1)
+	input = strings.Replace(input, "staging = false", "staging = false # safe test CA", 1)
+	input = strings.Replace(input, "server = \"\"", "server = \"https://pebble.test/dir\"", 1)
+	if err := os.WriteFile(path, []byte(input), 0o640); err != nil {
+		t.Fatal(err)
+	}
+	if err := UpdateSSL(path, "ops@example.test", true); err != nil {
+		t.Fatalf("UpdateSSL() error = %v", err)
+	}
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(raw)
+	for _, want := range []string{"email = \"ops@example.test\" # contact address", "staging = true # safe test CA", "server = \"https://pebble.test/dir\""} {
+		if !strings.Contains(text, want) {
+			t.Errorf("updated config missing %q:\n%s", want, text)
+		}
+	}
+	cfg, err := Load(path)
+	if err != nil || cfg.SSL.Email != "ops@example.test" || !cfg.SSL.Staging {
+		t.Errorf("Load(updated config) = %#v, %v", cfg.SSL, err)
 	}
 }
 

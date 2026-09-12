@@ -21,6 +21,9 @@ func (m appModel) View() string {
 	if m.help.open {
 		return m.overlayCenter(m.helpPopup(), view)
 	}
+	if m.settings.open {
+		return m.overlayCenter(m.settingsPopup(), view)
+	}
 	if m.phpPicker.open {
 		return m.overlayCenter(m.phpPickerPopup(), view)
 	}
@@ -197,7 +200,7 @@ func (m appModel) keybar() string {
 		if summary := m.subscriptionFilter.activeSummary("subscriptions", len(m.visibleSubscriptions()), len(m.items)); summary != "" {
 			return summary
 		}
-		return "↑/↓ select · enter open · a archive · d delete · / filter · ? help · q quit"
+		return "↑/↓ select · enter open · a archive · d delete · / filter · , settings · ? help · q quit"
 	}
 	if m.focus == focusSubscriptions {
 		if summary := m.subscriptionFilter.activeSummary("subscriptions", len(m.visibleSubscriptions()), len(m.items)); summary != "" {
@@ -211,9 +214,9 @@ func (m appModel) keybar() string {
 	}
 	switch m.focus {
 	case focusSubscriptions:
-		return "←/→ panels · ↑/↓ select · p PHP · s suspend/resume · a archive · d delete · esc back"
+		return "←/→ panels · ↑/↓ select · s suspend/resume · a archive · d delete · , settings · esc back"
 	case focusWebsites:
-		return "←/→ panels · ↑/↓ select · e toggle · t TLS · l/L logs · esc subscriptions"
+		return "←/→ panels · ↑/↓ select · p PHP · e toggle · t TLS · l/L logs · , settings · esc subscriptions"
 	case focusDetail:
 		return "←/→ panels · ↑/↓ scroll · b databases · esc subscriptions · ? help"
 	case focusLogs:

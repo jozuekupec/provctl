@@ -23,6 +23,15 @@ type Deps struct {
 	LoadPHPVersions       func(context.Context) ([]service.PHPFPMVersion, error)
 	SetWebsitePHP         func(context.Context, string, string, service.PHPSetOptions) (int64, error)
 	RunHealth             func(context.Context, string, string) ([]service.Check, error)
+	SaveSSLSettings       func(context.Context, string, bool) error
+	SSLSettings           SSLSettings
+}
+
+// SSLSettings is the small, explicitly TUI-managed portion of configuration.
+// Other settings remain file-managed until they have a dedicated safe editor.
+type SSLSettings struct {
+	Email   string
+	Staging bool
 }
 type websitesLoadedMsg struct {
 	items      []domain.Website
@@ -79,6 +88,7 @@ type websiteLogsLoadedMsg struct {
 	err        error
 	generation uint64
 }
+type settingsSavedMsg struct{ err error }
 
 type focus int
 
@@ -115,6 +125,13 @@ type phpPickerState struct {
 	items   []service.PHPFPMVersion
 }
 
+type settingsState struct {
+	open    bool
+	field   int
+	email   textinput.Model
+	staging bool
+}
+
 func (output outputState) append(line string) outputState {
 	next := append([]string(nil), output.lines...)
 	next = append(next, line)
@@ -142,6 +159,7 @@ type appModel struct {
 	websiteFilter      filterState
 	help               helpState
 	phpPicker          phpPickerState
+	settings           settingsState
 	status             string
 	confirm            confirmState
 	progress           progressState
