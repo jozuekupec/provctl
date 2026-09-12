@@ -131,6 +131,12 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   reconcile aliasů zopakovat v `pv` Pebble issuance, alias add/remove,
   `certbot renew --dry-run`, deploy hook a Apache reload. Současný `clean`
   snapshot Pebble neobsahuje; test se proto neprovádí při běžném E2 round-tripu.
+  Reprodukovatelný T16 (`scripts/tests/t16-ssl.sh`) nyní sestaví upstream Pebble
+  na hostu, spustí jej pouze uvnitř `pv` a ověří skutečné HTTP-01, renew,
+  deploy-hook, force-HTTPS výjimku pro ACME a disable. Harness má explicitní
+  kontrolu PID, síťové timeouty a `--noproxy '*'` pro čistě lokální management
+  endpoint; úplný opakovatelný běh zůstává E3 follow-upem před uzavřením SAN
+  reconcile větve.
   Review nyní konkretizuje nutný jednotný resolver lineage pro issuance,
   rendering, status, deploy hook, aliasy, delete a adopt; pořadí datové
   migrace a nevratných Certbot kroků je v `ssl-project-issuance-review.md`.

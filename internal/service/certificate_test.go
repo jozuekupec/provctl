@@ -182,3 +182,14 @@ func TestSSLService_CertbotArgsUsesCompleteSANSet(t *testing.T) {
 		}
 	}
 }
+
+func TestSSLService_RenewalCheckArgsUsesPebbleRenewal(t *testing.T) {
+	service := SSLService{Config: config.Config{SSL: config.SSL{Server: "https://pebble:14000/dir"}}}
+	if got, want := strings.Join(service.renewalCheckArgs("provctl-site-7"), " "), "renew --cert-name provctl-site-7 --force-renewal --no-random-sleep-on-renew"; got != want {
+		t.Errorf("renewalCheckArgs() = %q, want %q", got, want)
+	}
+	service.Config.SSL.Server = ""
+	if got, want := strings.Join(service.renewalCheckArgs("provctl-site-7"), " "), "renew --cert-name provctl-site-7 --dry-run"; got != want {
+		t.Errorf("renewalCheckArgs() = %q, want %q", got, want)
+	}
+}

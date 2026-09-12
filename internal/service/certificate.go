@@ -213,12 +213,24 @@ func (service SSLService) Enable(ctx context.Context, subscriptionName, primaryD
 		return err
 	}
 	if renewalCheck {
-		result, err := service.Commands.Run(ctx, "/usr/bin/certbot", "renew", "--cert-name", lineage, "--dry-run")
+		result, err := service.Commands.Run(ctx, "/usr/bin/certbot", service.renewalCheckArgs(lineage)...)
 		if err != nil {
 			return fmt.Errorf("certificate issued, but renewal check warning: %w", commandError("verify certificate renewal", result, err))
 		}
 	}
 	return nil
+}
+
+// renewalCheckArgs uses Certbot's harmless dry-run for the production and
+// staging Let’s Encrypt endpoints. Certbot deliberately replaces every ACME
+// directory with its public staging service when --dry-run is present, so a
+// configured local endpoint (Pebble) must use an actual forced renewal.
+func (service SSLService) renewalCheckArgs(lineage string) []string {
+	args := []string{"renew", "--cert-name", lineage}
+	if service.Config.SSL.Server != "" {
+		return append(args, "--force-renewal", "--no-random-sleep-on-renew")
+	}
+	return append(args, "--dry-run")
 }
 
 // Disable removes TLS from the generated configuration and leaves Certbot's

@@ -881,6 +881,12 @@ exit 0
 certbot renew --cert-name provctl-<sub>-<domain> --dry-run
 ```
 
+Je-li explicitně nakonfigurován lokální testovací ACME endpoint (`ssl.server`,
+např. Pebble), použije se místo `--dry-run`
+`--force-renewal --no-random-sleep-on-renew`: Certbot při
+`--dry-run` přepíná server na veřejný staging Let’s Encrypt a lokální endpoint
+by tak vůbec neověřil.
+
 **[MUST]** `provctl ssl enable` tento dry-run spustí automaticky jako poslední krok (lze vypnout `--no-renewal-check`) a jeho selhání hlásí jako `WARN` s plným výstupem certbota — certifikát už v tu chvíli existuje, takže to není důvod k rollbacku, ale je to důvod k upozornění.
 
 **[MUST]** Totéž je součástí `provctl health` pro každý web s SSL, ale **jen na vyžádání** (`--check-renewal`), protože dry-run chodí na síť do Let's Encrypt.

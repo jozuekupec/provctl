@@ -693,7 +693,7 @@ dpkg --compare-versions 1.1.0-rc1 lt 1.1.0 || echo "POZOR: -rc1 by se řadilo NA
 
 Testovat SSL proti ostrému Let's Encrypt je špatný nápad: potřebuje veřejnou DNS, veřejnou IP a má přísné limity. Pro vývoj slouží **Pebble** — testovací ACME server od Let's Encrypt.
 
-**PŘEDPOKLAD:** Pebble není v Debianu jako balíček; distribuuje se jako Go binárka / kontejner. Ověř aktuální způsob instalace v jeho repozitáři.
+**PŘEDPOKLAD:** Pebble není v Debianu jako balíček; distribuuje se jako Go binárka / kontejner. Ověř aktuální způsob instalace v jeho repozitáři. Automatizovaný scénář T16 používá jeho upstream checkout, z něhož na hostu sestaví binárku a spustí ji až uvnitř `pv`; ACME, DNS a HTTP-01 tedy neopustí testovací kontejner.
 
 ### Setup uvnitř E2
 
@@ -719,6 +719,15 @@ server = "https://localhost:14000/dir"     # override ACME serveru
 **[MUST]** Zadání musí počítat s konfigurovatelnou `ssl.server` URL — jinak nejde SSL flow testovat vůbec. (Doplnit do §23 zadání.)
 
 ### T16 — SSL flow
+
+```bash
+git clone --depth 1 https://github.com/letsencrypt/pebble.git /tmp/provctl-pebble
+PATH=/home/linuxbrew/.linuxbrew/bin:$PATH \
+  sg incus-admin -c './scripts/tests/t16-ssl.sh dist/provctl_*.deb /tmp/provctl-pebble'
+```
+
+T16 obnoví `pv` na `clean` i po selhání. Není součástí `run-all.sh`, protože
+vyžaduje síť při prvním stažení Pebble zdrojů a lokální Go toolchain.
 
 ```bash
 ./scripts/e2.sh sh 'provctl website create acme ssl.test --type php-fpm'
@@ -758,9 +767,16 @@ server = "https://localhost:14000/dir"     # override ACME serveru
 **Očekávané:** `authenticator = webroot`, `webroot_path = /var/lib/provctl/acme-challenge`.
 
 ```bash
-./scripts/e2.sh sh 'certbot renew --cert-name provctl-acme-ssl.test --dry-run; echo "exit=$?"'
+./scripts/e2.sh sh 'certbot renew --cert-name <lineage> --dry-run; echo "exit=$?"'
 ```
 **Očekávané:** `exit=0`.
+
+Pro lokální Pebble endpoint použij místo `--dry-run`
+`--force-renewal --no-random-sleep-on-renew`.
+Certbot totiž při `--dry-run` vědomě přepíná ACME server na veřejný Let’s
+Encrypt staging endpoint; `provctl ssl enable` proto pro explicitní
+`ssl.server` ověřuje obnovu pomocí `--force-renewal`, zatímco pro běžnou
+produkční konfiguraci zůstává bezpečný `--dry-run`.
 
 Vynucená obnova a ověření hooku:
 
