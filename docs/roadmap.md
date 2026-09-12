@@ -265,7 +265,15 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   Opakovaný E2 průchod pak reattachment ověřil: `backup list` po forced
   restore vypisuje oba záznamy, marker z původní zálohy je obnoven a Apache
   configtest zůstává zelený. Kontejner byl vrácen na `clean` a běží.
-- [x] **M8 — TUI:** návrh je zaznamenán v [tui-design.md](tui-design.md) a
+- [~] **M8 — TUI:** původní čtyřpanelový prototyp je funkční, ale po ruční
+  kontrole se ukázal jako UX nedostatečný: layout může oříznout horní řádek,
+  navigace, nápověda, filtry a potvrzení neodpovídají referenčnímu `branchctl`.
+  Schválený nástupnický návrh je v
+  [tui-redesign-proposal.md](tui-redesign-proposal.md): fullscreen subscription
+  picker, workspace jedné subscription, přesný layout, šipková navigace,
+  modální formuláře a ANSI-safe confirm overlay. Následující text popisuje
+  dosavadní implementovaný základ, který redesign nahradí nebo znovu použije.
+  Původní návrh je zaznamenán v [tui-design.md](tui-design.md) a
   cíleně přebírá konzistentní Bubble Tea vzor z projektu `depo`: hodnotový
   model, `Deps`, samostatné routing/render/keys/theme a I/O jen přes `tea.Cmd`.
   První read-only subscriptions obrazovka je funkční (`provctl` bez argumentů):
