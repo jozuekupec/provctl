@@ -316,6 +316,11 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   rozlišitelnému rámečku aktivního panelu, zachování historie Outputu při čtení
   logů a zahození závislých dat, když refresh nahradí vybranou subscription;
   nové modelové testy i `make test` prošly.
+  Pro ruční vizuální kontrolu je nyní připravený `pv` snapshot `tui-ready`:
+  obsahuje balíček `0.1.0`, dokončený bootstrap, subscriptions `demo` a
+  `staging` a PHP-FPM/static demo weby. Spouští se přes `incus exec` v reálném
+  terminálu; po kontrole lze stav bezpečně obnovit ze snapshotu `clean` nebo
+  znovu otevřít `tui-ready`.
 - [~] **M9 — distribuce:** je přidána deklarace `packaging/nfpm.yaml` pro
   jediný `provctl` `.deb`, config je `noreplace`, šablony jsou běžný obsah a
   balíček deklaruje pouze potřebné Debian závislosti. `scripts/build-deb.sh`
