@@ -71,6 +71,24 @@ func TestModel_SettingsPopupFitsTerminal(t *testing.T) {
 	}
 }
 
+func TestModel_SettingsTabsFitMinimumTerminal(t *testing.T) {
+	m := New(Deps{})
+	m.width, m.height = minWidth, minHeight
+	m = m.openSettings()
+	tabs := m.settingsTabs()
+	if got, want := lipgloss.Width(tabs), m.popupInnerW(popupLarge); got > want {
+		t.Fatalf("tab strip width = %d, inner popup width = %d:\n%s", got, want, tabs)
+	}
+	if got := lipgloss.Height(tabs); got != 3 {
+		t.Fatalf("tab strip height = %d, want bordered tabs with height 3:\n%s", got, tabs)
+	}
+	for _, label := range settingTabLabels {
+		if !strings.Contains(tabs, label) {
+			t.Errorf("tab strip does not contain %q:\n%s", label, tabs)
+		}
+	}
+}
+
 func TestModel_LoadWebsitesForSelectedSubscription(t *testing.T) {
 	m := New(Deps{LoadWebsites: func(_ context.Context, id int64) ([]domain.Website, error) {
 		if id != 7 {

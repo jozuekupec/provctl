@@ -8,6 +8,7 @@ import (
 
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 
 	"provctl/internal/config"
 )
@@ -22,6 +23,10 @@ const (
 type settingField struct{ section, key, label, kind string }
 
 var settingScopes = []string{"Meta", "Paths", "Apache", "PHP", "MariaDB", "Users", "SSL", "Logs", "Limits"}
+
+// settingTabLabels are deliberately short: all scopes must fit in the large
+// popup at the documented 80-column minimum without wrapping the tab strip.
+var settingTabLabels = []string{"Meta", "Paths", "Apache", "PHP", "DB", "Users", "SSL", "Logs", "Limits"}
 var settingFields = []settingField{
 	{"meta", "config_version", "Config version", settingInt},
 	{"paths", "vhosts", "VHosts directory", settingText}, {"paths", "backups", "Backups directory", settingText}, {"paths", "acme_challenge", "ACME challenge directory", settingText},
@@ -154,15 +159,7 @@ func (m appModel) handleSettingsKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 func (m appModel) settingsPopup() string {
 	inner := m.popupInnerW(popupLarge)
-	tabs := make([]string, len(settingScopes))
-	for index, label := range settingScopes {
-		if index == m.settings.scope {
-			tabs[index] = selectedStyle.Render("[" + label + "]")
-		} else {
-			tabs[index] = dimStyle.Render(label)
-		}
-	}
-	body := []string{strings.Join(tabs, " "), ""}
+	body := []string{m.settingsTabs(), ""}
 	for _, index := range m.settingsFields() {
 		field, value := settingFields[index], m.settings.values[index]
 		if index == m.activeSetting() && field.kind != settingBool {
@@ -180,6 +177,18 @@ func (m appModel) settingsPopup() string {
 		body = append(body, line)
 	}
 	return popupBox(m, popupOpts{Size: popupLarge, Fit: fitFixed, Title: "Settings", Body: popupWrap(body, inner), Footer: []string{dimStyle.Render("⇧←/⇧→ scope · tab/↑/↓ field · ←/→ toggle · enter/ctrl+s save · esc cancel")}})
+}
+
+func (m appModel) settingsTabs() string {
+	tabs := make([]string, len(settingScopes))
+	for index, label := range settingTabLabels {
+		if index == m.settings.scope {
+			tabs[index] = tabActiveStyle.Render(label)
+		} else {
+			tabs[index] = tabInactiveStyle.Render(label)
+		}
+	}
+	return lipgloss.JoinHorizontal(lipgloss.Bottom, tabs...)
 }
 
 func settingValue(cfg config.Config, index int) string {

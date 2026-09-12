@@ -78,7 +78,7 @@ func helpSections() []helpSection {
 			"h         run health checks",
 		}},
 		{title: "General", rows: []string{
-			",         edit SSL settings",
+			",         edit configuration settings",
 			"?         open this help",
 			"q         quit",
 		}},

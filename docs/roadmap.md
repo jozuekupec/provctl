@@ -371,6 +371,10 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   uses the shared class/fit model: Settings is a large fixed surface with a
   permanent footer, while short confirmations retain automatic sizing. Model,
   configuration round-trip, and fixed-popup geometry tests cover the contract.
+  The settings scopes now use the connected bordered tabs from `branchctl`:
+  the active scope has an open bottom edge and visually joins the form below;
+  compact `DB` keeps the complete tab strip inside the 80-column minimum.
+  A renderer test protects its width and border height.
   Původní návrh je zaznamenán v [tui-design.md](tui-design.md) a
   cíleně přebírá konzistentní Bubble Tea vzor z projektu `depo`: hodnotový
   model, `Deps`, samostatné routing/render/keys/theme a I/O jen přes `tea.Cmd`.

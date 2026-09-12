@@ -20,7 +20,20 @@ var (
 	confirmStyle     = lipgloss.NewStyle().Foreground(warnColor).Bold(true)
 	filterLabelStyle = lipgloss.NewStyle().Foreground(accentColor).Bold(true)
 	filterCountStyle = lipgloss.NewStyle().Foreground(warnColor).Bold(true)
+
+	// Settings scopes use the same connected-tab treatment as branchctl. The
+	// active tab has no bottom line, so it reads as the selected form surface.
+	tabActiveStyle   = lipgloss.NewStyle().Border(tabBorderWithBottom("┘", " ", "└")).BorderForeground(accentColor).Bold(true).Padding(0, 1)
+	tabInactiveStyle = lipgloss.NewStyle().Border(tabBorderWithBottom("┴", "─", "┴")).BorderForeground(dimColor).Padding(0, 1)
 )
+
+func tabBorderWithBottom(left, middle, right string) lipgloss.Border {
+	border := lipgloss.RoundedBorder()
+	border.BottomLeft = left
+	border.Bottom = middle
+	border.BottomRight = right
+	return border
+}
 
 const (
 	minWidth  = 80
