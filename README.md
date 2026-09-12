@@ -30,11 +30,13 @@ in an uninitialized development checkout, the missing configuration error is
 expected. Use explicit subcommands for non-interactive administration, for
 example `sudo provctl subscription list`.
 
-Press `,` in either TUI screen to open **Settings · SSL**. It changes the ACME
-contact e-mail and the staging/production switch, then saves atomically with
-Enter (or Ctrl+S). Keep staging enabled until certificate issuance has been
-verified; public Let's Encrypt issuance also needs public DNS and reachable
-HTTP port 80.
+Press `,` in either TUI screen to open **Settings**. Its section tabs expose
+every supported key from `/etc/provctl/config.toml`; Shift+Left/Right changes
+section, Tab/Up/Down changes field, and Enter (or Ctrl+S) saves atomically
+without discarding comments or unknown administrator keys. Restart the TUI
+after saving non-TLS settings so its already-opened service runtimes reload
+them. Keep ACME staging enabled until certificate issuance has been verified;
+public Let's Encrypt issuance also needs public DNS and reachable HTTP port 80.
 
 ## Install from the APT repository
 

@@ -364,11 +364,13 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   passive operation history. TLS progress also correctly marks a failed SSL
   service call as failed in the checklist.
   The TUI now has a `,` Settings popup, modelled after branchctl's focused
-  configuration editor. It edits the ACME contact e-mail and staging toggle,
-  saves them atomically while preserving the rest of `config.toml` (including
-  comments and a private ACME endpoint), and keeps the new value available to
-  the next TLS operation without restarting the TUI. Model and configuration
-  round-trip tests cover the interaction and preservation contract.
+  configuration editor. It exposes every supported config key in section tabs,
+  saves atomically while preserving the rest of `config.toml` (including
+  comments and unknown administrator keys), and keeps TLS settings available
+  immediately; other service runtimes reload on the next TUI start. The popup
+  uses the shared class/fit model: Settings is a large fixed surface with a
+  permanent footer, while short confirmations retain automatic sizing. Model,
+  configuration round-trip, and fixed-popup geometry tests cover the contract.
   Původní návrh je zaznamenán v [tui-design.md](tui-design.md) a
   cíleně přebírá konzistentní Bubble Tea vzor z projektu `depo`: hodnotový
   model, `Deps`, samostatné routing/render/keys/theme a I/O jen přes `tea.Cmd`.

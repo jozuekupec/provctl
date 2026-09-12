@@ -20,9 +20,9 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.status = "settings save failed: " + msg.err.Error()
 			return m, nil
 		}
-		m.deps.SSLSettings = SSLSettings{Email: strings.TrimSpace(m.settings.email.Value()), Staging: m.settings.staging}
-		m.settings, m.status = settingsState{}, "settings saved"
-		m.output = m.output.append("SSL settings saved")
+		m.deps.Config = msg.cfg
+		m.settings, m.status = settingsState{}, "settings saved; restart TUI to apply non-TLS settings"
+		m.output = m.output.append("configuration saved")
 		return m, nil
 	case progressStartMsg:
 		m.progress = progressState{title: msg.title, steps: append([]progressStep(nil), msg.steps...), active: true, ch: msg.ch, cancel: msg.cancel}

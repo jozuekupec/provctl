@@ -91,9 +91,9 @@ func NewRootCommand() *cobra.Command {
 			}
 			return sslRuntime.Service.Disable(ctx, subscription, domain)
 		}
-		_, err = ui.Program(ui.Deps{LoadSubscriptions: runtime.Service.List, LoadWebsites: websiteRuntime.Service.List, LoadDatabases: databaseRuntime.Service.ListForSubscription, ReadWebsiteLogs: websiteRuntime.Service.ReadLogs, SetWebsiteEnabled: websiteWriteRuntime.Service.SetEnabled, SetWebsiteTLS: setWebsiteTLS, SetSubscriptionStatus: subscriptionWriteRuntime.Service.SetStatus, DeleteSubscription: subscriptionWriteRuntime.Service.Delete, LoadPHPVersions: phpReadRuntime.Service.ListVersions, SetWebsitePHP: phpWriteRuntime.Service.Set, RunHealth: healthRuntime.Service.Run, SaveSSLSettings: func(_ context.Context, email string, staging bool) error {
-			return config.UpdateSSL(meta.ConfigFile, email, staging)
-		}, SSLSettings: ui.SSLSettings{Email: cfg.SSL.Email, Staging: cfg.SSL.Staging}}).Run()
+		_, err = ui.Program(ui.Deps{LoadSubscriptions: runtime.Service.List, LoadWebsites: websiteRuntime.Service.List, LoadDatabases: databaseRuntime.Service.ListForSubscription, ReadWebsiteLogs: websiteRuntime.Service.ReadLogs, SetWebsiteEnabled: websiteWriteRuntime.Service.SetEnabled, SetWebsiteTLS: setWebsiteTLS, SetSubscriptionStatus: subscriptionWriteRuntime.Service.SetStatus, DeleteSubscription: subscriptionWriteRuntime.Service.Delete, LoadPHPVersions: phpReadRuntime.Service.ListVersions, SetWebsitePHP: phpWriteRuntime.Service.Set, RunHealth: healthRuntime.Service.Run, SaveConfig: func(_ context.Context, updated config.Config) error {
+			return config.Update(meta.ConfigFile, updated)
+		}, Config: cfg}).Run()
 		return err
 	}
 	root.AddCommand(newDoctorCommand())

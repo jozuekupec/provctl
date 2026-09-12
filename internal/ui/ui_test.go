@@ -8,6 +8,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
+	"provctl/internal/config"
 	"provctl/internal/domain"
 	"provctl/internal/service"
 )
@@ -26,23 +27,24 @@ func TestModel_LoadAndNavigateSubscriptions(t *testing.T) {
 }
 
 func TestModel_SettingsEditsAndSavesSSLConfiguration(t *testing.T) {
-	var got SSLSettings
+	initial := config.Config{Meta: config.Meta{ConfigVersion: 1}, Paths: config.Paths{VHosts: "/vhosts", Backups: "/backups", ACMEChallenge: "/acme"}, Apache: config.Apache{Service: "apache2", SitesAvailable: "/available", SitesEnabled: "/enabled"}, Users: config.Users{UIDMin: 1, UIDMax: 2}, Limits: config.Limits{LockTimeoutSeconds: 1}, SSL: config.SSL{Email: "old@example.test"}}
+	var got config.Config
 	m := New(Deps{
-		SSLSettings: SSLSettings{Email: "old@example.test", Staging: false},
-		SaveSSLSettings: func(_ context.Context, email string, staging bool) error {
-			got = SSLSettings{Email: email, Staging: staging}
+		Config: initial,
+		SaveConfig: func(_ context.Context, updated config.Config) error {
+			got = updated
 			return nil
 		},
 	})
 	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(",")})
 	m = updated.(appModel)
-	if !m.settings.open || m.settings.email.Value() != "old@example.test" {
+	if !m.settings.open || m.settings.values[20] != "old@example.test" {
 		t.Fatalf("settings = %#v, want opened with current values", m.settings)
 	}
-	m.settings.email.SetValue("ops@example.test")
-	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyTab})
-	m = updated.(appModel)
-	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyRight})
+	m = m.changeSettingsScope(6)
+	m.settings.input.SetValue("ops@example.test")
+	m = m.moveSettingsField(1)
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyRight}) // staging
 	m = updated.(appModel)
 	updated, command := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	if command == nil {
@@ -50,16 +52,16 @@ func TestModel_SettingsEditsAndSavesSSLConfiguration(t *testing.T) {
 	}
 	updated, _ = updated.(appModel).Update(command())
 	m = updated.(appModel)
-	if got != (SSLSettings{Email: "ops@example.test", Staging: true}) {
-		t.Fatalf("saved settings = %#v", got)
+	if got.SSL.Email != "ops@example.test" || !got.SSL.Staging {
+		t.Fatalf("saved settings = %#v", got.SSL)
 	}
-	if m.settings.open || m.deps.SSLSettings != got || m.status != "settings saved" {
-		t.Fatalf("saved model = settings:%#v config:%#v status:%q", m.settings, m.deps.SSLSettings, m.status)
+	if m.settings.open || m.deps.Config.SSL != got.SSL || !strings.HasPrefix(m.status, "settings saved") {
+		t.Fatalf("saved model = settings:%#v config:%#v status:%q", m.settings, m.deps.Config.SSL, m.status)
 	}
 }
 
 func TestModel_SettingsPopupFitsTerminal(t *testing.T) {
-	m := New(Deps{SSLSettings: SSLSettings{Email: "ops@example.test", Staging: true}})
+	m := New(Deps{Config: config.Config{SSL: config.SSL{Email: "ops@example.test", Staging: true}}})
 	m.ready, m.width, m.height = true, 100, 28
 	m = m.openSettings()
 	for index, line := range strings.Split(m.View(), "\n") {

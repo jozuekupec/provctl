@@ -62,6 +62,13 @@ styles in `theme.go`; create additional feature files only when they have a
 concrete responsibility. The TUI is read-mostly and must call services rather
 than system or SQLite packages directly.
 
+Use the popup conventions from `branchctl`: size classes (small/medium/large),
+class-derived width, `fitFixed` for scrollable forms, lists and progress, and
+`fitAuto` for finite information and confirmations. A popup footer is a
+reserved bottom block with a separating blank line; truncate or scroll body
+content, never the footer. Keep overlays ANSI-aware and test both exact frame
+geometry and the documented minimum terminal size.
+
 ## Testing Guidelines
 
 Use the standard `testing` package and `github.com/google/go-cmp`. Name tests `TestThing_Scenario` and prefer table-driven tests. Unit tests must run unprivileged, offline, and without Debian services; use `internal/system/fake` for filesystem, process, and rollback cases. Store renderer fixtures in `testdata/` and review golden-file diffs before committing. Run `make test` before every pull request.
