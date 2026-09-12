@@ -296,6 +296,15 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   other key cancels. The concise one-row keybar only advertises currently
   implemented operations. Full `make test` (vet, staticcheck, race tests)
   passed after this block.
+  **Redesign block 4 complete:** the picker and Subscription panel now expose
+  the implemented subscription lifecycle rather than advertising placeholder
+  actions. `a` archives with a modal confirmation; `d` only permits permanent
+  deletion of an archived subscription and requires typing its exact name.
+  The action remains service-backed and uses the existing journalled deletion
+  path. Left/right now traverse Subscription → Domains → Detail → Logs →
+  Output and back, so subscription actions are reachable from the workspace.
+  Model tests cover archive, typed deletion, and panel navigation; `make test`
+  passed.
   Původní návrh je zaznamenán v [tui-design.md](tui-design.md) a
   cíleně přebírá konzistentní Bubble Tea vzor z projektu `depo`: hodnotový
   model, `Deps`, samostatné routing/render/keys/theme a I/O jen přes `tea.Cmd`.

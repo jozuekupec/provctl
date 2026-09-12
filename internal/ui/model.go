@@ -4,6 +4,7 @@ package ui
 import (
 	"context"
 
+	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 
 	"provctl/internal/domain"
@@ -17,6 +18,7 @@ type Deps struct {
 	ReadWebsiteLogs       func(context.Context, string, string, bool, int) (string, error)
 	SetWebsiteEnabled     func(context.Context, string, string, bool) (int64, error)
 	SetSubscriptionStatus func(context.Context, string, string) (int64, error)
+	DeleteSubscription    func(context.Context, string, bool) (int64, error)
 	RunHealth             func(context.Context, string, string) ([]service.Check, error)
 }
 type websitesLoadedMsg struct {
@@ -43,6 +45,10 @@ type websiteChangedMsg struct {
 type subscriptionChangedMsg struct {
 	err          error
 	name, status string
+}
+type subscriptionDeletedMsg struct {
+	err  error
+	name string
 }
 type healthLoadedMsg struct {
 	checks     []service.Check
@@ -72,6 +78,9 @@ type confirmState struct {
 	domain  string
 	title   string
 	lines   []string
+	word    string
+	input   textinput.Model
+	err     string
 }
 
 type helpState struct {
@@ -143,6 +152,34 @@ func (m appModel) changeSubscription(ctx context.Context, confirm confirmState) 
 
 func (m appModel) changeSubscriptionCmd(confirm confirmState) tea.Cmd {
 	return steppedCmd("Update subscription", []string{"apply subscription state"}, func(ctx context.Context) tea.Msg { return m.changeSubscription(ctx, confirm) })
+}
+
+func (m appModel) deleteSubscription(ctx context.Context, confirm confirmState) tea.Msg {
+	subscription, ok := m.selectedSubscription()
+	if m.deps.DeleteSubscription == nil || !ok || subscription.Name != confirm.domain {
+		return subscriptionDeletedMsg{err: context.Canceled}
+	}
+	_, err := m.deps.DeleteSubscription(ctx, subscription.Name, false)
+	return subscriptionDeletedMsg{err: err, name: subscription.Name}
+}
+
+func (m appModel) deleteSubscriptionCmd(confirm confirmState) tea.Cmd {
+	return steppedCmd("Delete subscription", []string{"remove subscription and managed resources"}, func(ctx context.Context) tea.Msg { return m.deleteSubscription(ctx, confirm) })
+}
+
+func (m appModel) askDeleteSubscription() appModel {
+	subscription, ok := m.selectedSubscription()
+	if !ok || subscription.Status != "archived" {
+		m.status = "archive the selected subscription before deletion"
+		return m
+	}
+	return m.askConfirm(confirmState{
+		action: "delete", domain: subscription.Name, word: subscription.Name,
+		title: "Delete subscription", lines: []string{
+			"Subscription: " + subscription.Name,
+			"This permanently removes managed resources and the subscription home.",
+		},
+	})
 }
 
 func (m appModel) loadHealth(ctx context.Context, generation uint64) tea.Msg {

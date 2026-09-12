@@ -236,6 +236,62 @@ func TestModel_ConfirmSubscriptionSuspendCallsDependency(t *testing.T) {
 	}
 }
 
+func TestModel_ArchiveSubscriptionCallsDependency(t *testing.T) {
+	var status string
+	m := New(Deps{SetSubscriptionStatus: func(_ context.Context, _, value string) (int64, error) {
+		status = value
+		return 1, nil
+	}})
+	m.items = []domain.Subscription{{Name: "acme", Status: "active"}}
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("a")})
+	m = updated.(appModel)
+	if m.confirm.action != "archived" {
+		t.Fatalf("confirmation = %#v", m.confirm)
+	}
+	updated, command := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("y")})
+	_ = runProgress(t, updated.(appModel), command)
+	if status != "archived" {
+		t.Fatalf("status = %q, want archived", status)
+	}
+}
+
+func TestModel_DeleteArchivedSubscriptionRequiresTypedName(t *testing.T) {
+	deleted := false
+	m := New(Deps{DeleteSubscription: func(_ context.Context, name string, force bool) (int64, error) {
+		deleted = name == "acme" && !force
+		return 1, nil
+	}})
+	m.items = []domain.Subscription{{Name: "acme", Status: "archived"}}
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("d")})
+	m = updated.(appModel)
+	if m.confirm.word != "acme" {
+		t.Fatalf("delete confirmation = %#v", m.confirm)
+	}
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = updated.(appModel)
+	if m.confirm.err == "" || deleted {
+		t.Fatalf("empty confirmation unexpectedly deleted: %#v", m.confirm)
+	}
+	for _, character := range "acme" {
+		updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{character}})
+		m = updated.(appModel)
+	}
+	updated, command := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	_ = runProgress(t, updated.(appModel), command)
+	if !deleted {
+		t.Fatal("DeleteSubscription was not called after typed confirmation")
+	}
+}
+
+func TestFocusNavigationMovesAcrossWorkspacePanels(t *testing.T) {
+	if got := focusLeft(focusWebsites); got != focusSubscriptions {
+		t.Fatalf("left from domains = %v, want subscriptions", got)
+	}
+	if got := focusRight(focusLogs); got != focusOutput {
+		t.Fatalf("right from logs = %v, want output", got)
+	}
+}
+
 func TestModel_ConfirmationCannotStartDuplicateMutation(t *testing.T) {
 	m := New(Deps{SetSubscriptionStatus: func(context.Context, string, string) (int64, error) { return 1, nil }})
 	m.items = []domain.Subscription{{Name: "acme", Status: "active"}}

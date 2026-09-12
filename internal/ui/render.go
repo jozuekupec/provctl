@@ -176,11 +176,11 @@ func (m appModel) keybar() string {
 		return m.websiteFilter.input.View() + "  enter apply • esc clear"
 	}
 	if !m.workspace {
-		return "↑/↓ select · enter open · / filter · r refresh · ? help · q quit"
+		return "↑/↓ select · enter open · a archive · d delete · / filter · ? help · q quit"
 	}
 	switch m.focus {
 	case focusSubscriptions:
-		return "←/→ panels · ↑/↓ select · s suspend/resume · esc subscriptions · ? help"
+		return "←/→ panels · ↑/↓ select · s suspend/resume · a archive · d delete · esc back"
 	case focusWebsites:
 		return "←/→ panels · ↑/↓ select · e toggle · l/L logs · esc subscriptions · ? help"
 	case focusDetail:

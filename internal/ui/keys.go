@@ -108,7 +108,11 @@ func (m appModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m, command := m.startWebsites()
 		return m, command
 	case "d":
-		m.focus = focusDetail
+		if m.focus == focusSubscriptions {
+			m = m.askDeleteSubscription()
+		} else {
+			m.focus = focusDetail
+		}
 	case "o":
 		m.focus = focusOutput
 	case "e":
@@ -123,7 +127,7 @@ func (m appModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			})
 		}
 	case "s":
-		if !m.showWebsites {
+		if m.focus == focusSubscriptions {
 			subscription, ok := m.selectedSubscription()
 			if !ok {
 				break
@@ -132,6 +136,13 @@ func (m appModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				m = m.askConfirm(confirmState{action: "suspended", domain: subscription.Name, title: "Suspend subscription", lines: []string{"Subscription: " + subscription.Name, "Websites will be unavailable until resumed."}})
 			} else if subscription.Status == "suspended" {
 				m = m.askConfirm(confirmState{action: "active", domain: subscription.Name, title: "Resume subscription", lines: []string{"Subscription: " + subscription.Name, "Restore normal service."}})
+			}
+		}
+	case "a":
+		if m.focus == focusSubscriptions {
+			subscription, ok := m.selectedSubscription()
+			if ok && subscription.Status != "archived" {
+				m = m.askConfirm(confirmState{action: "archived", domain: subscription.Name, title: "Archive subscription", lines: []string{"Subscription: " + subscription.Name, "Archiving is required before permanent deletion."}})
 			}
 		}
 	case "right", "tab":
@@ -194,6 +205,13 @@ func (m appModel) handlePickerKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.status = "loading subscriptions…"
 		m, command := m.startSubscriptions()
 		return m, command
+	case "a":
+		subscription, ok := m.selectedSubscription()
+		if ok && subscription.Status != "archived" {
+			m = m.askConfirm(confirmState{action: "archived", domain: subscription.Name, title: "Archive subscription", lines: []string{"Subscription: " + subscription.Name, "Archiving is required before permanent deletion."}})
+		}
+	case "d":
+		m = m.askDeleteSubscription()
 	case "enter":
 		if len(m.visibleSubscriptions()) == 0 {
 			return m, nil
@@ -207,8 +225,14 @@ func (m appModel) handlePickerKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 func focusRight(current focus) focus {
 	switch current {
-	case focusSubscriptions, focusWebsites:
+	case focusSubscriptions:
+		return focusWebsites
+	case focusWebsites:
 		return focusDetail
+	case focusDetail:
+		return focusLogs
+	case focusLogs:
+		return focusOutput
 	default:
 		return current
 	}
@@ -216,8 +240,14 @@ func focusRight(current focus) focus {
 
 func focusLeft(current focus) focus {
 	switch current {
-	case focusDetail, focusLogs, focusOutput:
+	case focusWebsites:
+		return focusSubscriptions
+	case focusDetail:
 		return focusWebsites
+	case focusLogs:
+		return focusDetail
+	case focusOutput:
+		return focusLogs
 	default:
 		return current
 	}

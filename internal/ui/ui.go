@@ -87,6 +87,19 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.output = m.output.append("subscription " + msg.name + " status=" + msg.status)
 		m, command := m.startSubscriptions()
 		return m, command
+	case subscriptionDeletedMsg:
+		m.progress.active = false
+		if msg.err != nil {
+			m.status = "subscription deletion failed: " + msg.err.Error()
+			m.output = m.output.append(m.status)
+			return m, nil
+		}
+		m = m.clearSelectionDetails()
+		m.workspace, m.focus = false, focusSubscriptions
+		m.status = "subscription " + msg.name + " deleted; refreshing…"
+		m.output = m.output.append("subscription " + msg.name + " deleted")
+		m, command := m.startSubscriptions()
+		return m, command
 	case healthLoadedMsg:
 		if m.healthLoad.stale(msg.generation) {
 			return m, nil

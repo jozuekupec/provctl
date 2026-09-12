@@ -60,6 +60,8 @@ func helpRows() []string {
 		"r\trefresh subscriptions",
 		"/\tfilter subscriptions or domains",
 		"s\tsuspend or resume selected subscription",
+		"a\tarchive selected subscription",
+		"d\tpermanently delete selected archived subscription",
 		"",
 		"Domains",
 		"e\tenable or disable selected domain",
