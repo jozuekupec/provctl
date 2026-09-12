@@ -3,8 +3,6 @@ package ui
 import (
 	"fmt"
 	"strings"
-
-	"github.com/charmbracelet/lipgloss"
 )
 
 func (m appModel) View() string {
@@ -14,26 +12,60 @@ func (m appModel) View() string {
 	if m.width < minWidth || m.height < minHeight {
 		return fmt.Sprintf("provctl needs a terminal of at least %d×%d; current size is %d×%d", minWidth, minHeight, m.width, m.height)
 	}
+	if !m.workspace {
+		return m.renderPicker()
+	}
+	return m.renderWorkspace()
+}
+
+func (m appModel) renderPicker() string {
+	body := panel("Subscriptions", m.renderSubscriptions(m.height-4), m.width, m.height-2, true)
+	return m.renderFrame(body)
+}
+
+func (m appModel) renderWorkspace() string {
 	layout := computeLayout(m.width, m.height)
-	left := lipgloss.JoinVertical(lipgloss.Left,
-		panel("Subscriptions", m.renderSubscriptions(layout.subscriptions-3), layout.leftWidth, layout.subscriptions, m.focus == focusSubscriptions),
-		panel("Websites", m.renderWebsites(layout.websites-3), layout.leftWidth, layout.websites, m.focus == focusWebsites),
-	)
-	output := m.outputLines(layout.output - 3)
+	left := strings.Join([]string{
+		panel("Subscription", m.subscriptionMetadata(), layout.leftWidth, layout.metadata, m.focus == focusSubscriptions),
+		panel("Domains", m.renderWebsites(layout.domains-2), layout.leftWidth, layout.domains, m.focus == focusWebsites),
+	}, "\n")
+	output := m.outputLines(layout.output - 2)
 	if m.progress.active {
 		output = m.progress.render()
 	}
-	right := lipgloss.JoinVertical(lipgloss.Left,
-		panel("Detail", m.detailLines(layout.detail-3), layout.rightWidth, layout.detail, m.focus == focusDetail),
+	right := strings.Join([]string{
+		panel("Detail", m.detailLines(layout.detail-2), layout.rightWidth, layout.detail, m.focus == focusDetail),
+		panel("Logs", m.logsLines(layout.logs-2), layout.rightWidth, layout.logs, m.focus == focusLogs),
 		panel("Output", output, layout.rightWidth, layout.output, m.focus == focusOutput),
-	)
-	body := lipgloss.JoinHorizontal(lipgloss.Top, left, right)
+	}, "\n")
+	body := joinColumns(left, right)
+	return m.renderFrame(body)
+}
+
+func (m appModel) renderFrame(body string) string {
 	status := dimStyle.Render(truncate(m.status, m.width))
 	keybar := keybarStyle.Render(truncate(m.keybar(), m.width))
 	if m.confirm.action != "" {
 		keybar = confirmStyle.Render(truncate(m.confirmationText(), m.width))
 	}
-	return lipgloss.JoinVertical(lipgloss.Left, body, status, keybar)
+	return strings.Join([]string{body, fit(status, m.width), fit(keybar, m.width)}, "\n")
+}
+
+func joinColumns(left, right string) string {
+	leftRows, rightRows := strings.Split(left, "\n"), strings.Split(right, "\n")
+	rows := max(len(leftRows), len(rightRows))
+	result := make([]string, rows)
+	for index := range rows {
+		var a, b string
+		if index < len(leftRows) {
+			a = leftRows[index]
+		}
+		if index < len(rightRows) {
+			b = rightRows[index]
+		}
+		result[index] = a + b
+	}
+	return strings.Join(result, "\n")
 }
 
 func (m appModel) renderSubscriptions(rows int) string {
@@ -77,6 +109,18 @@ func (m appModel) renderWebsites(rows int) string {
 	return strings.Join(lines, "\n")
 }
 
+func (m appModel) subscriptionMetadata() string {
+	if len(m.items) == 0 {
+		return "No subscription selected."
+	}
+	s := m.items[clamp(m.cursor, len(m.items))]
+	return strings.Join([]string{
+		"Name: " + s.Name, "Status: " + s.Status, "User: " + s.UnixUser,
+		"Home: " + valueOrDash(s.Home), "PHP-FPM: " + valueOrDash(s.PHPVersion),
+		"SSH: " + valueOrDash(s.SSHAccess),
+	}, "\n")
+}
+
 func (m appModel) detailLines(rows int) string {
 	return window(m.detail(), rows, m.detailScroll, false)
 }
@@ -86,6 +130,13 @@ func (m appModel) outputLines(rows int) string {
 		return "No output yet."
 	}
 	return window(strings.Join(m.output.lines, "\n"), rows, m.outputScroll, true)
+}
+
+func (m appModel) logsLines(rows int) string {
+	if len(m.logs.lines) == 0 {
+		return "Press l for access or L for error log."
+	}
+	return window(strings.Join(m.logs.lines, "\n"), rows, m.outputScroll, true)
 }
 
 func window(contents string, rows, scroll int, fromBottom bool) string {
@@ -111,14 +162,19 @@ func (m appModel) confirmationText() string {
 }
 
 func (m appModel) keybar() string {
+	if !m.workspace {
+		return "↑/↓ select • enter open • / filter • n new • e edit • s suspend/resume • a archive • d delete • ? help • q quit"
+	}
 	switch m.focus {
 	case focusSubscriptions:
-		return "↑/↓ select • enter websites • s suspend/resume • h health • b databases • r refresh • q quit"
+		return "← domains • ↑/↓ scroll • e edit • s suspend/resume • esc subscriptions • ? help"
 	case focusWebsites:
-		return "↑/↓ select • e enable/disable • l access log • L error log • d detail • esc back • q quit"
+		return "←/→ panels • ↑/↓ select • e enable/disable • l access • L error • esc subscriptions • ? help"
 	case focusDetail:
-		return "↑/↓ scroll • tab next panel • b databases • esc subscriptions • q quit"
+		return "← domains • ↑/↓ scroll • b databases • esc subscriptions • ? help"
+	case focusLogs:
+		return "← domains • ↑/↓ scroll • l access • L error • esc subscriptions • ? help"
 	default:
-		return "↑/↓ scroll • tab next panel • o output • esc subscriptions • q quit"
+		return "← domains • ↑/↓ scroll • h health • esc subscriptions • ? help"
 	}
 }

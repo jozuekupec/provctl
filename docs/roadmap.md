@@ -273,6 +273,15 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   picker, workspace jedné subscription, přesný layout, šipková navigace,
   modální formuláře a ANSI-safe confirm overlay. Následující text popisuje
   dosavadní implementovaný základ, který redesign nahradí nebo znovu použije.
+  **Redesign block 1 is complete:** startup now renders an exact full-screen
+  subscription picker; `Enter` opens a subscription workspace with metadata
+  and domains on the left and Detail, Logs, and Output on the right. The panel
+  renderer owns its outer dimensions instead of relying on Lipgloss height
+  composition, preventing the observed clipped top row. Workspace geometry is
+  covered at 101x28, including exact width for every row and exact terminal
+  height; the minimum terminal is now 80x24. `make test` passed after this
+  change. Filtering, help, modal confirmation, forms, and new mutations remain
+  in the next redesign blocks.
   Původní návrh je zaznamenán v [tui-design.md](tui-design.md) a
   cíleně přebírá konzistentní Bubble Tea vzor z projektu `depo`: hodnotový
   model, `Deps`, samostatné routing/render/keys/theme a I/O jen přes `tea.Cmd`.

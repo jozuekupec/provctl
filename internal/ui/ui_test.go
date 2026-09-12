@@ -57,7 +57,7 @@ func TestModel_SwitchingSubscriptionClearsDependentData(t *testing.T) {
 	m.items = []domain.Subscription{{ID: 1, Name: "acme"}, {ID: 2, Name: "beta"}}
 	m.websites = []domain.Website{{PrimaryDomain: "acme.test"}}
 	m.databases = []domain.Database{{Name: "acme_main"}}
-	m.showWebsites, m.focus = true, focusSubscriptions
+	m.workspace, m.showWebsites, m.focus = true, true, focusSubscriptions
 	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyDown})
 	m = updated.(appModel)
 	if m.cursor != 1 || m.showWebsites || len(m.websites) != 0 || len(m.databases) != 0 {
@@ -97,15 +97,27 @@ func TestModel_ViewUsesMinimumSizeGuard(t *testing.T) {
 	}
 }
 
-func TestModel_ViewRendersFourPanels(t *testing.T) {
+func TestModel_PickerRendersFullScreenSubscriptionList(t *testing.T) {
 	m := New(Deps{})
 	m.ready, m.width, m.height = true, 100, 28
 	m.items = []domain.Subscription{{Name: "acme", Status: "active", PHPVersion: "8.4"}}
 	view := m.View()
-	for _, panel := range []string{"Subscriptions", "Websites", "Detail", "Output"} {
-		if !strings.Contains(view, panel) {
-			t.Errorf("View() is missing %q:\n%s", panel, view)
+	if !strings.Contains(view, "Subscriptions") || strings.Contains(view, "Domains") {
+		t.Errorf("picker view =\n%s", view)
+	}
+}
+
+func TestModel_WorkspaceUsesExactTerminalFrame(t *testing.T) {
+	m := New(Deps{})
+	m.ready, m.width, m.height, m.workspace = true, 101, 28, true
+	m.items = []domain.Subscription{{Name: "acme", Status: "active", PHPVersion: "8.4"}}
+	for index, line := range strings.Split(m.View(), "\n") {
+		if got := lipgloss.Width(line); got != m.width {
+			t.Fatalf("line %d width = %d, want %d: %q", index, got, m.width, line)
 		}
+	}
+	if got := len(strings.Split(m.View(), "\n")); got != m.height {
+		t.Fatalf("line count = %d, want %d", got, m.height)
 	}
 }
 
@@ -140,7 +152,7 @@ func TestModel_ConfirmWebsiteToggleCallsDependency(t *testing.T) {
 		return 1, nil
 	}})
 	m.items = []domain.Subscription{{ID: 1, Name: "acme"}}
-	m.websites, m.showWebsites = []domain.Website{{PrimaryDomain: "example.test", Enabled: true}}, true
+	m.workspace, m.websites, m.showWebsites = true, []domain.Website{{PrimaryDomain: "example.test", Enabled: true}}, true
 	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("e")})
 	m = updated.(appModel)
 	if m.confirm.action == "" {
@@ -163,6 +175,7 @@ func TestModel_ConfirmSubscriptionSuspendCallsDependency(t *testing.T) {
 		return 1, nil
 	}})
 	m.items = []domain.Subscription{{ID: 1, Name: "acme", Status: "active"}}
+	m.workspace = true
 	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("s")})
 	m = updated.(appModel)
 	if m.confirm.action != "suspended" {
@@ -178,6 +191,7 @@ func TestModel_ConfirmSubscriptionSuspendCallsDependency(t *testing.T) {
 func TestModel_ConfirmationCannotStartDuplicateMutation(t *testing.T) {
 	m := New(Deps{SetSubscriptionStatus: func(context.Context, string, string) (int64, error) { return 1, nil }})
 	m.items = []domain.Subscription{{Name: "acme", Status: "active"}}
+	m.workspace = true
 	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("s")})
 	m = updated.(appModel)
 	updated, command := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("y")})
@@ -215,6 +229,7 @@ func TestModel_HealthWritesChecksToOutput(t *testing.T) {
 		return []service.Check{{Name: "Apache", Status: service.CheckOK, Detail: "active"}}, nil
 	}})
 	m.items = []domain.Subscription{{Name: "acme"}}
+	m.workspace = true
 	updated, command := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("h")})
 	updated, _ = updated.(appModel).Update(command())
 	m = updated.(appModel)
@@ -231,6 +246,7 @@ func TestModel_LoadDatabasesShowsDetail(t *testing.T) {
 		return []domain.Database{{Name: "acme_main"}}, nil
 	}})
 	m.items = []domain.Subscription{{Name: "acme"}}
+	m.workspace = true
 	updated, command := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("b")})
 	updated, _ = updated.(appModel).Update(command())
 	m = updated.(appModel)
@@ -247,11 +263,11 @@ func TestModel_LoadWebsiteLogsWritesOutput(t *testing.T) {
 		return "first\nsecond\n", nil
 	}})
 	m.items = []domain.Subscription{{Name: "acme"}}
-	m.websites, m.showWebsites = []domain.Website{{PrimaryDomain: "example.test"}}, true
+	m.workspace, m.websites, m.showWebsites = true, []domain.Website{{PrimaryDomain: "example.test"}}, true
 	updated, command := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("l")})
 	updated, _ = updated.(appModel).Update(command())
 	m = updated.(appModel)
-	if m.focus != focusOutput || strings.Join(m.output.lines, "\n") != "website log loaded\nfirst\nsecond" {
-		t.Errorf("output = %#v", m.output)
+	if m.focus != focusLogs || strings.Join(m.logs.lines, "\n") != "first\nsecond" {
+		t.Errorf("logs = %#v", m.logs)
 	}
 }

@@ -61,6 +61,7 @@ const (
 	focusSubscriptions focus = iota
 	focusWebsites
 	focusDetail
+	focusLogs
 	focusOutput
 )
 
@@ -90,8 +91,10 @@ type appModel struct {
 	databases     []domain.Database
 	websiteCursor int
 	showWebsites  bool
+	workspace     bool
 	focus         focus
 	output        outputState
+	logs          outputState
 	status        string
 	confirm       confirmState
 	progress      progressState

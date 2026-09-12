@@ -22,5 +22,5 @@ var (
 
 const (
 	minWidth  = 80
-	minHeight = 20
+	minHeight = 24
 )

@@ -110,11 +110,12 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.output = m.output.append(m.status)
 			return m, nil
 		}
-		m.focus, m.status = focusOutput, "website log loaded"
+		m.focus, m.status = focusLogs, "website log loaded"
 		m.output = m.output.append("website log loaded")
+		m.logs = outputState{}
 		for _, line := range strings.Split(strings.TrimSuffix(msg.contents, "\n"), "\n") {
 			if line != "" {
-				m.output = m.output.append(line)
+				m.logs = m.logs.append(line)
 			}
 		}
 	}

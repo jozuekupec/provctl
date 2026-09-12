@@ -5,6 +5,9 @@ import tea "github.com/charmbracelet/bubbletea"
 // handleKey routes a key by the current interaction mode. Keeping this apart
 // from Update makes the value-model message router easy to audit and test.
 func (m appModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if !m.workspace {
+		return m.handlePickerKey(msg)
+	}
 	if m.progress.active {
 		switch msg.String() {
 		case "esc":
@@ -125,11 +128,53 @@ func (m appModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				m.status = "confirm with y; esc cancels"
 			}
 		}
-	case "tab":
-		m.focus = (m.focus + 1) % 4
+	case "right", "tab":
+		m.focus = focusRight(m.focus)
+	case "left", "shift+tab":
+		m.focus = focusLeft(m.focus)
 	case "esc":
-		m = m.clearSelectionDetails()
-		m.focus = focusSubscriptions
+		m.workspace, m.focus, m.status = false, focusSubscriptions, "subscription picker"
 	}
 	return m, nil
+}
+
+func (m appModel) handlePickerKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "q", "ctrl+c":
+		return m, tea.Quit
+	case "j", "down":
+		m.cursor = clamp(m.cursor+1, len(m.items))
+	case "k", "up":
+		m.cursor = clamp(m.cursor-1, len(m.items))
+	case "r":
+		m.status = "loading subscriptions…"
+		m, command := m.startSubscriptions()
+		return m, command
+	case "enter":
+		if len(m.items) == 0 {
+			return m, nil
+		}
+		m.workspace, m.showWebsites, m.focus, m.status = true, true, focusWebsites, "loading domains…"
+		m, command := m.startWebsites()
+		return m, command
+	}
+	return m, nil
+}
+
+func focusRight(current focus) focus {
+	switch current {
+	case focusSubscriptions, focusWebsites:
+		return focusDetail
+	default:
+		return current
+	}
+}
+
+func focusLeft(current focus) focus {
+	switch current {
+	case focusDetail, focusLogs, focusOutput:
+		return focusWebsites
+	default:
+		return current
+	}
 }
