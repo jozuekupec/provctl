@@ -75,6 +75,7 @@ func helpSections() []helpSection {
 			"a / A     add or remove a domain alias",
 			"e         enable or disable selected domain",
 			"E         edit selected domain document root",
+			"T         edit selected proxy or redirect target",
 			"t         enable or disable TLS for selected domain",
 			"l / L     load access or error log",
 			"b         load subscription databases",
