@@ -648,8 +648,10 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   explicitním `ssl.server` proto nyní používá skutečný `--force-renewal
   --no-random-sleep-on-renew`; produkční konfigurace bez override zůstává na
   bezpečném `--dry-run`. Regresní test pokrývá oba argumentové kontrakty a
-  T17 cookbook je upravený pro Pebble. Reálný Pebble průchod zůstává oddělený
-  follow-up, aby se neměnil ruční TUI snapshot `pv`.
+  T17 cookbook je upravený pro Pebble. Stejná revize synchronizovala seznam
+  skutečně implementovaných testovacích skriptů a rozsah `run-all.sh` v
+  cookbooku. Reálný Pebble průchod zůstává oddělený follow-up, aby se neměnil
+  ruční TUI snapshot `pv`.
   První integrační běh v `pv` odhalil rozpor: Debian balíček instaloval
   `/etc/logrotate.d/provctl`, ale bootstrap očekával jiný obsah a odmítal jej.
   Bootstrap nyní používá totožný balíčkový obsah; jeho no-op a změnové testy

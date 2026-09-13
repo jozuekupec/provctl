@@ -854,17 +854,11 @@ scripts/
 ├── build-apt-repo.sh       # volá reprepro, používá CI i lokál
 ├── e2.sh                   # helper nad incus
 └── tests/
-    ├── run-all.sh          # spustí implementované T04/T05/T06/T10/T17, nenulový kód při selhání
+    ├── run-all.sh          # spustí implementované T04/T05/[T06]/T10/T17, nenulový kód při selhání
     ├── t04-package.sh
     ├── t05-piuparts.sh
     ├── t06-piuparts-upgrade.sh
-    ├── t07-doctor.sh
-    ├── t08-bootstrap.sh
-    ├── t09-lifecycle.sh
     ├── t10-isolation.sh    # POVINNÝ po každé změně práv nebo šablon
-    ├── t11-rollback.sh
-    ├── t12-reconcile.sh
-    ├── t15-backup.sh
     ├── t16-ssl.sh
     └── t17-adopt.sh
 ```
@@ -876,7 +870,7 @@ scripts/
   dist/provctl_0.9.0_amd64.deb
 ```
 
-Spouští T04, T05, volitelné T06 a T10 v tomto pořadí. Při prvním selhání
+Spouští T04, T05, volitelné T06, T10 a T17 v tomto pořadí. Při prvním selhání
 vypíše `FAIL: Tnn (exit N)` a předá návratový kód dané etapy; `PASS` na konci
 proto znamená úspěch celého implementovaného rozsahu, nikoli jen posledního
 skriptu.
