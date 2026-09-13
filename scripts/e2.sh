@@ -2,8 +2,11 @@
 # Run a deliberately scoped command in the disposable Incus E2 container.
 set -eu
 
-instance=pv
-snapshot=clean
+# The defaults preserve the documented disposable test environment. Callers
+# may opt into an isolated clone, which prevents a long-running scenario from
+# replacing an interactive pv session.
+instance=${PROVCTL_E2_INSTANCE:-pv}
+snapshot=${PROVCTL_E2_SNAPSHOT:-clean}
 
 usage() {
 	cat <<'EOF'

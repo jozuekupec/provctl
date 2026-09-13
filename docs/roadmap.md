@@ -527,7 +527,11 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   M8 zůstává otevřený pouze pro průběžnou ruční interaktivní kontrolu a
   samostatně navržené destruktivní workflow (například restore backupu);
   databáze, cron a backup history jsou záměrně read-only, dokud pro jejich
-  mutace nevznikne stejně bezpečný modalní návrh.
+  mutace nevznikne stejně bezpečný modalní návrh. Reálná TUI reprodukce
+  2026-09-13 opravila file browser: `ansi.TruncateLeft` přijímá počet
+  odstraněných buněk, nikoli cílovou šířku, a proto skrýval krátké cesty i
+  názvy. Prohlížeč nyní správně zobrazuje adresář i položky; regresní test a
+  nově nasazený balíček v `pv` to ověřují.
 - [x] **M9 — distribuce:** je přidána deklarace `packaging/nfpm.yaml` pro
   jediný `provctl` `.deb`, config je `noreplace`, šablony jsou běžný obsah a
   balíček deklaruje pouze potřebné Debian závislosti. `scripts/build-deb.sh`

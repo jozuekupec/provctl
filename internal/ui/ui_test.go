@@ -173,6 +173,25 @@ func TestModel_PathPickerPopupFitsTerminal(t *testing.T) {
 	}
 }
 
+func TestModel_PathPickerPopup_ShowsShortDirectoryEntries(t *testing.T) {
+	m := New(Deps{})
+	m.ready, m.width, m.height = true, 100, 28
+	m.pathPicker = pathPickerState{
+		open: true,
+		dir:  "/var/www/vhosts",
+		entries: []pathEntry{
+			{Entry: fsbrowse.Entry{Name: "..", Dir: true}, parent: true},
+			{Entry: fsbrowse.Entry{Name: "demo", Dir: true}},
+		},
+	}
+	view := m.pathPickerPopup()
+	for _, want := range []string{"/var/www/vhosts", "..", "demo/"} {
+		if !strings.Contains(view, want) {
+			t.Errorf("path picker does not show %q:\n%s", want, view)
+		}
+	}
+}
+
 func TestModel_DocumentRootFormConfirmsAndUpdatesSelectedDomain(t *testing.T) {
 	var gotSubscription, gotDomain, gotRoot string
 	m := New(Deps{

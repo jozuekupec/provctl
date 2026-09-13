@@ -23,6 +23,7 @@ test -d "$pebble_source/test/certs/localhost" || { echo "Pebble localhost test c
 
 root=$(CDPATH= cd "$(dirname "$0")/../.." && pwd)
 e2="$root/scripts/e2.sh"
+instance=${PROVCTL_E2_INSTANCE:-pv}
 package_name=$(basename "$package")
 workdir=$(mktemp -d /tmp/provctl-pebble.XXXXXX)
 pebble_bin="$workdir/pebble"
@@ -45,10 +46,10 @@ go -C "$pebble_source" build -o "$pebble_bin" ./cmd/pebble
 "$e2" reset
 "$e2" push "$package"
 run 'install -d -m 0755 /root/pebble/test/certs'
-incus file push --quiet "$pebble_bin" pv/root/pebble/pebble
-incus file push --quiet "$root/scripts/testdata/pebble-config.json" pv/root/pebble/pebble-config.json
-incus file push --quiet "$pebble_source/test/certs/pebble.minica.pem" pv/root/pebble/pebble.minica.pem
-incus file push --quiet -r "$pebble_source/test/certs/localhost" pv/root/pebble/test/certs/
+incus file push --quiet "$pebble_bin" "$instance/root/pebble/pebble"
+incus file push --quiet "$root/scripts/testdata/pebble-config.json" "$instance/root/pebble/pebble-config.json"
+incus file push --quiet "$pebble_source/test/certs/pebble.minica.pem" "$instance/root/pebble/pebble.minica.pem"
+incus file push --quiet -r "$pebble_source/test/certs/localhost" "$instance/root/pebble/test/certs/"
 
 run "export DEBIAN_FRONTEND=noninteractive; { apt-get -qq update && apt-get -qq install -y adduser apache2 certbot cron curl openssl php-fpm zstd && dpkg -i /root/$package_name; } >/tmp/provctl-t16-install.log 2>&1 || { cat /tmp/provctl-t16-install.log >&2; exit 1; }"
 run 'provctl bootstrap --install-missing --yes'

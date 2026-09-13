@@ -266,7 +266,7 @@ func (m appModel) handlePathPickerKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 func (m appModel) pathPickerPopup() string {
 	inner := m.popupInnerW(popupLarge)
-	body := []string{dimStyle.Render(ansi.TruncateLeft(m.pathPicker.dir, inner, "…")), ""}
+	body := []string{dimStyle.Render(pathTruncateLeft(m.pathPicker.dir, inner)), ""}
 	switch {
 	case m.pathPicker.loading:
 		body = append(body, "Reading directory…")
@@ -284,7 +284,7 @@ func (m appModel) pathPickerPopup() string {
 			if index == m.pathPicker.cursor {
 				marker = "▸ "
 			}
-			lines[index] = marker + ansi.TruncateLeft(name, inner-2, "…")
+			lines[index] = marker + pathTruncateLeft(name, inner-2)
 		}
 		if len(lines) == 0 {
 			lines = []string{"Nothing here."}
@@ -293,6 +293,22 @@ func (m appModel) pathPickerPopup() string {
 	}
 	footer := m.pathPickerFooter()
 	return popupBox(m, popupOpts{Size: popupLarge, Fit: fitFixed, Title: "Choose path", Body: body, Footer: []string{footer}})
+}
+
+// pathTruncateLeft keeps the useful end of a path or file name while treating
+// its argument as a maximum display width. ansi.TruncateLeft instead accepts
+// a number of cells to remove, which would erase ordinary short names here.
+func pathTruncateLeft(value string, width int) string {
+	if width <= 0 {
+		return ""
+	}
+	if ansi.StringWidth(value) <= width {
+		return value
+	}
+	if width == 1 {
+		return ansi.Truncate(value, width, "")
+	}
+	return ansi.TruncateLeft(value, ansi.StringWidth(value)-width+1, "…")
 }
 
 func (m appModel) pathPickerFooter() string {
