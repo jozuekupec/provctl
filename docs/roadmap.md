@@ -344,9 +344,8 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   the per-domain FPM check as OK; its existing HTTP 403/DNS warning for the
   fixture is unrelated to the PHP transition. Model tests cover discovery,
   selection, confirmation and the no-op guard; focused renderer, service,
-  SQLite, TUI and CLI tests passed. The standard `make test` reached `vet` and
-  `staticcheck`; its race phase exceeds the current command-runner reporting
-  window and must be rerun in a normal terminal before release.
+  SQLite, TUI and CLI tests passed; later complete `make test` runs also
+  verified the race phase before release.
   **Redesign block 8 in progress:** subscription-level metadata and list rows
   no longer present PHP-FPM as a subscription property; it is shown only on a
   selected domain. The PHP version picker marks and initially selects the
@@ -525,6 +524,10 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   `staging` a PHP-FPM/static demo weby. Spouští se přes `incus exec` v reálném
   terminálu; po kontrole lze stav bezpečně obnovit ze snapshotu `clean` nebo
   znovu otevřít `tui-ready`.
+  M8 zůstává otevřený pouze pro průběžnou ruční interaktivní kontrolu a
+  samostatně navržené destruktivní workflow (například restore backupu);
+  databáze, cron a backup history jsou záměrně read-only, dokud pro jejich
+  mutace nevznikne stejně bezpečný modalní návrh.
 - [x] **M9 — distribuce:** je přidána deklarace `packaging/nfpm.yaml` pro
   jediný `provctl` `.deb`, config je `noreplace`, šablony jsou běžný obsah a
   balíček deklaruje pouze potřebné Debian závislosti. `scripts/build-deb.sh`
