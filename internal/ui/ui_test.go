@@ -944,6 +944,23 @@ func TestModel_LoadSSHKeysShowsSSHKeyDetail(t *testing.T) {
 	}
 }
 
+func TestModel_LoadCronJobsShowsCronDetail(t *testing.T) {
+	m := New(Deps{LoadCronJobs: func(_ context.Context, subscription string) ([]domain.CronJob, error) {
+		if subscription != "acme" {
+			t.Fatalf("LoadCronJobs subscription = %q", subscription)
+		}
+		return []domain.CronJob{{ID: 7, Schedule: "@daily", Command: "/usr/local/bin/backup", Comment: "backup"}}, nil
+	}})
+	m.workspace = true
+	m.items = []domain.Subscription{{ID: 1, Name: "acme", Status: "active"}}
+	updated, command := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("c")})
+	updated, _ = updated.(appModel).Update(command())
+	m = updated.(appModel)
+	if m.detailView != detailCronJobs || m.focus != focusDetail || !strings.Contains(m.detail(), "@daily") || m.detailTitle() != "Cron jobs" {
+		t.Fatalf("detail view = %v focus = %v detail = %q title = %q", m.detailView, m.focus, m.detail(), m.detailTitle())
+	}
+}
+
 func TestFocusNavigationMovesAcrossWorkspacePanels(t *testing.T) {
 	if got := focusLeft(focusWebsites); got != focusSubscriptions {
 		t.Fatalf("left from domains = %v, want subscriptions", got)

@@ -68,6 +68,21 @@ func (m appModel) detail() string {
 		}
 		return strings.Join(lines, "\n")
 	}
+	if m.detailView == detailCronJobs {
+		if len(m.cronJobs) == 0 {
+			return "No cron jobs."
+		}
+		lines := make([]string, 0, len(m.cronJobs)+1)
+		lines = append(lines, "Subscription: "+subscription.Name)
+		for _, job := range m.cronJobs {
+			line := fmt.Sprintf("#%d · %s · %s", job.ID, job.Schedule, job.Command)
+			if job.Comment != "" {
+				line += " · " + job.Comment
+			}
+			lines = append(lines, line)
+		}
+		return strings.Join(lines, "\n")
+	}
 	return fmt.Sprintf("Subscription: %s\nStatus: %s\nUser: %s\nHome: %s\nWebsites: %d", subscription.Name, subscription.Status, subscription.UnixUser, subscription.Home, len(m.websites))
 }
 
@@ -77,6 +92,9 @@ func (m appModel) detailTitle() string {
 	}
 	if m.detailView == detailSSHKeys {
 		return "SSH keys"
+	}
+	if m.detailView == detailCronJobs {
+		return "Cron jobs"
 	}
 	return "Detail"
 }

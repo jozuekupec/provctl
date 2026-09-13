@@ -83,6 +83,7 @@ func helpSections() []helpSection {
 			"l / L     load access or error log",
 			"b         load subscription databases",
 			"K         load subscription SSH keys",
+			"c         load subscription cron jobs",
 			"h         run health checks",
 		}},
 		{title: "General", rows: []string{

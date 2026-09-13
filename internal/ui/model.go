@@ -18,6 +18,7 @@ type Deps struct {
 	LoadWebsites           func(context.Context, int64) ([]domain.Website, error)
 	LoadDatabases          func(context.Context, string) ([]domain.Database, error)
 	LoadSSHKeys            func(context.Context, string) ([]domain.SSHKey, error)
+	LoadCronJobs           func(context.Context, string) ([]domain.CronJob, error)
 	ReadWebsiteLogs        func(context.Context, string, string, bool, int) (string, error)
 	SetWebsiteEnabled      func(context.Context, string, string, bool) (int64, error)
 	SetWebsiteTLS          func(context.Context, string, string, bool) error
@@ -49,6 +50,11 @@ type databasesLoadedMsg struct {
 }
 type sshKeysLoadedMsg struct {
 	items      []domain.SSHKey
+	err        error
+	generation uint64
+}
+type cronJobsLoadedMsg struct {
+	items      []domain.CronJob
 	err        error
 	generation uint64
 }
@@ -162,6 +168,7 @@ const (
 	detailDomain detailView = iota
 	detailDatabases
 	detailSSHKeys
+	detailCronJobs
 )
 
 type outputState struct{ lines []string }
@@ -276,6 +283,7 @@ type appModel struct {
 	websites               []domain.Website
 	databases              []domain.Database
 	sshKeys                []domain.SSHKey
+	cronJobs               []domain.CronJob
 	websiteCursor          int
 	showWebsites           bool
 	workspace              bool
@@ -303,6 +311,7 @@ type appModel struct {
 	websitesLoad           opSlot
 	databasesLoad          opSlot
 	sshKeysLoad            opSlot
+	cronJobsLoad           opSlot
 	healthLoad             opSlot
 	logsLoad               opSlot
 	phpVersionsLoad        opSlot
@@ -488,6 +497,20 @@ func (m appModel) startSSHKeys() (appModel, tea.Cmd) {
 	return m, func() tea.Msg { return m.loadSSHKeys(ctx, generation) }
 }
 
+func (m appModel) loadCronJobs(ctx context.Context, generation uint64) tea.Msg {
+	subscription, ok := m.selectedSubscription()
+	if m.deps.LoadCronJobs == nil || !ok {
+		return cronJobsLoadedMsg{err: context.Canceled, generation: generation}
+	}
+	items, err := m.deps.LoadCronJobs(ctx, subscription.Name)
+	return cronJobsLoadedMsg{items: items, err: err, generation: generation}
+}
+
+func (m appModel) startCronJobs() (appModel, tea.Cmd) {
+	ctx, generation := m.cronJobsLoad.start()
+	return m, func() tea.Msg { return m.loadCronJobs(ctx, generation) }
+}
+
 func (m appModel) startHealth() (appModel, tea.Cmd) {
 	ctx, generation := m.healthLoad.start()
 	return m, func() tea.Msg { return m.loadHealth(ctx, generation) }
@@ -507,9 +530,10 @@ func (m appModel) clearSelectionDetails() appModel {
 	m.websitesLoad.invalidate()
 	m.databasesLoad.invalidate()
 	m.sshKeysLoad.invalidate()
+	m.cronJobsLoad.invalidate()
 	m.healthLoad.invalidate()
 	m.logsLoad.invalidate()
-	m.websites, m.databases = nil, nil
+	m.websites, m.databases, m.sshKeys, m.cronJobs = nil, nil, nil, nil
 	m.websiteCursor, m.detailScroll, m.outputScroll = 0, 0, 0
 	m.showWebsites = false
 	return m

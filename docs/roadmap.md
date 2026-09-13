@@ -434,6 +434,10 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   service's persisted metadata rather than reading `authorized_keys` directly.
   Its dedicated detail view exposes the public fingerprint and comment, and is
   protected by the same cancellable load slot as the other derived views.
+  Read-only cron inspection follows the same pattern through `c`: the detail
+  view shows each persisted job ID, schedule, command and optional comment.
+  This remains a database-derived view; the TUI does not parse or manipulate a
+  user's generated crontab directly.
   Subscription creation is now also available in the fullscreen picker through
   `n`: the bounded form accepts the derived subscription name and preserves the
   existing safe service defaults for user identity, home and unlimited quotas.
