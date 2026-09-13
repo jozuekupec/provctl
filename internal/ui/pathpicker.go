@@ -62,6 +62,17 @@ func (m appModel) openPathPickerForDocumentRoot() (appModel, tea.Cmd) {
 	return m, m.listPathCmd(m.documentRootForm.input.Value(), m.pathPicker.generation)
 }
 
+func (m appModel) openPathPickerForSSHKey() (appModel, tea.Cmd) {
+	input := newFilter().input
+	input.Prompt = ""
+	input.SetValue(m.sshKeyForm.input.Value())
+	m.pathPicker = pathPickerState{
+		open: true, target: pathPickerSSHKey, mode: fsbrowse.All, loading: true,
+		generation: m.pathPicker.generation + 1, filter: newFilter(), pathInput: input,
+	}
+	return m, m.listPathCmd(m.sshKeyForm.input.Value(), m.pathPicker.generation)
+}
+
 func (m appModel) listPathCmd(path string, generation uint64) tea.Cmd {
 	return func() tea.Msg {
 		if m.deps.BrowsePath == nil {
@@ -137,12 +148,18 @@ func (m appModel) acceptPath(path string) appModel {
 	switch m.pathPicker.target {
 	case pathPickerDocumentRoot:
 		m.documentRootForm.input.SetValue(absolute)
+	case pathPickerSSHKey:
+		m.sshKeyForm.input.SetValue(absolute)
 	default:
 		m.settings.values[m.pathPicker.field] = absolute
 	}
 	m.pathPicker = pathPickerState{}
 	if m.documentRootForm.open {
 		m.documentRootForm.input.Focus()
+		return m
+	}
+	if m.sshKeyForm.open {
+		m.sshKeyForm.input.Focus()
 		return m
 	}
 	return m.focusSettingInput()

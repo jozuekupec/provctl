@@ -30,6 +30,9 @@ func (m appModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if m.sshAccessForm.open {
 		return m.handleSSHAccessFormKey(msg)
 	}
+	if m.sshKeyForm.open {
+		return m.handleSSHKeyFormKey(msg)
+	}
 	if m.secret.open {
 		return m.handleSecretKey(msg)
 	}
@@ -140,6 +143,10 @@ func (m appModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "u":
 		if m.focus == focusSubscriptions {
 			m = m.openSSHAccessForm()
+		}
+	case "+":
+		if m.detailView == detailSSHKeys {
+			m = m.openSSHKeyForm()
 		}
 	case "p":
 		if m.focus == focusWebsites {

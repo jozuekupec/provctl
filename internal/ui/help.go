@@ -84,6 +84,7 @@ func helpSections() []helpSection {
 			"l / L     load access or error log",
 			"b         load subscription databases",
 			"K         load subscription SSH keys",
+			"+         add a public SSH key from a file (SSH keys detail)",
 			"c         load subscription cron jobs",
 			"V         load subscription backups",
 			"h         run health checks",

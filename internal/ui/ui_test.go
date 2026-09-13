@@ -1024,6 +1024,62 @@ func TestModel_SSHAccessShowsPasswordOnlyInSecretPopup(t *testing.T) {
 	}
 }
 
+func TestModel_PathPickerSetsSSHKeyFile(t *testing.T) {
+	root := t.TempDir()
+	key := filepath.Join(root, "operator.pub")
+	if err := os.WriteFile(key, []byte("ssh-ed25519 AAAA example\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	m := New(Deps{BrowsePath: func(_ context.Context, path string, mode fsbrowse.Mode) (string, []fsbrowse.Entry, error) {
+		return fsbrowse.Browse(path, mode)
+	}})
+	m.sshKeyForm = sshKeyFormState{open: true, input: newFilter().input}
+	m.sshKeyForm.input.SetValue(root)
+	updated, command := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	updated, _ = updated.(appModel).Update(command())
+	m = updated.(appModel)
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown}) // skip synthetic parent
+	m = updated.(appModel)
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(" ")})
+	m = updated.(appModel)
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = updated.(appModel)
+	if m.pathPicker.open || m.sshKeyForm.input.Value() != key {
+		t.Fatalf("picker/form = %#v / %q", m.pathPicker, m.sshKeyForm.input.Value())
+	}
+}
+
+func TestModel_AddSSHKeyUsesServiceAndRefreshesKeys(t *testing.T) {
+	var path string
+	m := New(Deps{
+		AddSSHKeyFromFile: func(_ context.Context, subscription, file string) (int64, error) {
+			if subscription != "acme" {
+				t.Fatalf("subscription = %q", subscription)
+			}
+			path = file
+			return 1, nil
+		},
+		LoadSSHKeys: func(context.Context, string) ([]domain.SSHKey, error) {
+			return []domain.SSHKey{{Fingerprint: "SHA256:new"}}, nil
+		},
+	})
+	m.workspace, m.focus, m.detailView = true, focusDetail, detailSSHKeys
+	m.items = []domain.Subscription{{ID: 1, Name: "acme"}}
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("+")})
+	m = updated.(appModel)
+	if !m.sshKeyForm.open {
+		t.Fatal("SSH key form did not open")
+	}
+	m.sshKeyForm.input.SetValue("/tmp/operator.pub")
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyCtrlS})
+	m = updated.(appModel)
+	updated, command := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("y")})
+	m = runProgress(t, updated.(appModel), command)
+	if path != "/tmp/operator.pub" || len(m.sshKeys) != 1 || m.sshKeys[0].Fingerprint != "SHA256:new" {
+		t.Fatalf("path=%q ssh keys=%#v", path, m.sshKeys)
+	}
+}
+
 func TestFocusNavigationMovesAcrossWorkspacePanels(t *testing.T) {
 	if got := focusLeft(focusWebsites); got != focusSubscriptions {
 		t.Fatalf("left from domains = %v, want subscriptions", got)

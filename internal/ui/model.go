@@ -21,6 +21,7 @@ type Deps struct {
 	LoadCronJobs           func(context.Context, string) ([]domain.CronJob, error)
 	LoadBackups            func(context.Context, string) ([]domain.Backup, error)
 	SetSSHAccess           func(context.Context, string, string) (string, int64, error)
+	AddSSHKeyFromFile      func(context.Context, string, string) (int64, error)
 	ReadWebsiteLogs        func(context.Context, string, string, bool, int) (string, error)
 	SetWebsiteEnabled      func(context.Context, string, string, bool) (int64, error)
 	SetWebsiteTLS          func(context.Context, string, string, bool) error
@@ -70,6 +71,11 @@ type sshAccessChangedMsg struct {
 	access   string
 	password string
 	items    []domain.Subscription
+}
+type sshKeyAddedMsg struct {
+	err   error
+	path  string
+	items []domain.SSHKey
 }
 
 type subscriptionsLoadedMsg struct {
@@ -256,6 +262,11 @@ type sshAccessFormState struct {
 	index int
 }
 
+type sshKeyFormState struct {
+	open  bool
+	input textinput.Model
+}
+
 type secretState struct {
 	open   bool
 	title  string
@@ -267,6 +278,7 @@ type pathPickerTarget uint8
 const (
 	pathPickerSettings pathPickerTarget = iota
 	pathPickerDocumentRoot
+	pathPickerSSHKey
 )
 
 // pathPickerState belongs to the picker, keeping its filter and asynchronous
@@ -327,6 +339,7 @@ type appModel struct {
 	targetForm             targetFormState
 	subscriptionCreateForm subscriptionCreateFormState
 	sshAccessForm          sshAccessFormState
+	sshKeyForm             sshKeyFormState
 	secret                 secretState
 	pathPicker             pathPickerState
 	status                 string

@@ -46,6 +46,9 @@ func (m appModel) View() string {
 	if m.sshAccessForm.open {
 		return m.overlayCenter(m.sshAccessFormPopup(), view)
 	}
+	if m.sshKeyForm.open {
+		return m.overlayCenter(m.sshKeyFormPopup(), view)
+	}
 	if m.secret.open {
 		return m.overlayCenter(m.secretPopup(), view)
 	}
@@ -246,7 +249,7 @@ func (m appModel) keybar() string {
 	case focusWebsites:
 		return "←/→ panels · ↑/↓ select · n create · D delete · a/A aliases · p PHP · e toggle · E root · T target · t TLS · l/L logs · , settings · esc subscriptions"
 	case focusDetail:
-		return "←/→ panels · ↑/↓ scroll · b databases · K SSH keys · c cron · V backups · esc subscriptions · ? help"
+		return "←/→ panels · ↑/↓ scroll · b databases · K SSH keys · + add key · c cron · V backups · esc subscriptions · ? help"
 	case focusLogs:
 		return "←/→ panels · ↑/↓ scroll · l/L logs · esc subscriptions · ? help"
 	default:

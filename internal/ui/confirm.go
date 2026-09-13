@@ -76,6 +76,8 @@ func (m appModel) runConfirmed() (tea.Model, tea.Cmd) {
 		return m, m.reconcileCmd(confirm)
 	case "set-ssh-access":
 		return m, m.changeSSHAccessCmd(confirm)
+	case "add-ssh-key":
+		return m, m.addSSHKeyCmd(confirm)
 	default:
 		return m, m.changeWebsiteCmd(confirm)
 	}

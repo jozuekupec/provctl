@@ -145,6 +145,17 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.secret = secretState{open: true, title: "SSH password", secret: msg.password}
 		}
 		return m, nil
+	case sshKeyAddedMsg:
+		m.progress.active = false
+		if msg.err != nil {
+			m.status = "SSH key add failed: " + msg.err.Error()
+			m.output = m.output.append(m.status)
+			return m, nil
+		}
+		m.sshKeys = append([]domain.SSHKey(nil), msg.items...)
+		m.detailView, m.focus, m.status = detailSSHKeys, focusDetail, "SSH key added"
+		m.output = m.output.append("SSH key added from " + msg.path)
+		return m, nil
 	case websiteChangedMsg:
 		m.progress.active = false
 		if msg.err != nil {

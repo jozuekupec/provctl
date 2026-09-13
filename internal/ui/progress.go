@@ -99,6 +99,8 @@ func operationFailed(message tea.Msg) bool {
 		return result.err != nil
 	case sshAccessChangedMsg:
 		return result.err != nil
+	case sshKeyAddedMsg:
+		return result.err != nil
 	case websitePHPChangedMsg:
 		return result.err != nil
 	case websiteDocumentRootChangedMsg:

@@ -452,6 +452,11 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   never append the generated password to Output; a TUI model test verifies
   that non-leakage contract. Key modes retain service validation requiring a
   registered public key.
+  The same shared file explorer now drives `+` in the SSH-key detail: the
+  administrator can type a key-file path or browse it, then the SSH service
+  reads and validates the key through its filesystem seam. The selected path
+  becomes absolute when accepted from the picker; TUI tests cover that handoff
+  and the refresh after the journalled add operation.
   The current manual-test package `0.1.1~dev.16.tui-views` was installed into
   the isolated `pv` Debian 13 container after its version and fixture
   subscriptions (`demo`, `staging`) were verified. Snapshot `tui-views-ssh`
