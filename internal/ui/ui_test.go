@@ -927,6 +927,23 @@ func TestModel_LoadDatabasesShowsDatabaseDetail(t *testing.T) {
 	}
 }
 
+func TestModel_LoadSSHKeysShowsSSHKeyDetail(t *testing.T) {
+	m := New(Deps{LoadSSHKeys: func(_ context.Context, subscription string) ([]domain.SSHKey, error) {
+		if subscription != "acme" {
+			t.Fatalf("LoadSSHKeys subscription = %q", subscription)
+		}
+		return []domain.SSHKey{{Fingerprint: "SHA256:example", Comment: "operator@example.test"}}, nil
+	}})
+	m.workspace = true
+	m.items = []domain.Subscription{{ID: 1, Name: "acme", Status: "active"}}
+	updated, command := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("K")})
+	updated, _ = updated.(appModel).Update(command())
+	m = updated.(appModel)
+	if m.detailView != detailSSHKeys || m.focus != focusDetail || !strings.Contains(m.detail(), "SHA256:example") || m.detailTitle() != "SSH keys" {
+		t.Fatalf("detail view = %v focus = %v detail = %q title = %q", m.detailView, m.focus, m.detail(), m.detailTitle())
+	}
+}
+
 func TestFocusNavigationMovesAcrossWorkspacePanels(t *testing.T) {
 	if got := focusLeft(focusWebsites); got != focusSubscriptions {
 		t.Fatalf("left from domains = %v, want subscriptions", got)

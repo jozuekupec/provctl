@@ -95,6 +95,17 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		m.databases, m.detailView, m.focus, m.status = append([]domain.Database(nil), msg.items...), detailDatabases, focusDetail, "databases loaded"
+	case sshKeysLoadedMsg:
+		if m.sshKeysLoad.stale(msg.generation) {
+			return m, nil
+		}
+		m.sshKeysLoad.finish(msg.generation)
+		if msg.err != nil {
+			m.status = "SSH key load failed: " + msg.err.Error()
+			m.output = m.output.append(m.status)
+			return m, nil
+		}
+		m.sshKeys, m.detailView, m.focus, m.status = append([]domain.SSHKey(nil), msg.items...), detailSSHKeys, focusDetail, "SSH keys loaded"
 	case websiteChangedMsg:
 		m.progress.active = false
 		if msg.err != nil {

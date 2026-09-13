@@ -53,12 +53,30 @@ func (m appModel) detail() string {
 		}
 		return strings.Join(lines, "\n")
 	}
+	if m.detailView == detailSSHKeys {
+		if len(m.sshKeys) == 0 {
+			return "No SSH keys."
+		}
+		lines := make([]string, 0, len(m.sshKeys)+1)
+		lines = append(lines, "Subscription: "+subscription.Name)
+		for _, key := range m.sshKeys {
+			line := key.Fingerprint
+			if key.Comment != "" {
+				line += " · " + key.Comment
+			}
+			lines = append(lines, line)
+		}
+		return strings.Join(lines, "\n")
+	}
 	return fmt.Sprintf("Subscription: %s\nStatus: %s\nUser: %s\nHome: %s\nWebsites: %d", subscription.Name, subscription.Status, subscription.UnixUser, subscription.Home, len(m.websites))
 }
 
 func (m appModel) detailTitle() string {
 	if m.detailView == detailDatabases {
 		return "Databases"
+	}
+	if m.detailView == detailSSHKeys {
+		return "SSH keys"
 	}
 	return "Detail"
 }

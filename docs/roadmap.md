@@ -430,6 +430,10 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   It renders each persisted database's name, user, host and charset; moving to
   another domain restores the domain detail, so stale database output cannot
   be mistaken for that domain's state.
+  Read-only SSH key inspection is now available through `K`, using the SSH
+  service's persisted metadata rather than reading `authorized_keys` directly.
+  Its dedicated detail view exposes the public fingerprint and comment, and is
+  protected by the same cancellable load slot as the other derived views.
   Subscription creation is now also available in the fullscreen picker through
   `n`: the bounded form accepts the derived subscription name and preserves the
   existing safe service defaults for user identity, home and unlimited quotas.

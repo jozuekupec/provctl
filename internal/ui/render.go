@@ -240,10 +240,10 @@ func (m appModel) keybar() string {
 	case focusWebsites:
 		return "←/→ panels · ↑/↓ select · n create · D delete · a/A aliases · p PHP · e toggle · E root · T target · t TLS · l/L logs · , settings · esc subscriptions"
 	case focusDetail:
-		return "←/→ panels · ↑/↓ scroll · b databases · esc subscriptions · ? help"
+		return "←/→ panels · ↑/↓ scroll · b databases · K SSH keys · esc subscriptions · ? help"
 	case focusLogs:
 		return "←/→ panels · ↑/↓ scroll · l/L logs · esc subscriptions · ? help"
 	default:
-		return "←/→ panels · ↑/↓ scroll · h health · R reconcile · esc subscriptions · ? help"
+		return "←/→ panels · ↑/↓ scroll · h health · R reconcile · K SSH keys · esc subscriptions · ? help"
 	}
 }

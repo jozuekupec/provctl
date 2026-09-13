@@ -147,6 +147,10 @@ func (m appModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.status = "loading databases…"
 		m, command := m.startDatabases()
 		return m, command
+	case "K":
+		m.status = "loading SSH keys…"
+		m, command := m.startSSHKeys()
+		return m, command
 	case "l":
 		if m.showWebsites && len(m.websites) > 0 {
 			m.status = "loading access log…"

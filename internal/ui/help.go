@@ -82,6 +82,7 @@ func helpSections() []helpSection {
 			"t         enable or disable TLS for selected domain",
 			"l / L     load access or error log",
 			"b         load subscription databases",
+			"K         load subscription SSH keys",
 			"h         run health checks",
 		}},
 		{title: "General", rows: []string{

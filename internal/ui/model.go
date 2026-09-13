@@ -17,6 +17,7 @@ type Deps struct {
 	LoadSubscriptions      func(context.Context) ([]domain.Subscription, error)
 	LoadWebsites           func(context.Context, int64) ([]domain.Website, error)
 	LoadDatabases          func(context.Context, string) ([]domain.Database, error)
+	LoadSSHKeys            func(context.Context, string) ([]domain.SSHKey, error)
 	ReadWebsiteLogs        func(context.Context, string, string, bool, int) (string, error)
 	SetWebsiteEnabled      func(context.Context, string, string, bool) (int64, error)
 	SetWebsiteTLS          func(context.Context, string, string, bool) error
@@ -43,6 +44,11 @@ type websitesLoadedMsg struct {
 }
 type databasesLoadedMsg struct {
 	items      []domain.Database
+	err        error
+	generation uint64
+}
+type sshKeysLoadedMsg struct {
+	items      []domain.SSHKey
 	err        error
 	generation uint64
 }
@@ -155,6 +161,7 @@ type detailView uint8
 const (
 	detailDomain detailView = iota
 	detailDatabases
+	detailSSHKeys
 )
 
 type outputState struct{ lines []string }
@@ -268,6 +275,7 @@ type appModel struct {
 	cursor                 int
 	websites               []domain.Website
 	databases              []domain.Database
+	sshKeys                []domain.SSHKey
 	websiteCursor          int
 	showWebsites           bool
 	workspace              bool
@@ -294,6 +302,7 @@ type appModel struct {
 	subscriptions          opSlot
 	websitesLoad           opSlot
 	databasesLoad          opSlot
+	sshKeysLoad            opSlot
 	healthLoad             opSlot
 	logsLoad               opSlot
 	phpVersionsLoad        opSlot
@@ -465,6 +474,20 @@ func (m appModel) startDatabases() (appModel, tea.Cmd) {
 	return m, func() tea.Msg { return m.loadDatabases(ctx, generation) }
 }
 
+func (m appModel) loadSSHKeys(ctx context.Context, generation uint64) tea.Msg {
+	subscription, ok := m.selectedSubscription()
+	if m.deps.LoadSSHKeys == nil || !ok {
+		return sshKeysLoadedMsg{err: context.Canceled, generation: generation}
+	}
+	items, err := m.deps.LoadSSHKeys(ctx, subscription.Name)
+	return sshKeysLoadedMsg{items: items, err: err, generation: generation}
+}
+
+func (m appModel) startSSHKeys() (appModel, tea.Cmd) {
+	ctx, generation := m.sshKeysLoad.start()
+	return m, func() tea.Msg { return m.loadSSHKeys(ctx, generation) }
+}
+
 func (m appModel) startHealth() (appModel, tea.Cmd) {
 	ctx, generation := m.healthLoad.start()
 	return m, func() tea.Msg { return m.loadHealth(ctx, generation) }
@@ -483,6 +506,7 @@ func (m appModel) startPHPVersions() (appModel, tea.Cmd) {
 func (m appModel) clearSelectionDetails() appModel {
 	m.websitesLoad.invalidate()
 	m.databasesLoad.invalidate()
+	m.sshKeysLoad.invalidate()
 	m.healthLoad.invalidate()
 	m.logsLoad.invalidate()
 	m.websites, m.databases = nil, nil
