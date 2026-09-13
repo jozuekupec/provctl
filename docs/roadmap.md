@@ -623,6 +623,12 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   `CAP_SYS_ADMIN`; workflow nyní používá pouze pro tento izolovaný chroot
   `docker run --privileged`. Lokální běh i vzdálený CI běh `34653180305`
   (commit `9af00a0`) úspěšně ověřily build, lintian a Debian 13 piuparts.
+  Kontrola po TUI blocích 2026-09-13 potvrzuje zelené běhy `34744196491`
+  (`64521dd`) a `34744244556` (`e912201`): oba dokončily package build,
+  lintian, `go vet`, staticcheck, race-enabled testy i Debian 13 piuparts.
+  Starší běh `34743203661` selhal pouze na třech staticcheck nálezech
+  (nepoužité popup konstanty a nevyužitý výsledek v UI testu); jejich oprava
+  je součástí pozdějších zelených běhů, nejde tedy o aktuální CI blokér.
 - [~] **M10 — migrace:**
   První integrační běh v `pv` odhalil rozpor: Debian balíček instaloval
   `/etc/logrotate.d/provctl`, ale bootstrap očekával jiný obsah a odmítal jej.
