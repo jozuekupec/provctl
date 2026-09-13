@@ -438,6 +438,9 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   the existing one-time secret popup, and refreshes the list. Password rotation
   and deletion remain CLI-only until the detail list gains an explicit selected
   database cursor and a destructive typed-name confirmation.
+  Help is now context-sensitive: opening `?` from a database, SSH-key, cron,
+  or backup detail displays only the shortcuts meaningful to that panel, rather
+  than the prior global list that advertised unavailable actions.
   Read-only SSH key inspection is now available through `K`, using the SSH
   service's persisted metadata rather than reading `authorized_keys` directly.
   Its dedicated detail view exposes the public fingerprint and comment, and is

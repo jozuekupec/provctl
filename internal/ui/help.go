@@ -54,7 +54,29 @@ type helpSection struct {
 	rows  []string
 }
 
-func helpSections() []helpSection {
+func (m appModel) helpSections() []helpSection {
+	navigation := helpSection{title: "Navigation", rows: []string{
+		"↑/↓       select an item or scroll the focused panel",
+		"←/→       move between workspace panels",
+		"esc       return to subscription picker",
+	}}
+	if !m.workspace {
+		return []helpSection{navigation, {title: "Subscriptions", rows: []string{
+			"enter     open selected subscription", "n         create a subscription", "a         archive selected subscription", "d         delete archived subscription", "r / /     refresh or filter", " ,        edit configuration settings",
+		}}, {title: "General", rows: []string{"?         this help", "q         quit"}}}
+	}
+	if m.focus == focusDetail {
+		switch m.detailView {
+		case detailDatabases:
+			return []helpSection{navigation, {title: "Databases", rows: []string{"n         create database", "b         reload database list", "↑/↓       scroll database list"}}, {title: "General", rows: []string{"?         this help", "q         quit"}}}
+		case detailSSHKeys:
+			return []helpSection{navigation, {title: "SSH keys", rows: []string{"+         add public key from a file", "K         reload SSH key list", "↑/↓       scroll key list"}}, {title: "General", rows: []string{"?         this help", "q         quit"}}}
+		case detailCronJobs:
+			return []helpSection{navigation, {title: "Cron jobs", rows: []string{"c         reload generated cron jobs", "↑/↓       scroll cron list"}}, {title: "General", rows: []string{"?         this help", "q         quit"}}}
+		case detailBackups:
+			return []helpSection{navigation, {title: "Backups", rows: []string{"V         reload backup history", "↑/↓       scroll backup list"}}, {title: "General", rows: []string{"?         this help", "q         quit"}}}
+		}
+	}
 	return []helpSection{
 		{title: "Navigation", rows: []string{
 			"↑/↓       select an item or scroll the focused panel",
@@ -83,7 +105,6 @@ func helpSections() []helpSection {
 			"t         enable or disable TLS for selected domain",
 			"l / L     load access or error log",
 			"b         load subscription databases",
-			"n         create database (Databases detail)",
 			"K         load subscription SSH keys",
 			"+         add a public SSH key from a file (SSH keys detail)",
 			"c         load subscription cron jobs",
@@ -101,7 +122,7 @@ func helpSections() []helpSection {
 func (m appModel) filteredHelpRows() []string {
 	needle := strings.ToLower(m.help.filter.query())
 	filtered := make([]string, 0, 24)
-	for _, section := range helpSections() {
+	for _, section := range m.helpSections() {
 		matches := make([]string, 0, len(section.rows))
 		for _, row := range section.rows {
 			if needle == "" || strings.Contains(strings.ToLower(section.title+" "+row), needle) {

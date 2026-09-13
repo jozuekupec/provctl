@@ -734,11 +734,21 @@ func TestModel_AppliedHelpFilterAlsoFitsPopup(t *testing.T) {
 
 func TestModel_HelpFilterDropsUnmatchedSections(t *testing.T) {
 	m := New(Deps{})
+	m.workspace, m.focus = true, focusWebsites
 	m.help = helpState{open: true, filter: newFilter()}
 	m.help.filter.input.SetValue("TLS")
 	rows := strings.Join(m.filteredHelpRows(), "\n")
 	if !strings.Contains(rows, "Domains") || strings.Contains(rows, "Subscriptions") {
 		t.Fatalf("filtered help sections = %q", rows)
+	}
+}
+
+func TestModel_HelpUsesActiveDetailContext(t *testing.T) {
+	m := New(Deps{})
+	m.workspace, m.focus, m.detailView = true, focusDetail, detailDatabases
+	rows := strings.Join(m.filteredHelpRows(), "\n")
+	if !strings.Contains(rows, "create database") || strings.Contains(rows, "add public key") {
+		t.Fatalf("contextual help = %q", rows)
 	}
 }
 
