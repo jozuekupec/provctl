@@ -74,6 +74,8 @@ func (m appModel) runConfirmed() (tea.Model, tea.Cmd) {
 		return m, m.deleteWebsiteCmd(confirm)
 	case "reconcile":
 		return m, m.reconcileCmd(confirm)
+	case "set-ssh-access":
+		return m, m.changeSSHAccessCmd(confirm)
 	default:
 		return m, m.changeWebsiteCmd(confirm)
 	}

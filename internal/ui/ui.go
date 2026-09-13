@@ -128,6 +128,23 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		m.backups, m.detailView, m.focus, m.status = append([]domain.Backup(nil), msg.items...), detailBackups, focusDetail, "backups loaded"
+	case sshAccessChangedMsg:
+		m.progress.active = false
+		if msg.err != nil {
+			m.status = "SSH access change failed: " + msg.err.Error()
+			m.output = m.output.append(m.status)
+			return m, nil
+		}
+		if msg.items != nil {
+			m.items = append([]domain.Subscription(nil), msg.items...)
+			m.cursor = clamp(m.cursor, len(m.visibleSubscriptions()))
+		}
+		m.status = "SSH access updated"
+		m.output = m.output.append("SSH access updated: " + msg.access)
+		if msg.password != "" {
+			m.secret = secretState{open: true, title: "SSH password", secret: msg.password}
+		}
+		return m, nil
 	case websiteChangedMsg:
 		m.progress.active = false
 		if msg.err != nil {

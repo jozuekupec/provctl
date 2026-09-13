@@ -70,6 +70,7 @@ func helpSections() []helpSection {
 			"a         archive selected subscription",
 			"d         permanently delete selected archived subscription",
 			"R         reconcile generated configuration for selected subscription",
+			"u         set SSH access mode for selected subscription",
 		}},
 		{title: "Domains", rows: []string{
 			"n         create a domain",

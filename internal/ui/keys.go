@@ -27,6 +27,12 @@ func (m appModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if m.subscriptionCreateForm.open {
 		return m.handleSubscriptionCreateFormKey(msg)
 	}
+	if m.sshAccessForm.open {
+		return m.handleSSHAccessFormKey(msg)
+	}
+	if m.secret.open {
+		return m.handleSecretKey(msg)
+	}
 	if m.settings.open {
 		return m.handleSettingsKey(msg)
 	}
@@ -130,6 +136,10 @@ func (m appModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				"Subscription: " + subscription.Name,
 				"Regenerate managed Apache configuration from provctl state.",
 			}})
+		}
+	case "u":
+		if m.focus == focusSubscriptions {
+			m = m.openSSHAccessForm()
 		}
 	case "p":
 		if m.focus == focusWebsites {

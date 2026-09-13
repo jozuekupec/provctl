@@ -446,6 +446,12 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   preventing an empty `SSH keys`, `Cron jobs` or `Backups` title from leaking
   into a newly selected subscription. The Help popup also now groups the
   domain-scoped PHP action with the other domain actions.
+  Subscription editing now includes `u` for SSH access (`none`, `key`,
+  `password`, `key+password`) through the existing journalled SSH service.
+  Password-bearing modes use a dedicated one-time acknowledgement popup and
+  never append the generated password to Output; a TUI model test verifies
+  that non-leakage contract. Key modes retain service validation requiring a
+  registered public key.
   Subscription creation is now also available in the fullscreen picker through
   `n`: the bounded form accepts the derived subscription name and preserves the
   existing safe service defaults for user identity, home and unlimited quotas.

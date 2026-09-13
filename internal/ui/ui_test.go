@@ -980,6 +980,50 @@ func TestModel_LoadBackupsShowsBackupDetail(t *testing.T) {
 	}
 }
 
+func TestModel_SSHAccessShowsPasswordOnlyInSecretPopup(t *testing.T) {
+	const password = "must-not-reach-output"
+	m := New(Deps{
+		SetSSHAccess: func(_ context.Context, subscription, access string) (string, int64, error) {
+			if subscription != "acme" || access != "password" {
+				t.Fatalf("SetSSHAccess(%q, %q)", subscription, access)
+			}
+			return password, 11, nil
+		},
+		LoadSubscriptions: func(context.Context) ([]domain.Subscription, error) {
+			return []domain.Subscription{{ID: 1, Name: "acme", SSHAccess: "password"}}, nil
+		},
+	})
+	m.workspace, m.focus = true, focusSubscriptions
+	m.items = []domain.Subscription{{ID: 1, Name: "acme", SSHAccess: "none"}}
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("u")})
+	m = updated.(appModel)
+	if !m.sshAccessForm.open {
+		t.Fatal("SSH access form did not open")
+	}
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
+	m = updated.(appModel)
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
+	m = updated.(appModel)
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = updated.(appModel)
+	if m.confirm.action != "set-ssh-access" || m.confirm.value != "password" {
+		t.Fatalf("confirmation = %#v", m.confirm)
+	}
+	updated, command := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("y")})
+	m = runProgress(t, updated.(appModel), command)
+	if !m.secret.open || m.secret.secret != password {
+		t.Fatalf("secret popup = %#v", m.secret)
+	}
+	if strings.Contains(strings.Join(m.output.lines, "\n"), password) {
+		t.Fatal("generated SSH password leaked into persistent output")
+	}
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = updated.(appModel)
+	if m.secret.open {
+		t.Fatal("secret popup did not acknowledge")
+	}
+}
+
 func TestFocusNavigationMovesAcrossWorkspacePanels(t *testing.T) {
 	if got := focusLeft(focusWebsites); got != focusSubscriptions {
 		t.Fatalf("left from domains = %v, want subscriptions", got)

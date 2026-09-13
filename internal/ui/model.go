@@ -20,6 +20,7 @@ type Deps struct {
 	LoadSSHKeys            func(context.Context, string) ([]domain.SSHKey, error)
 	LoadCronJobs           func(context.Context, string) ([]domain.CronJob, error)
 	LoadBackups            func(context.Context, string) ([]domain.Backup, error)
+	SetSSHAccess           func(context.Context, string, string) (string, int64, error)
 	ReadWebsiteLogs        func(context.Context, string, string, bool, int) (string, error)
 	SetWebsiteEnabled      func(context.Context, string, string, bool) (int64, error)
 	SetWebsiteTLS          func(context.Context, string, string, bool) error
@@ -63,6 +64,12 @@ type backupsLoadedMsg struct {
 	items      []domain.Backup
 	err        error
 	generation uint64
+}
+type sshAccessChangedMsg struct {
+	err      error
+	access   string
+	password string
+	items    []domain.Subscription
 }
 
 type subscriptionsLoadedMsg struct {
@@ -244,6 +251,17 @@ type subscriptionCreateFormState struct {
 	input textinput.Model
 }
 
+type sshAccessFormState struct {
+	open  bool
+	index int
+}
+
+type secretState struct {
+	open   bool
+	title  string
+	secret string
+}
+
 type pathPickerTarget uint8
 
 const (
@@ -308,6 +326,8 @@ type appModel struct {
 	aliasForm              aliasFormState
 	targetForm             targetFormState
 	subscriptionCreateForm subscriptionCreateFormState
+	sshAccessForm          sshAccessFormState
+	secret                 secretState
 	pathPicker             pathPickerState
 	status                 string
 	confirm                confirmState

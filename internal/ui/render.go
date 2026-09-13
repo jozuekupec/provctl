@@ -43,6 +43,12 @@ func (m appModel) View() string {
 	if m.subscriptionCreateForm.open {
 		return m.overlayCenter(m.subscriptionCreateFormPopup(), view)
 	}
+	if m.sshAccessForm.open {
+		return m.overlayCenter(m.sshAccessFormPopup(), view)
+	}
+	if m.secret.open {
+		return m.overlayCenter(m.secretPopup(), view)
+	}
 	if m.settings.open {
 		return m.overlayCenter(m.settingsPopup(), view)
 	}
@@ -236,7 +242,7 @@ func (m appModel) keybar() string {
 	}
 	switch m.focus {
 	case focusSubscriptions:
-		return "←/→ panels · ↑/↓ select · s suspend/resume · a archive · d delete · R reconcile · , settings · esc back"
+		return "←/→ panels · ↑/↓ select · u SSH access · s suspend/resume · a archive · d delete · R reconcile · , settings · esc back"
 	case focusWebsites:
 		return "←/→ panels · ↑/↓ select · n create · D delete · a/A aliases · p PHP · e toggle · E root · T target · t TLS · l/L logs · , settings · esc subscriptions"
 	case focusDetail:
