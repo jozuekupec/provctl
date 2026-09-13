@@ -83,6 +83,7 @@ func helpSections() []helpSection {
 			"t         enable or disable TLS for selected domain",
 			"l / L     load access or error log",
 			"b         load subscription databases",
+			"n         create database (Databases detail)",
 			"K         load subscription SSH keys",
 			"+         add a public SSH key from a file (SSH keys detail)",
 			"c         load subscription cron jobs",

@@ -17,6 +17,7 @@ type Deps struct {
 	LoadSubscriptions      func(context.Context) ([]domain.Subscription, error)
 	LoadWebsites           func(context.Context, int64) ([]domain.Website, error)
 	LoadDatabases          func(context.Context, string) ([]domain.Database, error)
+	CreateDatabase         func(context.Context, string, string, string) (string, int64, error)
 	LoadSSHKeys            func(context.Context, string) ([]domain.SSHKey, error)
 	LoadCronJobs           func(context.Context, string) ([]domain.CronJob, error)
 	LoadBackups            func(context.Context, string) ([]domain.Backup, error)
@@ -132,6 +133,12 @@ type subscriptionDeletedMsg struct {
 type subscriptionCreatedMsg struct {
 	err  error
 	name string
+}
+type databaseCreatedMsg struct {
+	err      error
+	name     string
+	password string
+	items    []domain.Database
 }
 type reconcileFinishedMsg struct {
 	err          error
@@ -258,6 +265,13 @@ type subscriptionCreateFormState struct {
 	inputs []textinput.Model
 }
 
+type databaseCreateFormState struct {
+	open  bool
+	field int
+	name  textinput.Model
+	creds textinput.Model
+}
+
 type sshAccessFormState struct {
 	open  bool
 	index int
@@ -339,6 +353,7 @@ type appModel struct {
 	aliasForm              aliasFormState
 	targetForm             targetFormState
 	subscriptionCreateForm subscriptionCreateFormState
+	databaseCreateForm     databaseCreateFormState
 	sshAccessForm          sshAccessFormState
 	sshKeyForm             sshKeyFormState
 	secret                 secretState

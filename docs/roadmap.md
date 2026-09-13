@@ -432,6 +432,12 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   It renders each persisted database's name, user, host and charset; moving to
   another domain restores the domain detail, so stale database output cannot
   be mistaken for that domain's state.
+  Database creation is now also available from that detail with `n`: a modal
+  accepts the safe local suffix and optional subscription-owned credentials
+  file, uses the journalled database service, shows the generated password in
+  the existing one-time secret popup, and refreshes the list. Password rotation
+  and deletion remain CLI-only until the detail list gains an explicit selected
+  database cursor and a destructive typed-name confirmation.
   Read-only SSH key inspection is now available through `K`, using the SSH
   service's persisted metadata rather than reading `authorized_keys` directly.
   Its dedicated detail view exposes the public fingerprint and comment, and is

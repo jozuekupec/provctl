@@ -27,6 +27,9 @@ func (m appModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if m.subscriptionCreateForm.open {
 		return m.handleSubscriptionCreateFormKey(msg)
 	}
+	if m.databaseCreateForm.open {
+		return m.handleDatabaseCreateFormKey(msg)
+	}
 	if m.sshAccessForm.open {
 		return m.handleSSHAccessFormKey(msg)
 	}
@@ -222,6 +225,8 @@ func (m appModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "n":
 		if m.focus == focusWebsites {
 			m = m.openWebsiteCreateForm()
+		} else if m.focus == focusDetail && m.detailView == detailDatabases {
+			m = m.openDatabaseCreateForm()
 		}
 	case "a":
 		if m.focus == focusWebsites {

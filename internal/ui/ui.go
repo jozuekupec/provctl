@@ -279,6 +279,17 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.output = m.output.append("subscription created: " + msg.name)
 		m, command := m.startSubscriptions()
 		return m, command
+	case databaseCreatedMsg:
+		m.progress.active = false
+		if msg.err != nil {
+			m.status = "database creation failed: " + msg.err.Error()
+			m.output = m.output.append(m.status)
+			return m, nil
+		}
+		m.databases, m.detailView, m.focus, m.status = append([]domain.Database(nil), msg.items...), detailDatabases, focusDetail, "database "+msg.name+" created"
+		m.output = m.output.append("database created: " + msg.name)
+		m.secret = secretState{open: true, title: "Database password", secret: msg.password}
+		return m, nil
 	case reconcileFinishedMsg:
 		m.progress.active = false
 		if msg.err != nil {

@@ -867,6 +867,40 @@ func TestSubscriptionCreateOptions_RejectsInvalidDiskQuota(t *testing.T) {
 	}
 }
 
+func TestModel_CreateDatabaseCallsDependency(t *testing.T) {
+	var created string
+	m := New(Deps{
+		CreateDatabase: func(_ context.Context, subscription, name, credentials string) (string, int64, error) {
+			created = subscription + "/" + name + "/" + credentials
+			return "generated-secret", 1, nil
+		},
+		LoadDatabases: func(context.Context, string) ([]domain.Database, error) {
+			return []domain.Database{{Name: "acme_app"}}, nil
+		},
+	})
+	m.items = []domain.Subscription{{ID: 1, Name: "acme", Status: "active"}}
+	m.workspace, m.focus, m.detailView = true, focusDetail, detailDatabases
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("n")})
+	m = updated.(appModel)
+	if !m.databaseCreateForm.open {
+		t.Fatal("database creation form did not open")
+	}
+	for _, character := range "app" {
+		updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{character}})
+		m = updated.(appModel)
+	}
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyCtrlS})
+	m = updated.(appModel)
+	updated, command := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("y")})
+	m = runProgress(t, updated.(appModel), command)
+	if created != "acme/app/" {
+		t.Fatalf("CreateDatabase = %q, want acme/app/", created)
+	}
+	if m.secret.secret != "generated-secret" || len(m.databases) != 1 {
+		t.Fatalf("secret/databases = %#v / %#v", m.secret, m.databases)
+	}
+}
+
 func TestModel_DeleteArchivedSubscriptionRequiresTypedName(t *testing.T) {
 	deleted := false
 	m := New(Deps{DeleteSubscription: func(_ context.Context, name string, force bool) (int64, error) {
