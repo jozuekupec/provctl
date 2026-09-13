@@ -29,6 +29,36 @@ func TestCertbotRenewals_ReconfigurePreservesLiveCertificate(t *testing.T) {
 	}
 }
 
+func TestCertbotRenewals_VerifyUsesPebbleCompatibleRenewal(t *testing.T) {
+	tests := []struct {
+		name   string
+		server string
+		want   []string
+	}{
+		{
+			name: "production uses dry run",
+			want: []string{"renew", "--cert-name", "legacy-0001", "--dry-run"},
+		},
+		{
+			name:   "local ACME uses forced renewal",
+			server: "https://pebble:14000/dir",
+			want:   []string{"renew", "--cert-name", "legacy-0001", "--force-renewal", "--no-random-sleep-on-renew"},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			commands := &fake.Commander{}
+			manager := CertbotRenewals{Commands: commands, Server: test.server}
+			if err := manager.Verify(context.Background(), "legacy-0001"); err != nil {
+				t.Fatal(err)
+			}
+			if len(commands.Calls) != 1 || !cmp.Equal(commands.Calls[0].Args, test.want) {
+				t.Fatalf("commands = %#v, want %#v", commands.Calls, test.want)
+			}
+		})
+	}
+}
+
 func TestCertbotRenewals_SnapshotRestoresContentsAndMode(t *testing.T) {
 	directory := t.TempDir()
 	path := filepath.Join(directory, "legacy.conf")

@@ -652,7 +652,10 @@ zálohy.
 TLS větev vyžaduje samostatný Pebble obraz: před adopcí připrav platný legacy
 lineage pokrývající `stary.test` (a případné SAN aliasy), pak ověř `curl -k
 --resolve stary.test:443:127.0.0.1 https://stary.test/`, `provctl ssl status
-stary stary.test` a `certbot renew --cert-name <legacy-lineage> --dry-run`.
+stary stary.test` a `certbot renew --cert-name <legacy-lineage>
+--force-renewal --no-random-sleep-on-renew`. Pro produkční Certbot konfiguraci
+bez `ssl.server` zůstává správnou bezpečnou kontrolou `--dry-run`; Pebble by
+jej ale přesměroval na veřejný staging endpoint.
 Po smazání adopovaného webu ověř, že jeho legacy lineage v
 `/etc/letsencrypt/live/` zůstal zachovaný. Běžný snapshot `clean` Pebble
 neobsahuje, proto je tento follow-up oddělený od standardního E2 průchodu.

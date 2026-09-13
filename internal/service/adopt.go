@@ -46,6 +46,10 @@ type CertbotRenewals struct {
 	Directory       string
 	LiveDirectory   string
 	BackupDirectory string
+	// Server is the configured non-production ACME directory. Certbot replaces
+	// it with public staging when --dry-run is used, so local Pebble verification
+	// must perform a real forced renewal instead.
+	Server string
 }
 
 func (manager CertbotRenewals) Find(_ context.Context, domainName string) ([]RenewalLineage, error) {
@@ -121,7 +125,13 @@ func (manager CertbotRenewals) Reconfigure(ctx context.Context, lineage RenewalL
 }
 
 func (manager CertbotRenewals) Verify(ctx context.Context, lineage string) error {
-	result, err := manager.Commands.Run(ctx, "/usr/bin/certbot", "renew", "--cert-name", lineage, "--dry-run")
+	args := []string{"renew", "--cert-name", lineage}
+	if manager.Server != "" {
+		args = append(args, "--force-renewal", "--no-random-sleep-on-renew")
+	} else {
+		args = append(args, "--dry-run")
+	}
+	result, err := manager.Commands.Run(ctx, "/usr/bin/certbot", args...)
 	if err != nil {
 		return commandError("verify certificate renewal", result, err)
 	}
@@ -264,7 +274,7 @@ func (service SubscriptionService) PrepareAdopt(ctx context.Context, name string
 	}
 	renewalManager := service.Renewals
 	if renewalManager == nil {
-		renewalManager = CertbotRenewals{FS: service.FS, Commands: service.Commands}
+		renewalManager = CertbotRenewals{FS: service.FS, Commands: service.Commands, Server: service.Config.SSL.Server}
 	}
 	renewals, err := renewalManager.Find(ctx, options.Domain)
 	if err != nil {

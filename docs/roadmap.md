@@ -642,6 +642,14 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   `https://jozuekupec.github.io/provctl/debian` a úspěšně nainstalovaný
   `provctl --version` `0.1.1`; kontejner byl po testu smazán.
 - [~] **M10 — migrace:**
+  Statická revize TLS adopce 2026-09-13 odstranila Pebble blokér: renewal
+  manager dříve vždy volal `certbot renew --dry-run`, který Certbotu pro
+  lokální ACME server přepíše directory na veřejný staging endpoint. Při
+  explicitním `ssl.server` proto nyní používá skutečný `--force-renewal
+  --no-random-sleep-on-renew`; produkční konfigurace bez override zůstává na
+  bezpečném `--dry-run`. Regresní test pokrývá oba argumentové kontrakty a
+  T17 cookbook je upravený pro Pebble. Reálný Pebble průchod zůstává oddělený
+  follow-up, aby se neměnil ruční TUI snapshot `pv`.
   První integrační běh v `pv` odhalil rozpor: Debian balíček instaloval
   `/etc/logrotate.d/provctl`, ale bootstrap očekával jiný obsah a odmítal jej.
   Bootstrap nyní používá totožný balíčkový obsah; jeho no-op a změnové testy
