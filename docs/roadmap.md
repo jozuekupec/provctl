@@ -168,7 +168,10 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   překročení. Kvóty počtu objektů lze volitelně nastavit přes
   `--quota-websites`, `--quota-databases` a `--quota-backups`; jsou uložené ve
   SQLite a create webu/databáze je před změnou systému vynucuje (nula znamená
-  bez limitu). Kvóta záloh bude vynucená spolu s připravovanou implementací
+  bez limitu). TUI nyní tyto čtyři kvóty přijímá již při vytvoření subscription
+  (disk ve formátu `20G`, `500M` nebo bytech; prázdné pole znamená bez limitu)
+  a zobrazuje je v detailu subscription; úprava existující kvóty zůstává
+  záměrně mimo aktuální rozsah. Kvóta záloh bude vynucená spolu s připravovanou implementací
   záloh. Audit JSONL je nyní centrálně připojený k executorům všech
   žurnálovaných produkčních operací; zapisuje pouze aktéra, akci, cíl, stav,
   délku a operation ID, nikdy argumenty, SQL, hesla ani chyby s potenciálně

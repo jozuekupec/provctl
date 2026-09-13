@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
@@ -807,8 +808,11 @@ func TestModel_ArchiveSubscriptionCallsDependency(t *testing.T) {
 func TestModel_CreateSubscriptionCallsDependency(t *testing.T) {
 	var created string
 	m := New(Deps{
-		CreateSubscription: func(_ context.Context, name string) (int64, error) {
+		CreateSubscription: func(_ context.Context, name string, options service.SubscriptionCreateOptions) (int64, error) {
 			created = name
+			if options.QuotaDiskBytes != 0 {
+				t.Fatalf("unexpected options: %#v", options)
+			}
 			return 1, nil
 		},
 		LoadSubscriptions: func(context.Context) ([]domain.Subscription, error) {
@@ -836,6 +840,30 @@ func TestModel_CreateSubscriptionCallsDependency(t *testing.T) {
 	}
 	if !strings.Contains(m.status, "refreshing") {
 		t.Fatalf("status = %q, want refresh", m.status)
+	}
+}
+
+func TestSubscriptionCreateOptions_ParsesQuotas(t *testing.T) {
+	inputs := make([]textinput.Model, 5)
+	inputs[1].SetValue("2G")
+	inputs[2].SetValue("3")
+	inputs[3].SetValue("4")
+	inputs[4].SetValue("5")
+	got, err := subscriptionCreateOptions(inputs)
+	if err != nil {
+		t.Fatalf("subscriptionCreateOptions() error = %v", err)
+	}
+	want := service.SubscriptionCreateOptions{QuotaDiskBytes: 2 * 1024 * 1024 * 1024, QuotaWebsites: 3, QuotaDatabases: 4, QuotaBackups: 5}
+	if got != want {
+		t.Fatalf("subscriptionCreateOptions() = %#v, want %#v", got, want)
+	}
+}
+
+func TestSubscriptionCreateOptions_RejectsInvalidDiskQuota(t *testing.T) {
+	inputs := make([]textinput.Model, 5)
+	inputs[1].SetValue("many")
+	if _, err := subscriptionCreateOptions(inputs); err == nil {
+		t.Fatal("subscriptionCreateOptions() error = nil, want invalid disk quota")
 	}
 }
 

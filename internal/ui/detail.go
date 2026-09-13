@@ -94,7 +94,7 @@ func (m appModel) detail() string {
 		}
 		return strings.Join(lines, "\n")
 	}
-	return fmt.Sprintf("Subscription: %s\nStatus: %s\nUser: %s\nHome: %s\nWebsites: %d", subscription.Name, subscription.Status, subscription.UnixUser, subscription.Home, len(m.websites))
+	return fmt.Sprintf("Subscription: %s\nStatus: %s\nUser: %s\nHome: %s\nWebsites: %d\n\nQuotas\nDisk: %s\nWebsites: %s\nDatabases: %s\nBackups: %s", subscription.Name, subscription.Status, subscription.UnixUser, subscription.Home, len(m.websites), quotaSize(subscription.QuotaDiskBytes), quotaCount(subscription.QuotaWebsites), quotaCount(subscription.QuotaDatabases), quotaCount(subscription.QuotaBackups))
 }
 
 func (m appModel) detailTitle() string {

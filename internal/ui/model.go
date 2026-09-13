@@ -30,7 +30,7 @@ type Deps struct {
 	SetWebsiteAlias        func(context.Context, string, string, string, bool) (int64, error)
 	SetWebsiteTarget       func(context.Context, string, string, string, int) (int64, error)
 	DeleteWebsite          func(context.Context, string, string) (int64, error)
-	CreateSubscription     func(context.Context, string) (int64, error)
+	CreateSubscription     func(context.Context, string, service.SubscriptionCreateOptions) (int64, error)
 	SetSubscriptionStatus  func(context.Context, string, string) (int64, error)
 	DeleteSubscription     func(context.Context, string, bool) (int64, error)
 	LoadPHPVersions        func(context.Context) ([]service.PHPFPMVersion, error)
@@ -253,8 +253,9 @@ type targetFormState struct {
 }
 
 type subscriptionCreateFormState struct {
-	open  bool
-	input textinput.Model
+	open   bool
+	field  int
+	inputs []textinput.Model
 }
 
 type sshAccessFormState struct {
