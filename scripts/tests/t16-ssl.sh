@@ -57,15 +57,16 @@ run 'install -d -m 0755 /root/pebble/test/certs && chmod 0755 /root/pebble/pebbl
 # Pebble's HTTPS listener uses its static test CA; its /roots endpoint instead
 # exposes the dynamically generated issuer of certificates it will issue.
 run 'install -m 0644 /root/pebble/pebble.minica.pem /usr/local/share/ca-certificates/provctl-pebble-server.crt && update-ca-certificates >/dev/null; ready=false; for attempt in $(seq 1 20); do if curl --noproxy "*" --insecure --connect-timeout 2 --max-time 3 -sf https://pebble:15000/roots/0 >/dev/null; then ready=true && break; fi; sleep 1; done; test "$ready" = true || { cat /tmp/provctl-pebble.log >&2; exit 1; }'
-run 'sed -i "s|email = \"\"|email = \"test@example.test\"|; s|server = \"\"|server = \"https://pebble:14000/dir\"|" /etc/provctl/config.toml'
+run 'sed -i "s|email = \"\"|email = \"test@example.test\"|; s|staging = true|staging = false|; s|server = \"\"|server = \"https://pebble:14000/dir\"|" /etc/provctl/config.toml'
 run 'provctl subscription create acme && provctl website create acme ssl.test --type php-fpm'
 
 # --force is intentional: ssl.test resolves to pv loopback, while validateDNS
 # correctly excludes loopback addresses from its set of server interfaces.
 run 'provctl ssl enable acme ssl.test --force'
 run 'lineage=$(provctl ssl status acme ssl.test | sed -n "s/^lineage: //p"); test -n "$lineage" && test -f "/etc/letsencrypt/live/$lineage/fullchain.pem" && apache2ctl configtest && curl -skI https://ssl.test/ >/dev/null'
-run 'provctl website set acme ssl.test --force-https && test "$(curl -s -o /dev/null -w "%{http_code}" http://ssl.test/)" = 301 && test "$(curl -s -o /dev/null -w "%{http_code}" http://ssl.test/.well-known/acme-challenge/x)" = 404'
+# ssl enable defaults to force HTTPS; the ACME path must remain HTTP-only.
+run 'test "$(curl --noproxy "*" -s -o /dev/null -w "%{http_code}" http://ssl.test/)" = 301 && test "$(curl --noproxy "*" -s -o /dev/null -w "%{http_code}" http://ssl.test/.well-known/acme-challenge/x)" = 404'
 run 'lineage=$(provctl ssl status acme ssl.test | sed -n "s/^lineage: //p"); grep -E "authenticator = webroot|webroot_path = /var/lib/provctl-acme-challenge" "/etc/letsencrypt/renewal/$lineage.conf"'
-run 'lineage=$(provctl ssl status acme ssl.test | sed -n "s/^lineage: //p"); certbot renew --cert-name "$lineage" --force-renewal --no-random-sleep-on-renew && test -s /var/log/provctl/deploy-hook.log && provctl ssl disable acme ssl.test && ! grep -q "<VirtualHost \*:443>" /etc/apache2/sites-available/provctl-acme-ssl.test.conf'
+run 'lineage=$(provctl ssl status acme ssl.test | sed -n "s/^lineage: //p"); certbot renew --cert-name "$lineage" --force-renewal --no-random-sleep-on-renew && grep -q "\"action\":\"ssl.deploy-hook\"" /var/log/provctl/audit.jsonl && provctl ssl disable acme ssl.test && ! grep -q "<VirtualHost \*:443>" /etc/apache2/sites-available/provctl-acme-ssl.test.conf'
 
 echo 'PASS: T16 Pebble HTTP-01 issuance, renewal, deploy hook, and disable'

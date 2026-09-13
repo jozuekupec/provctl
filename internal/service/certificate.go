@@ -374,7 +374,9 @@ func (service SSLService) certbotArgs(lineage string, domains []string, replaceN
 	if replaceNames {
 		args = append(args, "--expand")
 	}
-	if service.Config.SSL.Staging {
+	// Certbot treats --staging and an explicit --server as mutually exclusive.
+	// A configured server is an intentional override, typically local Pebble.
+	if service.Config.SSL.Staging && service.Config.SSL.Server == "" {
 		args = append(args, "--staging")
 	}
 	if service.Config.SSL.Server != "" {

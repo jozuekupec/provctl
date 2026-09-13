@@ -40,6 +40,11 @@ wait_for_systemd() {
 ensure_running() {
 	state=$(incus list "$instance" --format csv -c s)
 	if [ "$state" != "RUNNING" ]; then
+		# A copied Incus instance can retain the source's volatile MAC address
+		# through a snapshot. Opt in to regenerating it for isolated test clones.
+		if [ "${PROVCTL_E2_REGENERATE_NIC:-false}" = "true" ]; then
+			incus config unset "$instance" volatile.eth0.hwaddr 2>/dev/null || true
+		fi
 		incus start "$instance"
 	fi
 }
@@ -52,6 +57,12 @@ case "$command" in
 		;;
 	reset)
 		test "$#" -eq 1 || { usage >&2; exit 2; }
+		# Stop first: restoring a snapshot of a copied container can otherwise
+		# attempt to start it with the source's captured volatile MAC address.
+		state=$(incus list "$instance" --format csv -c s)
+		if [ "$state" = "RUNNING" ]; then
+			incus stop --force "$instance"
+		fi
 		incus snapshot restore "$instance" "$snapshot"
 		ensure_running
 		wait_for_systemd

@@ -656,6 +656,14 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   skutečně implementovaných testovacích skriptů a rozsah `run-all.sh` v
   cookbooku. Reálný Pebble průchod zůstává oddělený follow-up, aby se neměnil
   ruční TUI snapshot `pv`.
+  Izolovaný klon `pv-tls-debug-20260913` nyní ověřil skutečné HTTP-01 vydání
+  pro `ssl.test`, Apache `configtest`, Certbot renewal proti Pebble a deploy
+  hook zaznamenaný v audit logu; následný `ssl disable` odstranil TLS vhost.
+  Běh odhalil a opravil dva scénářové rozdíly: explicitní `[ssl].server` nesmí
+  Certbot kombinovat s `--staging` a HTTP redirect se zapíná už přes `ssl
+  enable`, nikoliv neexistujícím `website set` příkazem. E2 helper před
+  obnovou klonovaného snapshotu zastaví instanci a může regenerovat její
+  volatilní MAC, takže test nezasahuje do interaktivního `pv`.
   První integrační běh v `pv` odhalil rozpor: Debian balíček instaloval
   `/etc/logrotate.d/provctl`, ale bootstrap očekával jiný obsah a odmítal jej.
   Bootstrap nyní používá totožný balíčkový obsah; jeho no-op a změnové testy
