@@ -69,6 +69,7 @@ func helpSections() []helpSection {
 			"s         suspend or resume selected subscription",
 			"a         archive selected subscription",
 			"d         permanently delete selected archived subscription",
+			"R         reconcile generated configuration for selected subscription",
 			"p         choose a PHP-FPM version for selected domain",
 		}},
 		{title: "Domains", rows: []string{

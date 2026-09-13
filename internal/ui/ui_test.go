@@ -879,6 +879,29 @@ func TestModel_DeleteWebsiteRequiresTypedDomain(t *testing.T) {
 	}
 }
 
+func TestModel_ReconcileUsesSelectedSubscription(t *testing.T) {
+	var reconciled string
+	m := New(Deps{
+		Reconcile: func(_ context.Context, subscription string) (int64, error) {
+			reconciled = subscription
+			return 17, nil
+		},
+		LoadWebsites: func(context.Context, int64) ([]domain.Website, error) { return nil, nil },
+	})
+	m.workspace, m.focus = true, focusSubscriptions
+	m.items = []domain.Subscription{{ID: 1, Name: "acme", Status: "active"}}
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("R")})
+	m = updated.(appModel)
+	if m.confirm.action != "reconcile" || m.confirm.domain != "acme" {
+		t.Fatalf("confirmation = %#v", m.confirm)
+	}
+	updated, command := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("y")})
+	m = runProgress(t, updated.(appModel), command)
+	if reconciled != "acme" || !strings.Contains(m.status, "reconciled") {
+		t.Fatalf("reconciled=%q status=%q", reconciled, m.status)
+	}
+}
+
 func TestFocusNavigationMovesAcrossWorkspacePanels(t *testing.T) {
 	if got := focusLeft(focusWebsites); got != focusSubscriptions {
 		t.Fatalf("left from domains = %v, want subscriptions", got)

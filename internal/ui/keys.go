@@ -121,6 +121,14 @@ func (m appModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.status = "running health checks…"
 		m, command := m.startHealth()
 		return m, command
+	case "R":
+		subscription, ok := m.selectedSubscription()
+		if ok {
+			m = m.askConfirm(confirmState{action: "reconcile", domain: subscription.Name, title: "Reconcile configuration", lines: []string{
+				"Subscription: " + subscription.Name,
+				"Regenerate managed Apache configuration from provctl state.",
+			}})
+		}
 	case "p":
 		if m.focus == focusWebsites {
 			website, ok := m.selectedWebsite()

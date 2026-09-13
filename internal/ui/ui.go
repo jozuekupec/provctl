@@ -218,6 +218,25 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.output = m.output.append("subscription created: " + msg.name)
 		m, command := m.startSubscriptions()
 		return m, command
+	case reconcileFinishedMsg:
+		m.progress.active = false
+		if msg.err != nil {
+			m.status = "reconcile failed: " + msg.err.Error()
+			m.output = m.output.append(m.status)
+			return m, nil
+		}
+		if msg.operationID == 0 {
+			m.status = "nothing to reconcile"
+			m.output = m.output.append("reconcile: no generated drift")
+		} else {
+			m.status = "reconciled generated configuration"
+			m.output = m.output.append("reconciled subscription " + msg.subscription)
+		}
+		if msg.websites != nil {
+			m.websites = append([]domain.Website(nil), msg.websites...)
+			m.websiteCursor = clamp(m.websiteCursor, len(m.visibleWebsites()))
+		}
+		return m, nil
 	case phpVersionsLoadedMsg:
 		if m.phpVersionsLoad.stale(msg.generation) {
 			return m, nil

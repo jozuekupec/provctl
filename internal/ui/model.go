@@ -31,6 +31,7 @@ type Deps struct {
 	LoadPHPVersions        func(context.Context) ([]service.PHPFPMVersion, error)
 	SetWebsitePHP          func(context.Context, string, string, service.PHPSetOptions) (int64, error)
 	RunHealth              func(context.Context, string, string) ([]service.Check, error)
+	Reconcile              func(context.Context, string) (int64, error)
 	SaveConfig             func(context.Context, config.Config) error
 	BrowsePath             func(context.Context, string, fsbrowse.Mode) (string, []fsbrowse.Entry, error)
 	Config                 config.Config
@@ -100,6 +101,12 @@ type subscriptionDeletedMsg struct {
 type subscriptionCreatedMsg struct {
 	err  error
 	name string
+}
+type reconcileFinishedMsg struct {
+	err          error
+	subscription string
+	operationID  int64
+	websites     []domain.Website
 }
 type phpVersionsLoadedMsg struct {
 	items      []service.PHPFPMVersion

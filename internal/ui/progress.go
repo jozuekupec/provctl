@@ -95,6 +95,8 @@ func operationFailed(message tea.Msg) bool {
 		return result.err != nil
 	case subscriptionCreatedMsg:
 		return result.err != nil
+	case reconcileFinishedMsg:
+		return result.err != nil
 	case websitePHPChangedMsg:
 		return result.err != nil
 	case websiteDocumentRootChangedMsg:

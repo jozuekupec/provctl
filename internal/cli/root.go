@@ -56,6 +56,11 @@ func NewRootCommand() *cobra.Command {
 			return fmt.Errorf("open subscription mutation state: %w", err)
 		}
 		defer subscriptionWriteRuntime.Close()
+		reconcileRuntime, err := service.NewProductionReconcileRuntime(context.Background(), cfg)
+		if err != nil {
+			return fmt.Errorf("open reconcile TUI state: %w", err)
+		}
+		defer reconcileRuntime.Close()
 		healthRuntime, err := service.NewProductionHealthRuntime(context.Background(), cfg)
 		if err != nil {
 			return fmt.Errorf("open health state: %w", err)
@@ -133,7 +138,7 @@ func NewRootCommand() *cobra.Command {
 			}
 			return 0, fmt.Errorf("website %q not found in subscription %q", primaryDomain, subscription)
 		}
-		_, err = ui.Program(ui.Deps{LoadSubscriptions: runtime.Service.List, LoadWebsites: websiteRuntime.Service.List, LoadDatabases: databaseRuntime.Service.ListForSubscription, ReadWebsiteLogs: websiteRuntime.Service.ReadLogs, SetWebsiteEnabled: websiteWriteRuntime.Service.SetEnabled, SetWebsiteTLS: setWebsiteTLS, SetWebsiteDocumentRoot: websiteWriteRuntime.Service.SetDocumentRoot, SetWebsiteTarget: websiteWriteRuntime.Service.SetTarget, DeleteWebsite: websiteWriteRuntime.Service.Delete, CreateWebsite: createWebsiteFromUI, SetWebsiteAlias: setWebsiteAlias, CreateSubscription: subscriptionWriteRuntime.Service.Create, SetSubscriptionStatus: subscriptionWriteRuntime.Service.SetStatus, DeleteSubscription: subscriptionWriteRuntime.Service.Delete, LoadPHPVersions: phpReadRuntime.Service.ListVersions, SetWebsitePHP: phpWriteRuntime.Service.Set, RunHealth: healthRuntime.Service.Run, SaveConfig: func(_ context.Context, updated config.Config) error {
+		_, err = ui.Program(ui.Deps{LoadSubscriptions: runtime.Service.List, LoadWebsites: websiteRuntime.Service.List, LoadDatabases: databaseRuntime.Service.ListForSubscription, ReadWebsiteLogs: websiteRuntime.Service.ReadLogs, SetWebsiteEnabled: websiteWriteRuntime.Service.SetEnabled, SetWebsiteTLS: setWebsiteTLS, SetWebsiteDocumentRoot: websiteWriteRuntime.Service.SetDocumentRoot, SetWebsiteTarget: websiteWriteRuntime.Service.SetTarget, DeleteWebsite: websiteWriteRuntime.Service.Delete, CreateWebsite: createWebsiteFromUI, SetWebsiteAlias: setWebsiteAlias, CreateSubscription: subscriptionWriteRuntime.Service.Create, SetSubscriptionStatus: subscriptionWriteRuntime.Service.SetStatus, DeleteSubscription: subscriptionWriteRuntime.Service.Delete, LoadPHPVersions: phpReadRuntime.Service.ListVersions, SetWebsitePHP: phpWriteRuntime.Service.Set, RunHealth: healthRuntime.Service.Run, Reconcile: reconcileRuntime.Service.Reconcile, SaveConfig: func(_ context.Context, updated config.Config) error {
 			return config.Update(meta.ConfigFile, updated)
 		}, BrowsePath: func(_ context.Context, path string, mode fsbrowse.Mode) (string, []fsbrowse.Entry, error) {
 			return fsbrowse.Browse(path, mode)

@@ -236,7 +236,7 @@ func (m appModel) keybar() string {
 	}
 	switch m.focus {
 	case focusSubscriptions:
-		return "←/→ panels · ↑/↓ select · s suspend/resume · a archive · d delete · , settings · esc back"
+		return "←/→ panels · ↑/↓ select · s suspend/resume · a archive · d delete · R reconcile · , settings · esc back"
 	case focusWebsites:
 		return "←/→ panels · ↑/↓ select · n create · D delete · a/A aliases · p PHP · e toggle · E root · T target · t TLS · l/L logs · , settings · esc subscriptions"
 	case focusDetail:
@@ -244,6 +244,6 @@ func (m appModel) keybar() string {
 	case focusLogs:
 		return "←/→ panels · ↑/↓ scroll · l/L logs · esc subscriptions · ? help"
 	default:
-		return "←/→ panels · ↑/↓ scroll · h health · esc subscriptions · ? help"
+		return "←/→ panels · ↑/↓ scroll · h health · R reconcile · esc subscriptions · ? help"
 	}
 }

@@ -421,6 +421,10 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   it removes generated configuration (and managed TLS data) while preserving
   site data and logs. The service remains the only mutation boundary and the
   domain list is refreshed after the progress popup completes.
+  The subscription workspace also exposes `R` for a confirmed, service-backed
+  reconciliation of generated Apache configuration. It keeps the scope to the
+  selected subscription, reports the no-drift result without implying a write,
+  and refreshes its domain list after a real operation.
   Subscription creation is now also available in the fullscreen picker through
   `n`: the bounded form accepts the derived subscription name and preserves the
   existing safe service defaults for user identity, home and unlimited quotas.
