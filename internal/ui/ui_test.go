@@ -902,6 +902,31 @@ func TestModel_ReconcileUsesSelectedSubscription(t *testing.T) {
 	}
 }
 
+func TestModel_LoadDatabasesShowsDatabaseDetail(t *testing.T) {
+	m := New(Deps{LoadDatabases: func(_ context.Context, subscription string) ([]domain.Database, error) {
+		if subscription != "acme" {
+			t.Fatalf("LoadDatabases subscription = %q", subscription)
+		}
+		return []domain.Database{{Name: "acme_app", User: "acme_app", Host: "localhost", Charset: "utf8mb4"}}, nil
+	}})
+	m.workspace, m.showWebsites, m.focus = true, true, focusWebsites
+	m.items = []domain.Subscription{{ID: 1, Name: "acme", Status: "active"}}
+	m.websites = []domain.Website{{PrimaryDomain: "www.example.test", Type: domain.WebsiteStatic}, {PrimaryDomain: "api.example.test", Type: domain.WebsiteStatic}}
+	updated, command := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("b")})
+	updated, _ = updated.(appModel).Update(command())
+	m = updated.(appModel)
+	if m.detailView != detailDatabases || m.focus != focusDetail || !strings.Contains(m.detail(), "acme_app") || m.detailTitle() != "Databases" {
+		t.Fatalf("detail view = %v focus = %v detail = %q title = %q", m.detailView, m.focus, m.detail(), m.detailTitle())
+	}
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyLeft})
+	m = updated.(appModel)
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
+	m = updated.(appModel)
+	if m.detailView != detailDomain {
+		t.Fatal("changing the selected domain did not restore domain detail")
+	}
+}
+
 func TestFocusNavigationMovesAcrossWorkspacePanels(t *testing.T) {
 	if got := focusLeft(focusWebsites); got != focusSubscriptions {
 		t.Fatalf("left from domains = %v, want subscriptions", got)

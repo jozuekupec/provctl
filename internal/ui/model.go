@@ -150,6 +150,13 @@ const (
 	focusOutput
 )
 
+type detailView uint8
+
+const (
+	detailDomain detailView = iota
+	detailDatabases
+)
+
 type outputState struct{ lines []string }
 type confirmState struct {
 	action  string
@@ -282,6 +289,7 @@ type appModel struct {
 	confirm                confirmState
 	progress               progressState
 	detailScroll           int
+	detailView             detailView
 	outputScroll           int
 	subscriptions          opSlot
 	websitesLoad           opSlot

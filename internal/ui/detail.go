@@ -6,7 +6,7 @@ import (
 )
 
 func (m appModel) detail() string {
-	if m.showWebsites {
+	if m.detailView == detailDomain && m.showWebsites {
 		website, websiteOK := m.selectedWebsite()
 		if !websiteOK {
 			return "No domain selected."
@@ -42,11 +42,25 @@ func (m appModel) detail() string {
 	if !ok {
 		return "No selection."
 	}
-	names := make([]string, 0, len(m.databases))
-	for _, database := range m.databases {
-		names = append(names, database.Name)
+	if m.detailView == detailDatabases {
+		if len(m.databases) == 0 {
+			return "No databases."
+		}
+		lines := make([]string, 0, len(m.databases)+1)
+		lines = append(lines, "Subscription: "+subscription.Name)
+		for _, database := range m.databases {
+			lines = append(lines, database.Name+" · "+database.User+"@"+database.Host+" · "+database.Charset)
+		}
+		return strings.Join(lines, "\n")
 	}
-	return fmt.Sprintf("Subscription: %s\nStatus: %s\nUser: %s\nHome: %s\nWebsites: %d\nDatabases: %s", subscription.Name, subscription.Status, subscription.UnixUser, subscription.Home, len(m.websites), strings.Join(names, ", "))
+	return fmt.Sprintf("Subscription: %s\nStatus: %s\nUser: %s\nHome: %s\nWebsites: %d", subscription.Name, subscription.Status, subscription.UnixUser, subscription.Home, len(m.websites))
+}
+
+func (m appModel) detailTitle() string {
+	if m.detailView == detailDatabases {
+		return "Databases"
+	}
+	return "Detail"
 }
 
 func valueOrDash(value string) string {

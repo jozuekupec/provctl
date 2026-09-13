@@ -74,6 +74,7 @@ func (m appModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			next := clamp(m.websiteCursor+1, len(m.visibleWebsites()))
 			if next != m.websiteCursor {
 				m.websiteCursor = next
+				m.detailView = detailDomain
 				m.logsLoad.invalidate()
 			}
 		} else if m.focus == focusDetail {
@@ -92,6 +93,7 @@ func (m appModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			next := clamp(m.websiteCursor-1, len(m.visibleWebsites()))
 			if next != m.websiteCursor {
 				m.websiteCursor = next
+				m.detailView = detailDomain
 				m.logsLoad.invalidate()
 			}
 		} else if m.focus == focusDetail {

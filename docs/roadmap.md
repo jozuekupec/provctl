@@ -425,6 +425,11 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   reconciliation of generated Apache configuration. It keeps the scope to the
   selected subscription, reports the no-drift result without implying a write,
   and refreshes its domain list after a real operation.
+  The existing `b` database inspection now opens a real `Databases` detail
+  view rather than invisibly loading data behind the selected-domain detail.
+  It renders each persisted database's name, user, host and charset; moving to
+  another domain restores the domain detail, so stale database output cannot
+  be mistaken for that domain's state.
   Subscription creation is now also available in the fullscreen picker through
   `n`: the bounded form accepts the derived subscription name and preserves the
   existing safe service defaults for user identity, home and unlimited quotas.

@@ -68,7 +68,7 @@ func (m appModel) renderWorkspace() string {
 	left := strings.Join([]string{
 		panel(m.subscriptionPanelTitle(), m.subscriptionMetadata(), layout.leftWidth, layout.metadata, m.focus == focusSubscriptions),
 		panel(m.websitePanelTitle(), m.renderWebsites(layout.domains-2), layout.leftWidth, layout.domains, m.focus == focusWebsites),
-		panel("Detail", m.detailLines(layout.detail-2), layout.leftWidth, layout.detail, m.focus == focusDetail),
+		panel(m.detailTitle(), m.detailLines(layout.detail-2), layout.leftWidth, layout.detail, m.focus == focusDetail),
 	}, "\n")
 	output := m.outputLines(layout.output - 2)
 	right := strings.Join([]string{
