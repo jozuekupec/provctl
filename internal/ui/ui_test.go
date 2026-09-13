@@ -146,8 +146,8 @@ func TestModel_PathPickerEnterNavigatesButDoesNotSelect(t *testing.T) {
 	m = m.openSettings()
 	m = m.changeSettingsScope(1)
 	updated, command := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
-	updated, command = updated.(appModel).Update(command())
-	updated, command = updated.(appModel).Update(tea.KeyMsg{Type: tea.KeyDown})
+	updated, _ = updated.(appModel).Update(command())
+	updated, _ = updated.(appModel).Update(tea.KeyMsg{Type: tea.KeyDown})
 	updated, command = updated.(appModel).Update(tea.KeyMsg{Type: tea.KeyEnter})
 	if command == nil {
 		t.Fatal("enter on a directory did not navigate")
@@ -843,6 +843,39 @@ func TestModel_DeleteArchivedSubscriptionRequiresTypedName(t *testing.T) {
 	_ = runProgress(t, updated.(appModel), command)
 	if !deleted {
 		t.Fatal("DeleteSubscription was not called after typed confirmation")
+	}
+}
+
+func TestModel_DeleteWebsiteRequiresTypedDomain(t *testing.T) {
+	deleted := false
+	m := New(Deps{
+		DeleteWebsite: func(_ context.Context, subscription, domain string) (int64, error) {
+			deleted = subscription == "acme" && domain == "api.example.test"
+			return 1, nil
+		},
+		LoadWebsites: func(context.Context, int64) ([]domain.Website, error) { return nil, nil },
+	})
+	m.workspace, m.showWebsites, m.focus = true, true, focusWebsites
+	m.items = []domain.Subscription{{ID: 1, Name: "acme", Status: "active"}}
+	m.websites = []domain.Website{{ID: 2, PrimaryDomain: "api.example.test", Type: domain.WebsiteStatic}}
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("D")})
+	m = updated.(appModel)
+	if m.confirm.action != "delete-website" || m.confirm.word != "api.example.test" {
+		t.Fatalf("delete confirmation = %#v", m.confirm)
+	}
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = updated.(appModel)
+	if deleted || m.confirm.err == "" {
+		t.Fatalf("empty confirmation unexpectedly deleted: %#v", m.confirm)
+	}
+	for _, character := range "api.example.test" {
+		updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{character}})
+		m = updated.(appModel)
+	}
+	updated, command := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = runProgress(t, updated.(appModel), command)
+	if !deleted || len(m.websites) != 0 {
+		t.Fatalf("website deletion = %t, websites = %#v", deleted, m.websites)
 	}
 }
 

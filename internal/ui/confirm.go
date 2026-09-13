@@ -70,6 +70,8 @@ func (m appModel) runConfirmed() (tea.Model, tea.Cmd) {
 		return m, m.changeWebsiteAliasCmd(confirm)
 	case "set-target":
 		return m, m.targetCmd(confirm)
+	case "delete-website":
+		return m, m.deleteWebsiteCmd(confirm)
 	default:
 		return m, m.changeWebsiteCmd(confirm)
 	}

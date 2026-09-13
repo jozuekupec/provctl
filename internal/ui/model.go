@@ -24,6 +24,7 @@ type Deps struct {
 	CreateWebsite          func(context.Context, string, string, domain.WebsiteType, string, int) (int64, error)
 	SetWebsiteAlias        func(context.Context, string, string, string, bool) (int64, error)
 	SetWebsiteTarget       func(context.Context, string, string, string, int) (int64, error)
+	DeleteWebsite          func(context.Context, string, string) (int64, error)
 	CreateSubscription     func(context.Context, string) (int64, error)
 	SetSubscriptionStatus  func(context.Context, string, string) (int64, error)
 	DeleteSubscription     func(context.Context, string, bool) (int64, error)
@@ -79,6 +80,11 @@ type websiteAliasChangedMsg struct {
 	items  []domain.Website
 }
 type websiteTargetChangedMsg struct {
+	err    error
+	domain string
+	items  []domain.Website
+}
+type websiteDeletedMsg struct {
 	err    error
 	domain string
 	items  []domain.Website

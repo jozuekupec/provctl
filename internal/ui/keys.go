@@ -159,6 +159,10 @@ func (m appModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		} else {
 			m.focus = focusDetail
 		}
+	case "D":
+		if m.focus == focusWebsites {
+			m = m.askDeleteWebsite()
+		}
 	case "o":
 		m.focus = focusOutput
 	case "e":

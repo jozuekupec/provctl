@@ -23,17 +23,9 @@ const (
 	fitAuto
 )
 
-type popupWidth int
-
-const (
-	widthClass popupWidth = iota
-	widthAuto
-)
-
 type popupOpts struct {
 	Size         popupSize
 	Fit          popupFit
-	Width        popupWidth
 	Title        string
 	Danger       bool
 	Body, Footer []string

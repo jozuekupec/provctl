@@ -416,6 +416,11 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   redirect-code validation. The TUI form is now available via `T` for selected
   proxy/redirect domains, with redirect code toggled between 301 and 302 and
   the shared confirmation/progress flow.
+  A selected domain can now be deleted with capital `D`. The TUI requires the
+  exact domain acknowledgement used by the CLI and explicitly describes that
+  it removes generated configuration (and managed TLS data) while preserving
+  site data and logs. The service remains the only mutation boundary and the
+  domain list is refreshed after the progress popup completes.
   Subscription creation is now also available in the fullscreen picker through
   `n`: the bounded form accepts the derived subscription name and preserves the
   existing safe service defaults for user identity, home and unlimited quotas.

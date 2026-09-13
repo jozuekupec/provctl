@@ -105,6 +105,8 @@ func operationFailed(message tea.Msg) bool {
 		return result.err != nil
 	case websiteTargetChangedMsg:
 		return result.err != nil
+	case websiteDeletedMsg:
+		return result.err != nil
 	}
 	return true
 }
