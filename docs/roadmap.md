@@ -457,9 +457,9 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   reads and validates the key through its filesystem seam. The selected path
   becomes absolute when accepted from the picker; TUI tests cover that handoff
   and the refresh after the journalled add operation.
-  The current manual-test package `0.1.1~dev.16.tui-views` was installed into
+  The current manual-test package `0.1.1~dev.17.ssh-key-picker` was installed into
   the isolated `pv` Debian 13 container after its version and fixture
-  subscriptions (`demo`, `staging`) were verified. Snapshot `tui-views-ssh`
+  subscriptions (`demo`, `staging`) were verified. Snapshot `tui-ssh-key-picker`
   preserves this exact interactive test state; `clean` remains the untouched
   baseline for privileged integration scenarios.
   Subscription creation is now also available in the fullscreen picker through
