@@ -56,15 +56,40 @@ func TestModel_DomainEditorUsesTabsAndKeepsSubscriptionPickerSeparate(t *testing
 	if !m.domainEditor.open || !strings.Contains(m.View(), "Overview") || !strings.Contains(m.View(), "Routing") {
 		t.Fatalf("editor = %#v\n%s", m.domainEditor, m.View())
 	}
-	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyRight})
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyRight, Alt: false})
 	m = updated.(appModel)
-	if m.domainEditor.tab != 1 || !strings.Contains(m.View(), "Document root") {
+	if m.domainEditor.tab != 0 {
+		t.Fatalf("ordinary arrow changed tab: %#v", m.domainEditor)
+	}
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyShiftRight})
+	m = updated.(appModel)
+	if m.domainEditor.tab != 1 {
+		t.Fatalf("shift-right did not change tab: %#v", m.domainEditor)
+	}
+	if !strings.Contains(m.View(), "Document root") {
 		t.Fatalf("content tab = %#v\n%s", m.domainEditor, m.View())
 	}
 	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("s")})
 	m = updated.(appModel)
 	if m.workspace || m.domainEditor.open || m.focus != focusSubscriptions {
 		t.Fatalf("subscription return = workspace:%t editor:%#v focus:%v", m.workspace, m.domainEditor, m.focus)
+	}
+}
+
+func TestModel_DomainEditorTabsFitMinimumTerminal(t *testing.T) {
+	m := New(Deps{})
+	m.ready, m.width, m.height = true, minWidth, minHeight
+	m.workspace, m.showWebsites, m.focus = true, true, focusWebsites
+	m.items = []domain.Subscription{{ID: 1, Name: "acme"}}
+	m.websites = []domain.Website{{PrimaryDomain: "app.acme.test", Type: domain.WebsiteStatic}}
+	m = m.openDomainEditor()
+	if got, want := lipgloss.Width(m.domainEditorTabs()), m.width-4; got > want {
+		t.Fatalf("tab strip width = %d, want at most %d:\n%s", got, want, m.domainEditorTabs())
+	}
+	for index, line := range strings.Split(m.View(), "\n") {
+		if got := lipgloss.Width(line); got != m.width {
+			t.Fatalf("line %d width = %d, want %d: %q", index, got, m.width, line)
+		}
 	}
 }
 

@@ -304,7 +304,7 @@ func (m appModel) keybar() string {
 		return "↑/↓ select · enter open · n create · a archive · d delete · / filter · , settings · ? help · q quit"
 	}
 	if m.domainEditor.open {
-		return "←/→ tabs · enter action · esc workspace · s subscriptions · ? help · q quit"
+		return "⇧←/⇧→ tabs · enter action · esc workspace · s subscriptions · ? help · q quit"
 	}
 	if m.focus == focusWebsites {
 		if summary := m.websiteFilter.activeSummary("domains", len(m.visibleWebsites()), len(m.websites)); summary != "" {

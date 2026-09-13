@@ -442,6 +442,10 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   administration text below is superseded: the remaining M8 work is a
   separate subscription-administration editor for database, SSH, cron and
   backup actions, not a return to editable Detail rows.
+  The editor tab strip uses branchctl's ANSI-aware horizontal joining instead
+  of concatenating multi-line styled strings. `Shift+Left` and `Shift+Right`
+  now change tabs; ordinary arrows do not. A minimum-terminal geometry test
+  covers the tab width and every rendered frame row.
   The subscription workspace also exposes `R` for a confirmed, service-backed
   reconciliation of generated Apache configuration. It keeps the scope to the
   selected subscription, reports the no-drift result without implying a write,

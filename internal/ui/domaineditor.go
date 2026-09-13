@@ -1,9 +1,8 @@
 package ui
 
 import (
-	"strings"
-
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 
 	"provctl/internal/domain"
 )
@@ -31,10 +30,10 @@ func (m appModel) handleDomainEditorKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "esc":
 		m.domainEditor, m.status = domainEditorState{}, "domain editor closed"
 		return m, nil
-	case "right", "tab":
+	case "shift+right":
 		m.domainEditor.tab = (m.domainEditor.tab + 1) % len(domainEditorTabs)
 		return m, nil
-	case "left", "shift+tab":
+	case "shift+left":
 		m.domainEditor.tab = (m.domainEditor.tab + len(domainEditorTabs) - 1) % len(domainEditorTabs)
 		return m, nil
 	case "?":
@@ -113,5 +112,5 @@ func (m appModel) domainEditorTabs() string {
 			parts[index] = tabInactiveStyle.Render(label)
 		}
 	}
-	return strings.Join(parts, "")
+	return lipgloss.JoinHorizontal(lipgloss.Bottom, parts...)
 }
