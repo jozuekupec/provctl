@@ -525,7 +525,7 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   `staging` a PHP-FPM/static demo weby. Spouští se přes `incus exec` v reálném
   terminálu; po kontrole lze stav bezpečně obnovit ze snapshotu `clean` nebo
   znovu otevřít `tui-ready`.
-- [~] **M9 — distribuce:** je přidána deklarace `packaging/nfpm.yaml` pro
+- [x] **M9 — distribuce:** je přidána deklarace `packaging/nfpm.yaml` pro
   jediný `provctl` `.deb`, config je `noreplace`, šablony jsou běžný obsah a
   balíček deklaruje pouze potřebné Debian závislosti. `scripts/build-deb.sh`
   staví CGO-free binárku s verzí vloženou přes `-ldflags` a předává ji nfpm.
@@ -632,7 +632,12 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   Lokální `v0.1.0` tag míří na starší commit a nikdy nebyl publikován. První
   veřejný release proto bude `v0.1.1` z aktuálního zeleného `main`; jeho tag
   je zároveň produkční test signing secrets, GitHub Release a Pages APT
-  deploymentu.
+  deploymentu. **M9 completed 2026-09-13:** workflow `34744458540` dokončil
+  testy, amd64/arm64 build, GitHub Release i podpis a deployment APT obsahu
+  na Pages. Veřejný klientský test v novém dočasném Debian 13 Incus kontejneru
+  ověřil fingerprint, kandidáta `0.1.1` z
+  `https://jozuekupec.github.io/provctl/debian` a úspěšně nainstalovaný
+  `provctl --version` `0.1.1`; kontejner byl po testu smazán.
 - [~] **M10 — migrace:**
   První integrační běh v `pv` odhalil rozpor: Debian balíček instaloval
   `/etc/logrotate.d/provctl`, ale bootstrap očekával jiný obsah a odmítal jej.

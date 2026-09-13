@@ -49,8 +49,7 @@ does not move data.
 
 ## Install from the APT repository
 
-The following endpoint is the planned release destination; its first public
-deployment is still pending verification. Once published, install on your
+The public repository is published at the following endpoint. Install on your
 Debian hosting server using:
 
 ```bash
