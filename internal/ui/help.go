@@ -65,10 +65,11 @@ func helpSections() []helpSection {
 		{title: "Subscriptions", rows: []string{
 			"r         refresh subscriptions",
 			"/         filter subscriptions or domains",
+			"n         create a subscription (from picker)",
 			"s         suspend or resume selected subscription",
 			"a         archive selected subscription",
 			"d         permanently delete selected archived subscription",
-			"p         choose an installed PHP-FPM version",
+			"p         choose a PHP-FPM version for selected domain",
 		}},
 		{title: "Domains", rows: []string{
 			"n         create a domain",

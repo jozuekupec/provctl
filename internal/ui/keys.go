@@ -24,6 +24,9 @@ func (m appModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if m.targetForm.open {
 		return m.handleTargetFormKey(msg)
 	}
+	if m.subscriptionCreateForm.open {
+		return m.handleSubscriptionCreateFormKey(msg)
+	}
 	if m.settings.open {
 		return m.handleSettingsKey(msg)
 	}
@@ -296,6 +299,8 @@ func (m appModel) handlePickerKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	case "d":
 		m = m.askDeleteSubscription()
+	case "n":
+		m = m.openSubscriptionCreateForm()
 	case "enter":
 		if len(m.visibleSubscriptions()) == 0 {
 			return m, nil

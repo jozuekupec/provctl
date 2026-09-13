@@ -40,6 +40,9 @@ func (m appModel) View() string {
 	if m.targetForm.open {
 		return m.overlayCenter(m.targetFormPopup(), view)
 	}
+	if m.subscriptionCreateForm.open {
+		return m.overlayCenter(m.subscriptionCreateFormPopup(), view)
+	}
 	if m.settings.open {
 		return m.overlayCenter(m.settingsPopup(), view)
 	}
@@ -219,7 +222,7 @@ func (m appModel) keybar() string {
 		if summary := m.subscriptionFilter.activeSummary("subscriptions", len(m.visibleSubscriptions()), len(m.items)); summary != "" {
 			return summary
 		}
-		return "↑/↓ select · enter open · a archive · d delete · / filter · , settings · ? help · q quit"
+		return "↑/↓ select · enter open · n create · a archive · d delete · / filter · , settings · ? help · q quit"
 	}
 	if m.focus == focusSubscriptions {
 		if summary := m.subscriptionFilter.activeSummary("subscriptions", len(m.visibleSubscriptions()), len(m.items)); summary != "" {

@@ -783,6 +783,41 @@ func TestModel_ArchiveSubscriptionCallsDependency(t *testing.T) {
 	}
 }
 
+func TestModel_CreateSubscriptionCallsDependency(t *testing.T) {
+	var created string
+	m := New(Deps{
+		CreateSubscription: func(_ context.Context, name string) (int64, error) {
+			created = name
+			return 1, nil
+		},
+		LoadSubscriptions: func(context.Context) ([]domain.Subscription, error) {
+			return []domain.Subscription{{ID: 1, Name: "acme", Status: "active"}}, nil
+		},
+	})
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("n")})
+	m = updated.(appModel)
+	if !m.subscriptionCreateForm.open {
+		t.Fatal("subscription creation form did not open")
+	}
+	for _, character := range "acme" {
+		updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{character}})
+		m = updated.(appModel)
+	}
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyCtrlS})
+	m = updated.(appModel)
+	if m.confirm.action != "create-subscription" || m.confirm.domain != "acme" {
+		t.Fatalf("confirmation = %#v", m.confirm)
+	}
+	updated, command := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("y")})
+	m = runProgress(t, updated.(appModel), command)
+	if created != "acme" {
+		t.Fatalf("CreateSubscription name = %q, want acme", created)
+	}
+	if !strings.Contains(m.status, "refreshing") {
+		t.Fatalf("status = %q, want refresh", m.status)
+	}
+}
+
 func TestModel_DeleteArchivedSubscriptionRequiresTypedName(t *testing.T) {
 	deleted := false
 	m := New(Deps{DeleteSubscription: func(_ context.Context, name string, force bool) (int64, error) {

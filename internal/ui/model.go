@@ -24,6 +24,7 @@ type Deps struct {
 	CreateWebsite          func(context.Context, string, string, domain.WebsiteType, string, int) (int64, error)
 	SetWebsiteAlias        func(context.Context, string, string, string, bool) (int64, error)
 	SetWebsiteTarget       func(context.Context, string, string, string, int) (int64, error)
+	CreateSubscription     func(context.Context, string) (int64, error)
 	SetSubscriptionStatus  func(context.Context, string, string) (int64, error)
 	DeleteSubscription     func(context.Context, string, bool) (int64, error)
 	LoadPHPVersions        func(context.Context) ([]service.PHPFPMVersion, error)
@@ -87,6 +88,10 @@ type subscriptionChangedMsg struct {
 	name, status string
 }
 type subscriptionDeletedMsg struct {
+	err  error
+	name string
+}
+type subscriptionCreatedMsg struct {
 	err  error
 	name string
 }
@@ -193,6 +198,11 @@ type targetFormState struct {
 	code    int
 }
 
+type subscriptionCreateFormState struct {
+	open  bool
+	input textinput.Model
+}
+
 type pathPickerTarget uint8
 
 const (
@@ -231,40 +241,41 @@ func (output outputState) append(line string) outputState {
 }
 
 type appModel struct {
-	deps               Deps
-	width, height      int
-	ready              bool
-	items              []domain.Subscription
-	cursor             int
-	websites           []domain.Website
-	databases          []domain.Database
-	websiteCursor      int
-	showWebsites       bool
-	workspace          bool
-	focus              focus
-	output             outputState
-	logs               outputState
-	subscriptionFilter filterState
-	websiteFilter      filterState
-	help               helpState
-	phpPicker          phpPickerState
-	settings           settingsState
-	documentRootForm   documentRootFormState
-	websiteCreateForm  websiteCreateFormState
-	aliasForm          aliasFormState
-	targetForm         targetFormState
-	pathPicker         pathPickerState
-	status             string
-	confirm            confirmState
-	progress           progressState
-	detailScroll       int
-	outputScroll       int
-	subscriptions      opSlot
-	websitesLoad       opSlot
-	databasesLoad      opSlot
-	healthLoad         opSlot
-	logsLoad           opSlot
-	phpVersionsLoad    opSlot
+	deps                   Deps
+	width, height          int
+	ready                  bool
+	items                  []domain.Subscription
+	cursor                 int
+	websites               []domain.Website
+	databases              []domain.Database
+	websiteCursor          int
+	showWebsites           bool
+	workspace              bool
+	focus                  focus
+	output                 outputState
+	logs                   outputState
+	subscriptionFilter     filterState
+	websiteFilter          filterState
+	help                   helpState
+	phpPicker              phpPickerState
+	settings               settingsState
+	documentRootForm       documentRootFormState
+	websiteCreateForm      websiteCreateFormState
+	aliasForm              aliasFormState
+	targetForm             targetFormState
+	subscriptionCreateForm subscriptionCreateFormState
+	pathPicker             pathPickerState
+	status                 string
+	confirm                confirmState
+	progress               progressState
+	detailScroll           int
+	outputScroll           int
+	subscriptions          opSlot
+	websitesLoad           opSlot
+	databasesLoad          opSlot
+	healthLoad             opSlot
+	logsLoad               opSlot
+	phpVersionsLoad        opSlot
 }
 
 func (m appModel) changeWebsite(ctx context.Context, confirm confirmState) tea.Msg {

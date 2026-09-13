@@ -416,6 +416,13 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   redirect-code validation. The TUI form is now available via `T` for selected
   proxy/redirect domains, with redirect code toggled between 301 and 302 and
   the shared confirmation/progress flow.
+  Subscription creation is now also available in the fullscreen picker through
+  `n`: the bounded form accepts the derived subscription name and preserves the
+  existing safe service defaults for user identity, home and unlimited quotas.
+  It follows the same confirmation/progress path as every other write and
+  refreshes the picker after completion. Subscription metadata editing remains
+  deliberately unimplemented because the service/CLI has no coherent update
+  operation to expose yet; it must not become a DB-only TUI shortcut.
   Původní návrh je zaznamenán v [tui-design.md](tui-design.md) a
   cíleně přebírá konzistentní Bubble Tea vzor z projektu `depo`: hodnotový
   model, `Deps`, samostatné routing/render/keys/theme a I/O jen přes `tea.Cmd`.

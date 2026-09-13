@@ -195,6 +195,17 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.output = m.output.append("subscription " + msg.name + " deleted")
 		m, command := m.startSubscriptions()
 		return m, command
+	case subscriptionCreatedMsg:
+		m.progress.active = false
+		if msg.err != nil {
+			m.status = "subscription creation failed: " + msg.err.Error()
+			m.output = m.output.append(m.status)
+			return m, nil
+		}
+		m.status = "subscription " + msg.name + " created; refreshing…"
+		m.output = m.output.append("subscription created: " + msg.name)
+		m, command := m.startSubscriptions()
+		return m, command
 	case phpVersionsLoadedMsg:
 		if m.phpVersionsLoad.stale(msg.generation) {
 			return m, nil
