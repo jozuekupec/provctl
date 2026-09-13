@@ -74,6 +74,51 @@ type SubscriptionCreateOptions struct {
 	QuotaBackups   int
 }
 
+// SubscriptionUsage is a read-only, derived overview for subscription lists.
+// It is intentionally separate from Subscription because neither website
+// counts nor disk usage are persisted subscription configuration.
+type SubscriptionUsage struct {
+	ActiveWebsites   int
+	DisabledWebsites int
+	DiskUsedBytes    int64
+	DiskUsageKnown   bool
+}
+
+// ListUsage returns the small set of live figures needed by a subscription
+// picker. A failed disk measurement does not hide otherwise usable data.
+func (service SubscriptionService) ListUsage(ctx context.Context) (map[int64]SubscriptionUsage, error) {
+	subscriptions, err := service.List(ctx)
+	if err != nil {
+		return nil, err
+	}
+	usage := make(map[int64]SubscriptionUsage, len(subscriptions))
+	for _, subscription := range subscriptions {
+		websites, err := service.Store.ListWebsites(ctx, subscription.ID)
+		if err != nil {
+			return nil, fmt.Errorf("list websites for subscription %q: %w", subscription.Name, err)
+		}
+		current := SubscriptionUsage{}
+		for _, website := range websites {
+			if website.Enabled {
+				current.ActiveWebsites++
+			} else {
+				current.DisabledWebsites++
+			}
+		}
+		if service.Commands != nil && subscription.Home != "" {
+			result, err := service.Commands.Run(ctx, "/usr/bin/du", "-sb", subscription.Home)
+			if err == nil {
+				var bytes int64
+				if _, err := fmt.Sscan(result.Stdout, &bytes); err == nil && bytes >= 0 {
+					current.DiskUsedBytes, current.DiskUsageKnown = bytes, true
+				}
+			}
+		}
+		usage[subscription.ID] = current
+	}
+	return usage, nil
+}
+
 // SubscriptionRuntime owns the database connection used by a production command.
 type SubscriptionRuntime struct {
 	Service    SubscriptionService

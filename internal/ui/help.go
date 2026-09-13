@@ -58,41 +58,27 @@ func (m appModel) helpSections() []helpSection {
 	navigation := helpSection{title: "Navigation", rows: []string{
 		"↑/↓       select an item or scroll the focused panel",
 		"←/→       move between workspace panels",
-		"esc       return to subscription picker",
+		"s         return to subscription picker",
 	}}
 	if !m.workspace {
 		return []helpSection{navigation, {title: "Subscriptions", rows: []string{
 			"enter     open selected subscription", "n         create a subscription", "a         archive selected subscription", "d         delete archived subscription", "r / /     refresh or filter", " ,        edit configuration settings",
 		}}, {title: "General", rows: []string{"?         this help", "q         quit"}}}
 	}
-	if m.focus == focusDetail {
-		switch m.detailView {
-		case detailDatabases:
-			return []helpSection{navigation, {title: "Databases", rows: []string{"n         create database", "b         reload database list", "↑/↓       scroll database list"}}, {title: "General", rows: []string{"?         this help", "q         quit"}}}
-		case detailSSHKeys:
-			return []helpSection{navigation, {title: "SSH keys", rows: []string{"n         add public key from a file", "K         reload SSH key list", "↑/↓       select a key"}}, {title: "General", rows: []string{"?         this help", "q         quit"}}}
-		case detailCronJobs:
-			return []helpSection{navigation, {title: "Cron jobs", rows: []string{"c         reload generated cron jobs", "↑/↓       scroll cron list"}}, {title: "General", rows: []string{"?         this help", "q         quit"}}}
-		case detailBackups:
-			return []helpSection{navigation, {title: "Backups", rows: []string{"V         reload backup history", "↑/↓       scroll backup list"}}, {title: "General", rows: []string{"?         this help", "q         quit"}}}
-		}
-	}
 	return []helpSection{
 		{title: "Navigation", rows: []string{
 			"↑/↓       select an item or scroll the focused panel",
 			"←/→       move between workspace panels",
-			"enter     open selected subscription",
-			"esc       clear a focused filter or return to picker",
+			"enter     edit selected domain",
+			"s         return to subscription picker",
 		}},
 		{title: "Subscriptions", rows: []string{
 			"r         refresh subscriptions",
-			"/         filter subscriptions or domains",
+			"/         filter domains",
 			"n         create a subscription (from picker)",
-			"s         suspend or resume selected subscription",
 			"a         archive selected subscription",
 			"d         permanently delete selected archived subscription",
-			"R         reconcile generated configuration for selected subscription",
-			"u         set SSH access mode for selected subscription",
+			"u         set SSH access mode (from picker)",
 		}},
 		{title: "Domains", rows: []string{
 			"n         create a domain",
@@ -104,11 +90,6 @@ func (m appModel) helpSections() []helpSection {
 			"T         edit selected proxy or redirect target",
 			"t         enable or disable TLS for selected domain",
 			"l / L     load access or error log",
-			"b         load subscription databases",
-			"K         load subscription SSH keys",
-			"n         add a public SSH key from SSH keys detail",
-			"c         load subscription cron jobs",
-			"V         load subscription backups",
 			"h         run health checks",
 		}},
 		{title: "General", rows: []string{

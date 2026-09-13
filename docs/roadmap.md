@@ -423,6 +423,25 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   it removes generated configuration (and managed TLS data) while preserving
   site data and logs. The service remains the only mutation boundary and the
   domain list is refreshed after the progress popup completes.
+  **Redesign block 11 in progress:** the workspace no longer treats the
+  Subscription metadata panel as focusable; the fullscreen picker is the sole
+  selection boundary and `s` returns there from the normal workspace. Detail
+  is again read-only, so it no longer presents database, SSH, cron, or backup
+  rows as if they were directly editable. Those controls will move into the
+  planned subscription administration surface. Picker rows now asynchronously
+  combine persisted quotas with read-only live usage: active and disabled
+  website counts plus `du -sb` disk usage. A failed disk measurement leaves
+  the subscription usable and displays an unknown value. Domain rows carry a
+  visible type tag (`[php-fpm]`, `[static]`, `[proxy]`, `[redirect]`). Focused
+  model/service tests and full `make test` passed.
+  `Enter` over a selected domain now opens the next safe editor slice: a
+  full-screen surface with connected Overview, Content, Runtime, TLS, Routing
+  and Logs tabs. Each tab exposes only its related existing operation, while
+  the shared confirmation/progress flow returns to the same editor. `Esc`
+  returns to the workspace and `s` to the picker. The historical Detail-based
+  administration text below is superseded: the remaining M8 work is a
+  separate subscription-administration editor for database, SSH, cron and
+  backup actions, not a return to editable Detail rows.
   The subscription workspace also exposes `R` for a confirmed, service-backed
   reconciliation of generated Apache configuration. It keeps the scope to the
   selected subscription, reports the no-drift result without implying a write,

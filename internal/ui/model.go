@@ -15,6 +15,7 @@ import (
 
 type Deps struct {
 	LoadSubscriptions      func(context.Context) ([]domain.Subscription, error)
+	LoadSubscriptionUsage  func(context.Context) (map[int64]service.SubscriptionUsage, error)
 	LoadWebsites           func(context.Context, int64) ([]domain.Website, error)
 	LoadDatabases          func(context.Context, string) ([]domain.Database, error)
 	CreateDatabase         func(context.Context, string, string, string) (string, int64, error)
@@ -81,6 +82,11 @@ type sshKeyAddedMsg struct {
 
 type subscriptionsLoadedMsg struct {
 	items      []domain.Subscription
+	err        error
+	generation uint64
+}
+type subscriptionUsageLoadedMsg struct {
+	items      map[int64]service.SubscriptionUsage
 	err        error
 	generation uint64
 }
@@ -232,6 +238,11 @@ type settingsState struct {
 	input  textinput.Model
 }
 
+type domainEditorState struct {
+	open bool
+	tab  int
+}
+
 type documentRootFormState struct {
 	open    bool
 	website domain.Website
@@ -331,6 +342,7 @@ type appModel struct {
 	width, height          int
 	ready                  bool
 	items                  []domain.Subscription
+	usage                  map[int64]service.SubscriptionUsage
 	cursor                 int
 	websites               []domain.Website
 	databases              []domain.Database
@@ -348,6 +360,7 @@ type appModel struct {
 	help                   helpState
 	phpPicker              phpPickerState
 	settings               settingsState
+	domainEditor           domainEditorState
 	documentRootForm       documentRootFormState
 	websiteCreateForm      websiteCreateFormState
 	aliasForm              aliasFormState
@@ -362,10 +375,10 @@ type appModel struct {
 	confirm                confirmState
 	progress               progressState
 	detailScroll           int
-	detailCursor           int
 	detailView             detailView
 	outputScroll           int
 	subscriptions          opSlot
+	usageLoad              opSlot
 	websitesLoad           opSlot
 	databasesLoad          opSlot
 	sshKeysLoad            opSlot
@@ -492,15 +505,6 @@ func (m appModel) loadWebsites(ctx context.Context, generation uint64) tea.Msg {
 	return websitesLoadedMsg{items: items, err: err, generation: generation}
 }
 
-func (m appModel) loadDatabases(ctx context.Context, generation uint64) tea.Msg {
-	subscription, ok := m.selectedSubscription()
-	if m.deps.LoadDatabases == nil || !ok {
-		return databasesLoadedMsg{err: context.Canceled, generation: generation}
-	}
-	items, err := m.deps.LoadDatabases(ctx, subscription.Name)
-	return databasesLoadedMsg{items: items, err: err, generation: generation}
-}
-
 func (m appModel) loadWebsiteLogs(ctx context.Context, generation uint64, errorLog bool) tea.Msg {
 	subscription, subscriptionOK := m.selectedSubscription()
 	website, websiteOK := m.selectedWebsite()
@@ -512,7 +516,7 @@ func (m appModel) loadWebsiteLogs(ctx context.Context, generation uint64, errorL
 }
 
 func New(deps Deps) appModel {
-	return appModel{deps: deps, focus: focusSubscriptions, status: "loading subscriptions…", subscriptionFilter: newFilter(), websiteFilter: newFilter(), help: helpState{filter: newFilter()}}
+	return appModel{deps: deps, usage: make(map[int64]service.SubscriptionUsage), focus: focusSubscriptions, status: "loading subscriptions…", subscriptionFilter: newFilter(), websiteFilter: newFilter(), help: helpState{filter: newFilter()}}
 }
 
 func (m appModel) Init() tea.Cmd {
@@ -532,56 +536,22 @@ func (m appModel) startSubscriptions() (appModel, tea.Cmd) {
 	return m, func() tea.Msg { return m.loadSubscriptions(ctx, generation) }
 }
 
+func (m appModel) loadSubscriptionUsage(ctx context.Context, generation uint64) tea.Msg {
+	if m.deps.LoadSubscriptionUsage == nil {
+		return subscriptionUsageLoadedMsg{generation: generation}
+	}
+	items, err := m.deps.LoadSubscriptionUsage(ctx)
+	return subscriptionUsageLoadedMsg{items: items, err: err, generation: generation}
+}
+
+func (m appModel) startSubscriptionUsage() (appModel, tea.Cmd) {
+	ctx, generation := m.usageLoad.start()
+	return m, func() tea.Msg { return m.loadSubscriptionUsage(ctx, generation) }
+}
+
 func (m appModel) startWebsites() (appModel, tea.Cmd) {
 	ctx, generation := m.websitesLoad.start()
 	return m, func() tea.Msg { return m.loadWebsites(ctx, generation) }
-}
-
-func (m appModel) startDatabases() (appModel, tea.Cmd) {
-	ctx, generation := m.databasesLoad.start()
-	return m, func() tea.Msg { return m.loadDatabases(ctx, generation) }
-}
-
-func (m appModel) loadSSHKeys(ctx context.Context, generation uint64) tea.Msg {
-	subscription, ok := m.selectedSubscription()
-	if m.deps.LoadSSHKeys == nil || !ok {
-		return sshKeysLoadedMsg{err: context.Canceled, generation: generation}
-	}
-	items, err := m.deps.LoadSSHKeys(ctx, subscription.Name)
-	return sshKeysLoadedMsg{items: items, err: err, generation: generation}
-}
-
-func (m appModel) startSSHKeys() (appModel, tea.Cmd) {
-	ctx, generation := m.sshKeysLoad.start()
-	return m, func() tea.Msg { return m.loadSSHKeys(ctx, generation) }
-}
-
-func (m appModel) loadCronJobs(ctx context.Context, generation uint64) tea.Msg {
-	subscription, ok := m.selectedSubscription()
-	if m.deps.LoadCronJobs == nil || !ok {
-		return cronJobsLoadedMsg{err: context.Canceled, generation: generation}
-	}
-	items, err := m.deps.LoadCronJobs(ctx, subscription.Name)
-	return cronJobsLoadedMsg{items: items, err: err, generation: generation}
-}
-
-func (m appModel) startCronJobs() (appModel, tea.Cmd) {
-	ctx, generation := m.cronJobsLoad.start()
-	return m, func() tea.Msg { return m.loadCronJobs(ctx, generation) }
-}
-
-func (m appModel) loadBackups(ctx context.Context, generation uint64) tea.Msg {
-	subscription, ok := m.selectedSubscription()
-	if m.deps.LoadBackups == nil || !ok {
-		return backupsLoadedMsg{err: context.Canceled, generation: generation}
-	}
-	items, err := m.deps.LoadBackups(ctx, subscription.Name)
-	return backupsLoadedMsg{items: items, err: err, generation: generation}
-}
-
-func (m appModel) startBackups() (appModel, tea.Cmd) {
-	ctx, generation := m.backupsLoad.start()
-	return m, func() tea.Msg { return m.loadBackups(ctx, generation) }
 }
 
 func (m appModel) startHealth() (appModel, tea.Cmd) {
@@ -601,6 +571,7 @@ func (m appModel) startPHPVersions() (appModel, tea.Cmd) {
 
 func (m appModel) clearSelectionDetails() appModel {
 	m.websitesLoad.invalidate()
+	m.usageLoad.invalidate()
 	m.databasesLoad.invalidate()
 	m.sshKeysLoad.invalidate()
 	m.cronJobsLoad.invalidate()

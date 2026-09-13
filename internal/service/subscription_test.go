@@ -227,6 +227,24 @@ func newSubscriptionService(fs *subscriptionFS, users *subscriptionUsers, store 
 	return SubscriptionService{FS: fs, Users: users, Store: store, Executor: plan.Executor{Journal: journal, Locker: subscriptionLocker{}}, Config: cfg}
 }
 
+func TestSubscriptionService_ListUsageCountsWebsitesAndMeasuresDisk(t *testing.T) {
+	store := &subscriptionStore{values: map[string]domain.Subscription{
+		"acme": {ID: 7, Name: "acme", Home: "/vhosts/acme"},
+	}, websites: []domain.Website{{SubscriptionID: 7, Enabled: true}, {SubscriptionID: 7, Enabled: false}, {SubscriptionID: 7, Enabled: true}}}
+	commands := &fake.Commander{Result: system.Result{Stdout: "12345\t/vhosts/acme\n"}}
+	service := SubscriptionService{Store: store, Commands: commands}
+	usage, err := service.ListUsage(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := usage[7], (SubscriptionUsage{ActiveWebsites: 2, DisabledWebsites: 1, DiskUsedBytes: 12345, DiskUsageKnown: true}); !cmp.Equal(got, want) {
+		t.Fatalf("usage = %#v, want %#v", got, want)
+	}
+	if got, want := commands.Calls, []fake.CommandCall{{Name: "/usr/bin/du", Args: []string{"-sb", "/vhosts/acme"}}}; !cmp.Equal(got, want) {
+		t.Fatalf("commands = %#v, want %#v", got, want)
+	}
+}
+
 func TestSubscriptionService_CreateCreatesSystemAndDatabaseState(t *testing.T) {
 	fs := &subscriptionFS{directories: map[string]bool{}}
 	users, store, journal := &subscriptionUsers{}, &subscriptionStore{values: map[string]domain.Subscription{}}, &subscriptionJournal{}

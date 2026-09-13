@@ -51,6 +51,9 @@ func (m appModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if m.confirm.action != "" {
 		return m.handleConfirmKey(msg)
 	}
+	if m.domainEditor.open {
+		return m.handleDomainEditorKey(msg)
+	}
 	if m.subscriptionFilter.active || m.websiteFilter.active {
 		return m.handleFilterKey(msg)
 	}
@@ -89,8 +92,6 @@ func (m appModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				m.detailView = detailDomain
 				m.logsLoad.invalidate()
 			}
-		} else if m.focus == focusDetail {
-			m.detailCursor = clamp(m.detailCursor+1, m.detailItemCount())
 		} else if m.focus == focusOutput {
 			m.outputScroll++
 		} else {
@@ -108,8 +109,6 @@ func (m appModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				m.detailView = detailDomain
 				m.logsLoad.invalidate()
 			}
-		} else if m.focus == focusDetail {
-			m.detailCursor = clamp(m.detailCursor-1, m.detailItemCount())
 		} else if m.focus == focusOutput {
 			m.outputScroll = max(0, m.outputScroll-1)
 		} else {
@@ -124,10 +123,7 @@ func (m appModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m, command := m.startSubscriptions()
 		return m, command
 	case "/":
-		if m.focus == focusSubscriptions {
-			m.subscriptionFilter.active = true
-			m.subscriptionFilter.input.Focus()
-		} else if m.focus == focusWebsites {
+		if m.focus == focusWebsites {
 			m.websiteFilter.active = true
 			m.websiteFilter.input.Focus()
 		}
@@ -143,10 +139,6 @@ func (m appModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				"Regenerate managed Apache configuration from provctl state.",
 			}})
 		}
-	case "u":
-		if m.focus == focusSubscriptions {
-			m = m.openSSHAccessForm()
-		}
 	case "p":
 		if m.focus == focusWebsites {
 			website, ok := m.selectedWebsite()
@@ -159,22 +151,6 @@ func (m appModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m, command := m.startPHPVersions()
 			return m, command
 		}
-	case "b":
-		m.status = "loading databases…"
-		m, command := m.startDatabases()
-		return m, command
-	case "K":
-		m.status = "loading SSH keys…"
-		m, command := m.startSSHKeys()
-		return m, command
-	case "c":
-		m.status = "loading cron jobs…"
-		m, command := m.startCronJobs()
-		return m, command
-	case "V":
-		m.status = "loading backups…"
-		m, command := m.startBackups()
-		return m, command
 	case "l":
 		if m.showWebsites && len(m.websites) > 0 {
 			m.status = "loading access log…"
@@ -188,15 +164,11 @@ func (m appModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, command
 		}
 	case "enter":
-		m.showWebsites, m.focus, m.status = true, focusWebsites, "loading websites…"
-		m, command := m.startWebsites()
-		return m, command
-	case "d":
-		if m.focus == focusSubscriptions {
-			m = m.askDeleteSubscription()
-		} else {
-			m.focus = focusDetail
+		if m.focus == focusWebsites {
+			m = m.openDomainEditor()
 		}
+	case "d":
+		m.focus = focusDetail
 	case "D":
 		if m.focus == focusWebsites {
 			m = m.askDeleteWebsite()
@@ -229,11 +201,6 @@ func (m appModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "a":
 		if m.focus == focusWebsites {
 			m = m.openAliasForm(true)
-		} else if m.focus == focusSubscriptions {
-			subscription, ok := m.selectedSubscription()
-			if ok && subscription.Status != "archived" {
-				m = m.askConfirm(confirmState{action: "archived", domain: subscription.Name, title: "Archive subscription", lines: []string{"Subscription: " + subscription.Name, "Archiving is required before permanent deletion."}})
-			}
 		}
 	case "A":
 		if m.focus == focusWebsites {
@@ -259,27 +226,12 @@ func (m appModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m = m.askConfirm(confirmState{action: "set-tls", enabled: enabled, domain: website.PrimaryDomain, title: map[bool]string{true: "Enable TLS", false: "Disable TLS"}[enabled], lines: lines})
 		}
 	case "s":
-		if m.focus == focusSubscriptions {
-			subscription, ok := m.selectedSubscription()
-			if !ok {
-				break
-			}
-			if subscription.Status == "active" {
-				m = m.askConfirm(confirmState{action: "suspended", domain: subscription.Name, title: "Suspend subscription", lines: []string{"Subscription: " + subscription.Name, "Websites will be unavailable until resumed."}})
-			} else if subscription.Status == "suspended" {
-				m = m.askConfirm(confirmState{action: "active", domain: subscription.Name, title: "Resume subscription", lines: []string{"Subscription: " + subscription.Name, "Restore normal service."}})
-			}
-		}
+		m.workspace, m.focus, m.status = false, focusSubscriptions, "subscription picker"
 	case "right", "tab":
 		m.focus = focusRight(m.focus)
 	case "left", "shift+tab":
 		m.focus = focusLeft(m.focus)
 	case "esc":
-		if m.focus == focusSubscriptions && m.subscriptionFilter.query() != "" {
-			m.subscriptionFilter.input.SetValue("")
-			m.cursor = 0
-			return m, nil
-		}
 		if m.focus == focusWebsites && m.websiteFilter.query() != "" {
 			m.websiteFilter.input.SetValue("")
 			m.websiteCursor = 0
@@ -345,6 +297,8 @@ func (m appModel) handlePickerKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	case "d":
 		m = m.askDeleteSubscription()
+	case "u":
+		m = m.openSSHAccessForm()
 	case "n":
 		m = m.openSubscriptionCreateForm()
 	case "enter":
@@ -403,8 +357,6 @@ func (m appModel) handlePHPPickerKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 func focusRight(current focus) focus {
 	switch current {
-	case focusSubscriptions:
-		return focusWebsites
 	case focusWebsites:
 		return focusDetail
 	case focusDetail:
@@ -418,8 +370,6 @@ func focusRight(current focus) focus {
 
 func focusLeft(current focus) focus {
 	switch current {
-	case focusWebsites:
-		return focusSubscriptions
 	case focusDetail:
 		return focusWebsites
 	case focusLogs:

@@ -3,6 +3,9 @@ package ui
 import (
 	"fmt"
 	"strings"
+
+	"provctl/internal/domain"
+	"provctl/internal/service"
 )
 
 func (m appModel) View() string {
@@ -15,6 +18,8 @@ func (m appModel) View() string {
 	var view string
 	if !m.workspace {
 		view = m.renderPicker()
+	} else if m.domainEditor.open {
+		view = m.renderDomainEditor()
 	} else {
 		view = m.renderWorkspace()
 	}
@@ -70,6 +75,50 @@ func (m appModel) View() string {
 	return view
 }
 
+func (m appModel) renderDomainEditor() string {
+	website, ok := m.selectedWebsite()
+	if !ok {
+		return m.renderFrame(panel("Domain editor", "No domain selected.", m.width, m.height-2, true))
+	}
+	title := "Edit domain · " + website.PrimaryDomain
+	body := strings.Join([]string{m.domainEditorTabs(), "", m.domainEditorBody(website)}, "\n")
+	return m.renderFrame(panel(title, body, m.width, m.height-2, true))
+}
+
+func (m appModel) domainEditorBody(website domain.Website) string {
+	subscription, _ := m.selectedSubscription()
+	phpVersion := valueOrDash(website.PHPVersion)
+	switch m.domainEditor.tab {
+	case 0:
+		return strings.Join([]string{"Domain: " + website.PrimaryDomain, "Subscription: " + subscription.Name, "Type: " + string(website.Type), "Status: " + map[bool]string{true: "enabled", false: "disabled"}[website.Enabled], "", "Enter  toggle enabled state"}, "\n")
+	case 1:
+		return strings.Join([]string{"Document root: " + valueOrDash(website.DocumentRoot), "Home: " + valueOrDash(subscription.Home), "", "Enter  choose a document root"}, "\n")
+	case 2:
+		if website.Type != domain.WebsitePHPFPM {
+			return "This domain type has no PHP-FPM runtime."
+		}
+		return strings.Join([]string{"PHP-FPM: " + phpVersion, "", "Enter  choose an installed PHP-FPM version"}, "\n")
+	case 3:
+		return strings.Join([]string{"TLS: " + map[bool]string{true: "enabled", false: "disabled"}[website.SSLEnabled], "Force HTTPS: " + fmt.Sprint(website.ForceHTTPS), "HSTS: " + fmt.Sprint(website.HSTS), "", "Enter  enable or disable TLS"}, "\n")
+	case 4:
+		aliases := "—"
+		if len(website.Aliases) > 0 {
+			aliases = strings.Join(website.Aliases, ", ")
+		}
+		lines := []string{"Aliases: " + aliases}
+		if website.Target != "" {
+			lines = append(lines, "Target: "+website.Target)
+		}
+		lines = append(lines, "", "a/A    add or remove alias")
+		if website.Type == domain.WebsiteProxy || website.Type == domain.WebsiteRedirect {
+			lines = append(lines, "Enter  edit target")
+		}
+		return strings.Join(lines, "\n")
+	default:
+		return "Enter  load access log\nL      load error log"
+	}
+}
+
 func (m appModel) renderPicker() string {
 	body := panel(m.subscriptionPanelTitle(), m.renderSubscriptions(m.height-4), m.width, m.height-2, true)
 	return m.renderFrame(body)
@@ -78,7 +127,7 @@ func (m appModel) renderPicker() string {
 func (m appModel) renderWorkspace() string {
 	layout := computeLayout(m.width, m.height, m.focus)
 	left := strings.Join([]string{
-		panel(m.subscriptionPanelTitle(), m.subscriptionMetadata(), layout.leftWidth, layout.metadata, m.focus == focusSubscriptions),
+		panel("Subscription", m.subscriptionMetadata(), layout.leftWidth, layout.metadata, false),
 		panel(m.websitePanelTitle(), m.renderWebsites(layout.domains-2), layout.leftWidth, layout.domains, m.focus == focusWebsites),
 		panel(m.detailTitle(), m.detailLines(layout.detail-2), layout.leftWidth, layout.detail, m.focus == focusDetail),
 	}, "\n")
@@ -141,7 +190,8 @@ func (m appModel) renderSubscriptions(rows int) string {
 	lines := make([]string, 0, end-start)
 	for index := start; index < end; index++ {
 		item := items[index]
-		line := fmt.Sprintf("  %-24s %s", item.Name, item.Status)
+		usage, known := m.usage[item.ID]
+		line := fmt.Sprintf("  %-18s [%s] · %s", item.Name, item.Status, m.subscriptionSummary(item, usage, known))
 		if index == m.cursor {
 			line = selectedStyle.Render("> " + strings.TrimPrefix(line, "  "))
 		}
@@ -169,13 +219,30 @@ func (m appModel) renderWebsites(rows int) string {
 		if website.Enabled {
 			state = "on"
 		}
-		line := fmt.Sprintf("  %-27s %-8s %s", website.PrimaryDomain, website.Type, state)
+		tag := "[" + string(website.Type) + "]"
+		line := fmt.Sprintf("  %-24s %-10s %s", website.PrimaryDomain, tag, state)
 		if index == m.websiteCursor {
 			line = selectedStyle.Render("> " + strings.TrimPrefix(line, "  "))
 		}
 		lines = append(lines, line)
 	}
 	return strings.Join(lines, "\n")
+}
+
+func (m appModel) subscriptionSummary(subscription domain.Subscription, usage service.SubscriptionUsage, known bool) string {
+	websiteUsage := "sites —/" + quotaCount(subscription.QuotaWebsites)
+	diskUsage := "disk —/" + quotaSize(subscription.QuotaDiskBytes)
+	if known {
+		websiteUsage = fmt.Sprintf("sites %d", usage.ActiveWebsites)
+		if usage.DisabledWebsites > 0 {
+			websiteUsage += fmt.Sprintf("+%d off", usage.DisabledWebsites)
+		}
+		websiteUsage += "/" + quotaCount(subscription.QuotaWebsites)
+		if usage.DiskUsageKnown {
+			diskUsage = quotaSize(usage.DiskUsedBytes) + "/" + quotaSize(subscription.QuotaDiskBytes)
+		}
+	}
+	return websiteUsage + " · " + diskUsage + " · db " + quotaCount(subscription.QuotaDatabases)
 }
 
 func (m appModel) subscriptionMetadata() string {
@@ -236,10 +303,8 @@ func (m appModel) keybar() string {
 		}
 		return "↑/↓ select · enter open · n create · a archive · d delete · / filter · , settings · ? help · q quit"
 	}
-	if m.focus == focusSubscriptions {
-		if summary := m.subscriptionFilter.activeSummary("subscriptions", len(m.visibleSubscriptions()), len(m.items)); summary != "" {
-			return summary
-		}
+	if m.domainEditor.open {
+		return "←/→ tabs · enter action · esc workspace · s subscriptions · ? help · q quit"
 	}
 	if m.focus == focusWebsites {
 		if summary := m.websiteFilter.activeSummary("domains", len(m.visibleWebsites()), len(m.websites)); summary != "" {
@@ -247,21 +312,13 @@ func (m appModel) keybar() string {
 		}
 	}
 	switch m.focus {
-	case focusSubscriptions:
-		return "←/→ panels · ↑/↓ select · u SSH access · s suspend/resume · a archive · d delete · R reconcile · , settings · esc back"
 	case focusWebsites:
-		return "←/→ panels · ↑/↓ select · n create · D delete · a/A aliases · p PHP · e toggle · E root · T target · t TLS · l/L logs · , settings · esc subscriptions"
+		return "←/→ panels · ↑/↓ select · enter edit · n create · D delete · a/A aliases · p PHP · e toggle · E root · T target · t TLS · l/L logs · s subscriptions"
 	case focusDetail:
-		if m.detailView == detailDatabases {
-			return "←/→ panels · ↑/↓ select · n create database · b reload · esc subscriptions · ? help"
-		}
-		if m.detailView == detailSSHKeys {
-			return "←/→ panels · ↑/↓ select · n add key · K reload · esc subscriptions · ? help"
-		}
-		return "←/→ panels · ↑/↓ select · b databases · K SSH keys · c cron · V backups · esc subscriptions · ? help"
+		return "←/→ panels · read-only preview · s subscriptions · ? help"
 	case focusLogs:
-		return "←/→ panels · ↑/↓ scroll · l/L logs · esc subscriptions · ? help"
+		return "←/→ panels · ↑/↓ scroll · l/L logs · s subscriptions · ? help"
 	default:
-		return "←/→ panels · ↑/↓ scroll · h health · R reconcile · K SSH keys · c cron · V backups · esc subscriptions · ? help"
+		return "←/→ panels · ↑/↓ scroll · h health · R reconcile · s subscriptions · ? help"
 	}
 }

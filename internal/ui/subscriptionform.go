@@ -177,5 +177,18 @@ func quotaSize(value int64) string {
 	if value == 0 {
 		return "unlimited"
 	}
-	return fmt.Sprintf("%d bytes", value)
+	units := []string{"bytes", "KiB", "MiB", "GiB", "TiB"}
+	amount := float64(value)
+	unit := 0
+	for amount >= 1024 && unit < len(units)-1 {
+		amount /= 1024
+		unit++
+	}
+	if unit == 0 {
+		return fmt.Sprintf("%d bytes", value)
+	}
+	if amount == float64(int64(amount)) {
+		return fmt.Sprintf("%.0f %s", amount, units[unit])
+	}
+	return fmt.Sprintf("%.1f %s", amount, units[unit])
 }

@@ -70,8 +70,23 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.selectedSubscriptionID() != selectedID {
 			m = m.clearSelectionDetails()
 		}
-		m.status = "r refresh • enter websites • d detail • o output • q quit"
+		m.status = "subscriptions refreshed"
 		m.output = m.output.append("subscriptions refreshed")
+		m, command := m.startSubscriptionUsage()
+		return m, command
+	case subscriptionUsageLoadedMsg:
+		if m.usageLoad.stale(msg.generation) {
+			return m, nil
+		}
+		m.usageLoad.finish(msg.generation)
+		if msg.err != nil {
+			m.output = m.output.append("subscription usage unavailable: " + msg.err.Error())
+			return m, nil
+		}
+		m.usage = make(map[int64]service.SubscriptionUsage, len(msg.items))
+		for id, usage := range msg.items {
+			m.usage[id] = usage
+		}
 	case websitesLoadedMsg:
 		if m.websitesLoad.stale(msg.generation) {
 			return m, nil
@@ -94,7 +109,7 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.output = m.output.append(m.status)
 			return m, nil
 		}
-		m.databases, m.detailCursor, m.detailView, m.focus, m.status = append([]domain.Database(nil), msg.items...), 0, detailDatabases, focusDetail, "databases loaded"
+		m.databases, m.detailView, m.focus, m.status = append([]domain.Database(nil), msg.items...), detailDatabases, focusDetail, "databases loaded"
 	case sshKeysLoadedMsg:
 		if m.sshKeysLoad.stale(msg.generation) {
 			return m, nil
@@ -105,7 +120,7 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.output = m.output.append(m.status)
 			return m, nil
 		}
-		m.sshKeys, m.detailCursor, m.detailView, m.focus, m.status = append([]domain.SSHKey(nil), msg.items...), 0, detailSSHKeys, focusDetail, "SSH keys loaded"
+		m.sshKeys, m.detailView, m.focus, m.status = append([]domain.SSHKey(nil), msg.items...), detailSSHKeys, focusDetail, "SSH keys loaded"
 	case cronJobsLoadedMsg:
 		if m.cronJobsLoad.stale(msg.generation) {
 			return m, nil
@@ -116,7 +131,7 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.output = m.output.append(m.status)
 			return m, nil
 		}
-		m.cronJobs, m.detailCursor, m.detailView, m.focus, m.status = append([]domain.CronJob(nil), msg.items...), 0, detailCronJobs, focusDetail, "cron jobs loaded"
+		m.cronJobs, m.detailView, m.focus, m.status = append([]domain.CronJob(nil), msg.items...), detailCronJobs, focusDetail, "cron jobs loaded"
 	case backupsLoadedMsg:
 		if m.backupsLoad.stale(msg.generation) {
 			return m, nil
@@ -127,7 +142,7 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.output = m.output.append(m.status)
 			return m, nil
 		}
-		m.backups, m.detailCursor, m.detailView, m.focus, m.status = append([]domain.Backup(nil), msg.items...), 0, detailBackups, focusDetail, "backups loaded"
+		m.backups, m.detailView, m.focus, m.status = append([]domain.Backup(nil), msg.items...), detailBackups, focusDetail, "backups loaded"
 	case sshAccessChangedMsg:
 		m.progress.active = false
 		if msg.err != nil {

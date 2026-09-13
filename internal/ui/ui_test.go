@@ -30,6 +30,44 @@ func TestModel_LoadAndNavigateSubscriptions(t *testing.T) {
 	}
 }
 
+func TestModel_SubscriptionPickerShowsUsageAndDomainTags(t *testing.T) {
+	m := New(Deps{})
+	m.items = []domain.Subscription{{ID: 1, Name: "acme", Status: "active", QuotaDiskBytes: 2 * 1024 * 1024 * 1024, QuotaWebsites: 5, QuotaDatabases: 3}}
+	m.usage[1] = service.SubscriptionUsage{ActiveWebsites: 2, DisabledWebsites: 1, DiskUsedBytes: 512 * 1024 * 1024, DiskUsageKnown: true}
+	picker := m.renderSubscriptions(4)
+	if !strings.Contains(picker, "sites 2+1 off/5") || !strings.Contains(picker, "512 MiB/2 GiB") || !strings.Contains(picker, "db 3") {
+		t.Fatalf("subscription overview = %q", picker)
+	}
+	m.workspace, m.showWebsites = true, true
+	m.websites = []domain.Website{{PrimaryDomain: "api.acme.test", Type: domain.WebsiteProxy, Enabled: true}}
+	if got := m.renderWebsites(4); !strings.Contains(got, "[proxy]") {
+		t.Fatalf("website row = %q", got)
+	}
+}
+
+func TestModel_DomainEditorUsesTabsAndKeepsSubscriptionPickerSeparate(t *testing.T) {
+	m := New(Deps{})
+	m.ready, m.width, m.height = true, 100, 28
+	m.workspace, m.showWebsites, m.focus = true, true, focusWebsites
+	m.items = []domain.Subscription{{ID: 1, Name: "acme", Home: "/vhosts/acme"}}
+	m.websites = []domain.Website{{PrimaryDomain: "app.acme.test", Type: domain.WebsiteStatic, DocumentRoot: "/vhosts/acme/public"}}
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = updated.(appModel)
+	if !m.domainEditor.open || !strings.Contains(m.View(), "Overview") || !strings.Contains(m.View(), "Routing") {
+		t.Fatalf("editor = %#v\n%s", m.domainEditor, m.View())
+	}
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyRight})
+	m = updated.(appModel)
+	if m.domainEditor.tab != 1 || !strings.Contains(m.View(), "Document root") {
+		t.Fatalf("content tab = %#v\n%s", m.domainEditor, m.View())
+	}
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("s")})
+	m = updated.(appModel)
+	if m.workspace || m.domainEditor.open || m.focus != focusSubscriptions {
+		t.Fatalf("subscription return = workspace:%t editor:%#v focus:%v", m.workspace, m.domainEditor, m.focus)
+	}
+}
+
 func TestModel_SettingsEditsAndSavesSSLConfiguration(t *testing.T) {
 	initial := config.Config{Meta: config.Meta{ConfigVersion: 1}, Paths: config.Paths{VHosts: "/vhosts", Backups: "/backups", ACMEChallenge: "/acme"}, Apache: config.Apache{Service: "apache2", SitesAvailable: "/available", SitesEnabled: "/enabled"}, Users: config.Users{UIDMin: 1, UIDMax: 2}, Limits: config.Limits{LockTimeoutSeconds: 1}, SSL: config.SSL{Email: "old@example.test"}}
 	var got config.Config
@@ -734,7 +772,7 @@ func TestModel_AppliedHelpFilterAlsoFitsPopup(t *testing.T) {
 
 func TestModel_HelpFilterDropsUnmatchedSections(t *testing.T) {
 	m := New(Deps{})
-	m.workspace, m.focus = true, focusWebsites
+	m.workspace, m.showWebsites, m.focus = true, true, focusWebsites
 	m.help = helpState{open: true, filter: newFilter()}
 	m.help.filter.input.SetValue("TLS")
 	rows := strings.Join(m.filteredHelpRows(), "\n")
@@ -743,19 +781,20 @@ func TestModel_HelpFilterDropsUnmatchedSections(t *testing.T) {
 	}
 }
 
-func TestModel_HelpUsesActiveDetailContext(t *testing.T) {
+func TestModel_HelpTreatsDetailAsReadOnly(t *testing.T) {
 	m := New(Deps{})
 	m.workspace, m.focus, m.detailView = true, focusDetail, detailDatabases
 	rows := strings.Join(m.filteredHelpRows(), "\n")
-	if !strings.Contains(rows, "create database") || strings.Contains(rows, "add public key") {
-		t.Fatalf("contextual help = %q", rows)
+	if strings.Contains(rows, "create database") || !strings.Contains(rows, "edit selected domain") {
+		t.Fatalf("read-only detail help = %q", rows)
 	}
 }
 
-func TestModel_SubscriptionFilterShowsCountAndClearsFromWorkspace(t *testing.T) {
+func TestModel_WorkspaceFiltersDomainsAndReturnsToPicker(t *testing.T) {
 	m := New(Deps{})
-	m.ready, m.width, m.height, m.workspace = true, 100, 28, true
-	m.items = []domain.Subscription{{Name: "acme", Status: "active"}, {Name: "beta", Status: "archived"}}
+	m.ready, m.width, m.height, m.workspace, m.focus = true, 100, 28, true, focusWebsites
+	m.items = []domain.Subscription{{Name: "acme", Status: "active"}}
+	m.websites = []domain.Website{{PrimaryDomain: "acme.test", Type: domain.WebsiteStatic}, {PrimaryDomain: "beta.test", Type: domain.WebsiteProxy}}
 	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("/")})
 	m = updated.(appModel)
 	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("a")})
@@ -764,35 +803,15 @@ func TestModel_SubscriptionFilterShowsCountAndClearsFromWorkspace(t *testing.T) 
 	m = updated.(appModel)
 	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("m")})
 	m = updated.(appModel)
-	if !strings.Contains(m.keybar(), "1/2 matches") || !strings.Contains(m.subscriptionPanelTitle(), "1/2") {
-		t.Fatalf("filter indicators = %q / %q", m.keybar(), m.subscriptionPanelTitle())
+	if !strings.Contains(m.keybar(), "1/2 matches") || !strings.Contains(m.websitePanelTitle(), "1/2") {
+		t.Fatalf("filter indicators = %q / %q", m.keybar(), m.websitePanelTitle())
 	}
 	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	m = updated.(appModel)
-	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("s")})
 	m = updated.(appModel)
-	if m.subscriptionFilter.query() != "" || m.cursor != 0 {
-		t.Fatalf("escape did not clear applied subscription filter: %#v", m.subscriptionFilter)
-	}
-}
-
-func TestModel_ConfirmSubscriptionSuspendCallsDependency(t *testing.T) {
-	called := false
-	m := New(Deps{SetSubscriptionStatus: func(_ context.Context, name, status string) (int64, error) {
-		called = name == "acme" && status == "suspended"
-		return 1, nil
-	}})
-	m.items = []domain.Subscription{{ID: 1, Name: "acme", Status: "active"}}
-	m.workspace = true
-	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("s")})
-	m = updated.(appModel)
-	if m.confirm.action != "suspended" {
-		t.Fatalf("confirmation = %#v", m.confirm)
-	}
-	updated, command := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("y")})
-	m = runProgress(t, updated.(appModel), command)
-	if !called {
-		t.Fatal("SetSubscriptionStatus was not called")
+	if m.workspace || m.focus != focusSubscriptions {
+		t.Fatalf("s did not return to picker: workspace=%t focus=%v", m.workspace, m.focus)
 	}
 }
 
@@ -981,7 +1000,7 @@ func TestModel_ReconcileUsesSelectedSubscription(t *testing.T) {
 		},
 		LoadWebsites: func(context.Context, int64) ([]domain.Website, error) { return nil, nil },
 	})
-	m.workspace, m.focus = true, focusSubscriptions
+	m.workspace, m.focus = true, focusWebsites
 	m.items = []domain.Subscription{{ID: 1, Name: "acme", Status: "active"}}
 	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("R")})
 	m = updated.(appModel)
@@ -992,82 +1011,6 @@ func TestModel_ReconcileUsesSelectedSubscription(t *testing.T) {
 	m = runProgress(t, updated.(appModel), command)
 	if reconciled != "acme" || !strings.Contains(m.status, "reconciled") {
 		t.Fatalf("reconciled=%q status=%q", reconciled, m.status)
-	}
-}
-
-func TestModel_LoadDatabasesShowsDatabaseDetail(t *testing.T) {
-	m := New(Deps{LoadDatabases: func(_ context.Context, subscription string) ([]domain.Database, error) {
-		if subscription != "acme" {
-			t.Fatalf("LoadDatabases subscription = %q", subscription)
-		}
-		return []domain.Database{{Name: "acme_app", User: "acme_app", Host: "localhost", Charset: "utf8mb4"}}, nil
-	}})
-	m.workspace, m.showWebsites, m.focus = true, true, focusWebsites
-	m.items = []domain.Subscription{{ID: 1, Name: "acme", Status: "active"}}
-	m.websites = []domain.Website{{PrimaryDomain: "www.example.test", Type: domain.WebsiteStatic}, {PrimaryDomain: "api.example.test", Type: domain.WebsiteStatic}}
-	updated, command := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("b")})
-	updated, _ = updated.(appModel).Update(command())
-	m = updated.(appModel)
-	if m.detailView != detailDatabases || m.focus != focusDetail || !strings.Contains(m.detail(), "acme_app") || m.detailTitle() != "Databases" {
-		t.Fatalf("detail view = %v focus = %v detail = %q title = %q", m.detailView, m.focus, m.detail(), m.detailTitle())
-	}
-	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyLeft})
-	m = updated.(appModel)
-	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
-	m = updated.(appModel)
-	if m.detailView != detailDomain {
-		t.Fatal("changing the selected domain did not restore domain detail")
-	}
-}
-
-func TestModel_LoadSSHKeysShowsSSHKeyDetail(t *testing.T) {
-	m := New(Deps{LoadSSHKeys: func(_ context.Context, subscription string) ([]domain.SSHKey, error) {
-		if subscription != "acme" {
-			t.Fatalf("LoadSSHKeys subscription = %q", subscription)
-		}
-		return []domain.SSHKey{{Fingerprint: "SHA256:example", Comment: "operator@example.test"}}, nil
-	}})
-	m.workspace = true
-	m.items = []domain.Subscription{{ID: 1, Name: "acme", Status: "active"}}
-	updated, command := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("K")})
-	updated, _ = updated.(appModel).Update(command())
-	m = updated.(appModel)
-	if m.detailView != detailSSHKeys || m.focus != focusDetail || !strings.Contains(m.detail(), "SHA256:example") || m.detailTitle() != "SSH keys" {
-		t.Fatalf("detail view = %v focus = %v detail = %q title = %q", m.detailView, m.focus, m.detail(), m.detailTitle())
-	}
-}
-
-func TestModel_LoadCronJobsShowsCronDetail(t *testing.T) {
-	m := New(Deps{LoadCronJobs: func(_ context.Context, subscription string) ([]domain.CronJob, error) {
-		if subscription != "acme" {
-			t.Fatalf("LoadCronJobs subscription = %q", subscription)
-		}
-		return []domain.CronJob{{ID: 7, Schedule: "@daily", Command: "/usr/local/bin/backup", Comment: "backup"}}, nil
-	}})
-	m.workspace = true
-	m.items = []domain.Subscription{{ID: 1, Name: "acme", Status: "active"}}
-	updated, command := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("c")})
-	updated, _ = updated.(appModel).Update(command())
-	m = updated.(appModel)
-	if m.detailView != detailCronJobs || m.focus != focusDetail || !strings.Contains(m.detail(), "@daily") || m.detailTitle() != "Cron jobs" {
-		t.Fatalf("detail view = %v focus = %v detail = %q title = %q", m.detailView, m.focus, m.detail(), m.detailTitle())
-	}
-}
-
-func TestModel_LoadBackupsShowsBackupDetail(t *testing.T) {
-	m := New(Deps{LoadBackups: func(_ context.Context, subscription string) ([]domain.Backup, error) {
-		if subscription != "acme" {
-			t.Fatalf("LoadBackups subscription = %q", subscription)
-		}
-		return []domain.Backup{{ID: 9, Status: "completed", SizeBytes: 2048}}, nil
-	}})
-	m.workspace = true
-	m.items = []domain.Subscription{{ID: 1, Name: "acme", Status: "active"}}
-	updated, command := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("V")})
-	updated, _ = updated.(appModel).Update(command())
-	m = updated.(appModel)
-	if m.detailView != detailBackups || m.focus != focusDetail || !strings.Contains(m.detail(), "2048 bytes") || m.detailTitle() != "Backups" {
-		t.Fatalf("detail view = %v focus = %v detail = %q title = %q", m.detailView, m.focus, m.detail(), m.detailTitle())
 	}
 }
 
@@ -1084,7 +1027,7 @@ func TestModel_SSHAccessShowsPasswordOnlyInSecretPopup(t *testing.T) {
 			return []domain.Subscription{{ID: 1, Name: "acme", SSHAccess: "password"}}, nil
 		},
 	})
-	m.workspace, m.focus = true, focusSubscriptions
+	m.workspace, m.focus = false, focusSubscriptions
 	m.items = []domain.Subscription{{ID: 1, Name: "acme", SSHAccess: "none"}}
 	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("u")})
 	m = updated.(appModel)
@@ -1172,8 +1115,8 @@ func TestModel_AddSSHKeyUsesServiceAndRefreshesKeys(t *testing.T) {
 }
 
 func TestFocusNavigationMovesAcrossWorkspacePanels(t *testing.T) {
-	if got := focusLeft(focusWebsites); got != focusSubscriptions {
-		t.Fatalf("left from domains = %v, want subscriptions", got)
+	if got := focusLeft(focusWebsites); got != focusWebsites {
+		t.Fatalf("left from domains = %v, want domains", got)
 	}
 	if got := focusRight(focusLogs); got != focusOutput {
 		t.Fatalf("right from logs = %v, want output", got)
@@ -1181,10 +1124,11 @@ func TestFocusNavigationMovesAcrossWorkspacePanels(t *testing.T) {
 }
 
 func TestModel_ConfirmationCannotStartDuplicateMutation(t *testing.T) {
-	m := New(Deps{SetSubscriptionStatus: func(context.Context, string, string) (int64, error) { return 1, nil }})
+	m := New(Deps{SetWebsiteEnabled: func(context.Context, string, string, bool) (int64, error) { return 1, nil }})
 	m.items = []domain.Subscription{{Name: "acme", Status: "active"}}
-	m.workspace = true
-	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("s")})
+	m.websites = []domain.Website{{PrimaryDomain: "acme.test", Enabled: true}}
+	m.workspace, m.showWebsites, m.focus = true, true, focusWebsites
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("e")})
 	m = updated.(appModel)
 	updated, command := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("y")})
 	m = updated.(appModel)
@@ -1235,23 +1179,6 @@ func TestModel_HealthWritesChecksToOutput(t *testing.T) {
 	m = updated.(appModel)
 	if m.focus != focusOutput || !strings.Contains(strings.Join(m.output.lines, "\n"), "Apache") {
 		t.Errorf("model = %#v", m)
-	}
-}
-
-func TestModel_LoadDatabasesShowsDetail(t *testing.T) {
-	m := New(Deps{LoadDatabases: func(_ context.Context, name string) ([]domain.Database, error) {
-		if name != "acme" {
-			t.Fatalf("name = %q", name)
-		}
-		return []domain.Database{{Name: "acme_main"}}, nil
-	}})
-	m.items = []domain.Subscription{{Name: "acme"}}
-	m.workspace = true
-	updated, command := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("b")})
-	updated, _ = updated.(appModel).Update(command())
-	m = updated.(appModel)
-	if m.focus != focusDetail || !strings.Contains(m.detail(), "acme_main") {
-		t.Errorf("detail = %q", m.detail())
 	}
 }
 
