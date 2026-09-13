@@ -19,6 +19,7 @@ type Deps struct {
 	LoadDatabases          func(context.Context, string) ([]domain.Database, error)
 	LoadSSHKeys            func(context.Context, string) ([]domain.SSHKey, error)
 	LoadCronJobs           func(context.Context, string) ([]domain.CronJob, error)
+	LoadBackups            func(context.Context, string) ([]domain.Backup, error)
 	ReadWebsiteLogs        func(context.Context, string, string, bool, int) (string, error)
 	SetWebsiteEnabled      func(context.Context, string, string, bool) (int64, error)
 	SetWebsiteTLS          func(context.Context, string, string, bool) error
@@ -55,6 +56,11 @@ type sshKeysLoadedMsg struct {
 }
 type cronJobsLoadedMsg struct {
 	items      []domain.CronJob
+	err        error
+	generation uint64
+}
+type backupsLoadedMsg struct {
+	items      []domain.Backup
 	err        error
 	generation uint64
 }
@@ -169,6 +175,7 @@ const (
 	detailDatabases
 	detailSSHKeys
 	detailCronJobs
+	detailBackups
 )
 
 type outputState struct{ lines []string }
@@ -284,6 +291,7 @@ type appModel struct {
 	databases              []domain.Database
 	sshKeys                []domain.SSHKey
 	cronJobs               []domain.CronJob
+	backups                []domain.Backup
 	websiteCursor          int
 	showWebsites           bool
 	workspace              bool
@@ -312,6 +320,7 @@ type appModel struct {
 	databasesLoad          opSlot
 	sshKeysLoad            opSlot
 	cronJobsLoad           opSlot
+	backupsLoad            opSlot
 	healthLoad             opSlot
 	logsLoad               opSlot
 	phpVersionsLoad        opSlot
@@ -511,6 +520,20 @@ func (m appModel) startCronJobs() (appModel, tea.Cmd) {
 	return m, func() tea.Msg { return m.loadCronJobs(ctx, generation) }
 }
 
+func (m appModel) loadBackups(ctx context.Context, generation uint64) tea.Msg {
+	subscription, ok := m.selectedSubscription()
+	if m.deps.LoadBackups == nil || !ok {
+		return backupsLoadedMsg{err: context.Canceled, generation: generation}
+	}
+	items, err := m.deps.LoadBackups(ctx, subscription.Name)
+	return backupsLoadedMsg{items: items, err: err, generation: generation}
+}
+
+func (m appModel) startBackups() (appModel, tea.Cmd) {
+	ctx, generation := m.backupsLoad.start()
+	return m, func() tea.Msg { return m.loadBackups(ctx, generation) }
+}
+
 func (m appModel) startHealth() (appModel, tea.Cmd) {
 	ctx, generation := m.healthLoad.start()
 	return m, func() tea.Msg { return m.loadHealth(ctx, generation) }
@@ -531,9 +554,10 @@ func (m appModel) clearSelectionDetails() appModel {
 	m.databasesLoad.invalidate()
 	m.sshKeysLoad.invalidate()
 	m.cronJobsLoad.invalidate()
+	m.backupsLoad.invalidate()
 	m.healthLoad.invalidate()
 	m.logsLoad.invalidate()
-	m.websites, m.databases, m.sshKeys, m.cronJobs = nil, nil, nil, nil
+	m.websites, m.databases, m.sshKeys, m.cronJobs, m.backups = nil, nil, nil, nil, nil
 	m.websiteCursor, m.detailScroll, m.outputScroll = 0, 0, 0
 	m.showWebsites = false
 	return m

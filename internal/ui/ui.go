@@ -117,6 +117,17 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		m.cronJobs, m.detailView, m.focus, m.status = append([]domain.CronJob(nil), msg.items...), detailCronJobs, focusDetail, "cron jobs loaded"
+	case backupsLoadedMsg:
+		if m.backupsLoad.stale(msg.generation) {
+			return m, nil
+		}
+		m.backupsLoad.finish(msg.generation)
+		if msg.err != nil {
+			m.status = "backup load failed: " + msg.err.Error()
+			m.output = m.output.append(m.status)
+			return m, nil
+		}
+		m.backups, m.detailView, m.focus, m.status = append([]domain.Backup(nil), msg.items...), detailBackups, focusDetail, "backups loaded"
 	case websiteChangedMsg:
 		m.progress.active = false
 		if msg.err != nil {

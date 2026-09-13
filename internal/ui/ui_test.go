@@ -961,6 +961,23 @@ func TestModel_LoadCronJobsShowsCronDetail(t *testing.T) {
 	}
 }
 
+func TestModel_LoadBackupsShowsBackupDetail(t *testing.T) {
+	m := New(Deps{LoadBackups: func(_ context.Context, subscription string) ([]domain.Backup, error) {
+		if subscription != "acme" {
+			t.Fatalf("LoadBackups subscription = %q", subscription)
+		}
+		return []domain.Backup{{ID: 9, Status: "completed", SizeBytes: 2048}}, nil
+	}})
+	m.workspace = true
+	m.items = []domain.Subscription{{ID: 1, Name: "acme", Status: "active"}}
+	updated, command := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("V")})
+	updated, _ = updated.(appModel).Update(command())
+	m = updated.(appModel)
+	if m.detailView != detailBackups || m.focus != focusDetail || !strings.Contains(m.detail(), "2048 bytes") || m.detailTitle() != "Backups" {
+		t.Fatalf("detail view = %v focus = %v detail = %q title = %q", m.detailView, m.focus, m.detail(), m.detailTitle())
+	}
+}
+
 func TestFocusNavigationMovesAcrossWorkspacePanels(t *testing.T) {
 	if got := focusLeft(focusWebsites); got != focusSubscriptions {
 		t.Fatalf("left from domains = %v, want subscriptions", got)

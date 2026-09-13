@@ -438,6 +438,10 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   view shows each persisted job ID, schedule, command and optional comment.
   This remains a database-derived view; the TUI does not parse or manipulate a
   user's generated crontab directly.
+  Backup history is now available through `V`. It loads only the persisted
+  subscription archives and shows ID, completion status, size and start time;
+  inspection and restore remain explicit CLI workflows until their destructive
+  confirmation and archive-verification UX has a dedicated design.
   Subscription creation is now also available in the fullscreen picker through
   `n`: the bounded form accepts the derived subscription name and preserves the
   existing safe service defaults for user identity, home and unlimited quotas.

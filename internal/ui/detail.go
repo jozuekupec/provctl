@@ -83,6 +83,17 @@ func (m appModel) detail() string {
 		}
 		return strings.Join(lines, "\n")
 	}
+	if m.detailView == detailBackups {
+		if len(m.backups) == 0 {
+			return "No backups."
+		}
+		lines := make([]string, 0, len(m.backups)+1)
+		lines = append(lines, "Subscription: "+subscription.Name)
+		for _, backup := range m.backups {
+			lines = append(lines, fmt.Sprintf("#%d · %s · %d bytes · %s", backup.ID, backup.Status, backup.SizeBytes, backup.StartedAt.UTC().Format("2006-01-02 15:04Z")))
+		}
+		return strings.Join(lines, "\n")
+	}
 	return fmt.Sprintf("Subscription: %s\nStatus: %s\nUser: %s\nHome: %s\nWebsites: %d", subscription.Name, subscription.Status, subscription.UnixUser, subscription.Home, len(m.websites))
 }
 
@@ -95,6 +106,9 @@ func (m appModel) detailTitle() string {
 	}
 	if m.detailView == detailCronJobs {
 		return "Cron jobs"
+	}
+	if m.detailView == detailBackups {
+		return "Backups"
 	}
 	return "Detail"
 }
