@@ -2,6 +2,15 @@
     urgency: medium
     distributions:
       - unstable
+  semver: "0.1.1-1"
+  date: "2026-09-13T00:00:00Z"
+  packager: "Jozue Kupec <jozuekupec80@gmail.com>"
+  changes:
+    - note: "Complete the subscription-focused terminal UI and safe management workflows."
+- deb:
+    urgency: medium
+    distributions:
+      - unstable
   semver: "0.1.0-1"
   date: "2026-09-12T00:00:00Z"
   packager: "Jozue Kupec <jozuekupec80@gmail.com>"

@@ -629,6 +629,10 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   Starší běh `34743203661` selhal pouze na třech staticcheck nálezech
   (nepoužité popup konstanty a nevyužitý výsledek v UI testu); jejich oprava
   je součástí pozdějších zelených běhů, nejde tedy o aktuální CI blokér.
+  Lokální `v0.1.0` tag míří na starší commit a nikdy nebyl publikován. První
+  veřejný release proto bude `v0.1.1` z aktuálního zeleného `main`; jeho tag
+  je zároveň produkční test signing secrets, GitHub Release a Pages APT
+  deploymentu.
 - [~] **M10 — migrace:**
   První integrační běh v `pv` odhalil rozpor: Debian balíček instaloval
   `/etc/logrotate.d/provctl`, ale bootstrap očekával jiný obsah a odmítal jej.
