@@ -70,7 +70,7 @@ func (m appModel) helpSections() []helpSection {
 		case detailDatabases:
 			return []helpSection{navigation, {title: "Databases", rows: []string{"n         create database", "b         reload database list", "↑/↓       scroll database list"}}, {title: "General", rows: []string{"?         this help", "q         quit"}}}
 		case detailSSHKeys:
-			return []helpSection{navigation, {title: "SSH keys", rows: []string{"+         add public key from a file", "K         reload SSH key list", "↑/↓       scroll key list"}}, {title: "General", rows: []string{"?         this help", "q         quit"}}}
+			return []helpSection{navigation, {title: "SSH keys", rows: []string{"n         add public key from a file", "K         reload SSH key list", "↑/↓       select a key"}}, {title: "General", rows: []string{"?         this help", "q         quit"}}}
 		case detailCronJobs:
 			return []helpSection{navigation, {title: "Cron jobs", rows: []string{"c         reload generated cron jobs", "↑/↓       scroll cron list"}}, {title: "General", rows: []string{"?         this help", "q         quit"}}}
 		case detailBackups:
@@ -106,7 +106,7 @@ func (m appModel) helpSections() []helpSection {
 			"l / L     load access or error log",
 			"b         load subscription databases",
 			"K         load subscription SSH keys",
-			"+         add a public SSH key from a file (SSH keys detail)",
+			"n         add a public SSH key from SSH keys detail",
 			"c         load subscription cron jobs",
 			"V         load subscription backups",
 			"h         run health checks",

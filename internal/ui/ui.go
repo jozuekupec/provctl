@@ -94,7 +94,7 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.output = m.output.append(m.status)
 			return m, nil
 		}
-		m.databases, m.detailView, m.focus, m.status = append([]domain.Database(nil), msg.items...), detailDatabases, focusDetail, "databases loaded"
+		m.databases, m.detailCursor, m.detailView, m.focus, m.status = append([]domain.Database(nil), msg.items...), 0, detailDatabases, focusDetail, "databases loaded"
 	case sshKeysLoadedMsg:
 		if m.sshKeysLoad.stale(msg.generation) {
 			return m, nil
@@ -105,7 +105,7 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.output = m.output.append(m.status)
 			return m, nil
 		}
-		m.sshKeys, m.detailView, m.focus, m.status = append([]domain.SSHKey(nil), msg.items...), detailSSHKeys, focusDetail, "SSH keys loaded"
+		m.sshKeys, m.detailCursor, m.detailView, m.focus, m.status = append([]domain.SSHKey(nil), msg.items...), 0, detailSSHKeys, focusDetail, "SSH keys loaded"
 	case cronJobsLoadedMsg:
 		if m.cronJobsLoad.stale(msg.generation) {
 			return m, nil
@@ -116,7 +116,7 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.output = m.output.append(m.status)
 			return m, nil
 		}
-		m.cronJobs, m.detailView, m.focus, m.status = append([]domain.CronJob(nil), msg.items...), detailCronJobs, focusDetail, "cron jobs loaded"
+		m.cronJobs, m.detailCursor, m.detailView, m.focus, m.status = append([]domain.CronJob(nil), msg.items...), 0, detailCronJobs, focusDetail, "cron jobs loaded"
 	case backupsLoadedMsg:
 		if m.backupsLoad.stale(msg.generation) {
 			return m, nil
@@ -127,7 +127,7 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.output = m.output.append(m.status)
 			return m, nil
 		}
-		m.backups, m.detailView, m.focus, m.status = append([]domain.Backup(nil), msg.items...), detailBackups, focusDetail, "backups loaded"
+		m.backups, m.detailCursor, m.detailView, m.focus, m.status = append([]domain.Backup(nil), msg.items...), 0, detailBackups, focusDetail, "backups loaded"
 	case sshAccessChangedMsg:
 		m.progress.active = false
 		if msg.err != nil {

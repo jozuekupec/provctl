@@ -1156,7 +1156,7 @@ func TestModel_AddSSHKeyUsesServiceAndRefreshesKeys(t *testing.T) {
 	})
 	m.workspace, m.focus, m.detailView = true, focusDetail, detailSSHKeys
 	m.items = []domain.Subscription{{ID: 1, Name: "acme"}}
-	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("+")})
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("n")})
 	m = updated.(appModel)
 	if !m.sshKeyForm.open {
 		t.Fatal("SSH key form did not open")

@@ -253,9 +253,12 @@ func (m appModel) keybar() string {
 		return "←/→ panels · ↑/↓ select · n create · D delete · a/A aliases · p PHP · e toggle · E root · T target · t TLS · l/L logs · , settings · esc subscriptions"
 	case focusDetail:
 		if m.detailView == detailDatabases {
-			return "←/→ panels · ↑/↓ scroll · n create database · b reload · esc subscriptions · ? help"
+			return "←/→ panels · ↑/↓ select · n create database · b reload · esc subscriptions · ? help"
 		}
-		return "←/→ panels · ↑/↓ scroll · b databases · K SSH keys · + add key · c cron · V backups · esc subscriptions · ? help"
+		if m.detailView == detailSSHKeys {
+			return "←/→ panels · ↑/↓ select · n add key · K reload · esc subscriptions · ? help"
+		}
+		return "←/→ panels · ↑/↓ select · b databases · K SSH keys · c cron · V backups · esc subscriptions · ? help"
 	case focusLogs:
 		return "←/→ panels · ↑/↓ scroll · l/L logs · esc subscriptions · ? help"
 	default:

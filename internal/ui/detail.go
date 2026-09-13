@@ -48,8 +48,8 @@ func (m appModel) detail() string {
 		}
 		lines := make([]string, 0, len(m.databases)+1)
 		lines = append(lines, "Subscription: "+subscription.Name)
-		for _, database := range m.databases {
-			lines = append(lines, database.Name+" · "+database.User+"@"+database.Host+" · "+database.Charset)
+		for index, database := range m.databases {
+			lines = append(lines, m.detailItem(index, database.Name+" · "+database.User+"@"+database.Host+" · "+database.Charset))
 		}
 		return strings.Join(lines, "\n")
 	}
@@ -59,12 +59,12 @@ func (m appModel) detail() string {
 		}
 		lines := make([]string, 0, len(m.sshKeys)+1)
 		lines = append(lines, "Subscription: "+subscription.Name)
-		for _, key := range m.sshKeys {
+		for index, key := range m.sshKeys {
 			line := key.Fingerprint
 			if key.Comment != "" {
 				line += " · " + key.Comment
 			}
-			lines = append(lines, line)
+			lines = append(lines, m.detailItem(index, line))
 		}
 		return strings.Join(lines, "\n")
 	}
@@ -74,12 +74,12 @@ func (m appModel) detail() string {
 		}
 		lines := make([]string, 0, len(m.cronJobs)+1)
 		lines = append(lines, "Subscription: "+subscription.Name)
-		for _, job := range m.cronJobs {
+		for index, job := range m.cronJobs {
 			line := fmt.Sprintf("#%d · %s · %s", job.ID, job.Schedule, job.Command)
 			if job.Comment != "" {
 				line += " · " + job.Comment
 			}
-			lines = append(lines, line)
+			lines = append(lines, m.detailItem(index, line))
 		}
 		return strings.Join(lines, "\n")
 	}
@@ -89,12 +89,34 @@ func (m appModel) detail() string {
 		}
 		lines := make([]string, 0, len(m.backups)+1)
 		lines = append(lines, "Subscription: "+subscription.Name)
-		for _, backup := range m.backups {
-			lines = append(lines, fmt.Sprintf("#%d · %s · %d bytes · %s", backup.ID, backup.Status, backup.SizeBytes, backup.StartedAt.UTC().Format("2006-01-02 15:04Z")))
+		for index, backup := range m.backups {
+			lines = append(lines, m.detailItem(index, fmt.Sprintf("#%d · %s · %d bytes · %s", backup.ID, backup.Status, backup.SizeBytes, backup.StartedAt.UTC().Format("2006-01-02 15:04Z"))))
 		}
 		return strings.Join(lines, "\n")
 	}
 	return fmt.Sprintf("Subscription: %s\nStatus: %s\nUser: %s\nHome: %s\nWebsites: %d\n\nQuotas\nDisk: %s\nWebsites: %s\nDatabases: %s\nBackups: %s", subscription.Name, subscription.Status, subscription.UnixUser, subscription.Home, len(m.websites), quotaSize(subscription.QuotaDiskBytes), quotaCount(subscription.QuotaWebsites), quotaCount(subscription.QuotaDatabases), quotaCount(subscription.QuotaBackups))
+}
+
+func (m appModel) detailItem(index int, line string) string {
+	if index == m.detailCursor {
+		return selectedStyle.Render("> " + line)
+	}
+	return "  " + line
+}
+
+func (m appModel) detailItemCount() int {
+	switch m.detailView {
+	case detailDatabases:
+		return len(m.databases)
+	case detailSSHKeys:
+		return len(m.sshKeys)
+	case detailCronJobs:
+		return len(m.cronJobs)
+	case detailBackups:
+		return len(m.backups)
+	default:
+		return 0
+	}
 }
 
 func (m appModel) detailTitle() string {

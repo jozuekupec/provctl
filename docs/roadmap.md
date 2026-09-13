@@ -441,6 +441,11 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   Help is now context-sensitive: opening `?` from a database, SSH-key, cron,
   or backup detail displays only the shortcuts meaningful to that panel, rather
   than the prior global list that advertised unavailable actions.
+  Detail-derived lists now have their own selected row (`↑/↓`), rather than
+  borrowing scroll-only behavior; SSH key creation follows the common `n`
+  convention instead of the former special `+` key. This is the shared base
+  for selected-item deletion and inspection in databases, SSH, cron, and
+  backups.
   Read-only SSH key inspection is now available through `K`, using the SSH
   service's persisted metadata rather than reading `authorized_keys` directly.
   Its dedicated detail view exposes the public fingerprint and comment, and is

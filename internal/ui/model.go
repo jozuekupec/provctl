@@ -362,6 +362,7 @@ type appModel struct {
 	confirm                confirmState
 	progress               progressState
 	detailScroll           int
+	detailCursor           int
 	detailView             detailView
 	outputScroll           int
 	subscriptions          opSlot

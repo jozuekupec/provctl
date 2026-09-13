@@ -90,7 +90,7 @@ func (m appModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				m.logsLoad.invalidate()
 			}
 		} else if m.focus == focusDetail {
-			m.detailScroll++
+			m.detailCursor = clamp(m.detailCursor+1, m.detailItemCount())
 		} else if m.focus == focusOutput {
 			m.outputScroll++
 		} else {
@@ -109,7 +109,7 @@ func (m appModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				m.logsLoad.invalidate()
 			}
 		} else if m.focus == focusDetail {
-			m.detailScroll = max(0, m.detailScroll-1)
+			m.detailCursor = clamp(m.detailCursor-1, m.detailItemCount())
 		} else if m.focus == focusOutput {
 			m.outputScroll = max(0, m.outputScroll-1)
 		} else {
@@ -146,10 +146,6 @@ func (m appModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "u":
 		if m.focus == focusSubscriptions {
 			m = m.openSSHAccessForm()
-		}
-	case "+":
-		if m.detailView == detailSSHKeys {
-			m = m.openSSHKeyForm()
 		}
 	case "p":
 		if m.focus == focusWebsites {
@@ -227,6 +223,8 @@ func (m appModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m = m.openWebsiteCreateForm()
 		} else if m.focus == focusDetail && m.detailView == detailDatabases {
 			m = m.openDatabaseCreateForm()
+		} else if m.focus == focusDetail && m.detailView == detailSSHKeys {
+			m = m.openSSHKeyForm()
 		}
 	case "a":
 		if m.focus == focusWebsites {
