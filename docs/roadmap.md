@@ -452,6 +452,11 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   never append the generated password to Output; a TUI model test verifies
   that non-leakage contract. Key modes retain service validation requiring a
   registered public key.
+  The current manual-test package `0.1.1~dev.16.tui-views` was installed into
+  the isolated `pv` Debian 13 container after its version and fixture
+  subscriptions (`demo`, `staging`) were verified. Snapshot `tui-views-ssh`
+  preserves this exact interactive test state; `clean` remains the untouched
+  baseline for privileged integration scenarios.
   Subscription creation is now also available in the fullscreen picker through
   `n`: the bounded form accepts the derived subscription name and preserves the
   existing safe service defaults for user identity, home and unlimited quotas.
