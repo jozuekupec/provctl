@@ -357,10 +357,12 @@ func TestModel_SwitchingSubscriptionClearsDependentData(t *testing.T) {
 	m.items = []domain.Subscription{{ID: 1, Name: "acme"}, {ID: 2, Name: "beta"}}
 	m.websites = []domain.Website{{PrimaryDomain: "acme.test"}}
 	m.databases = []domain.Database{{Name: "acme_main"}}
+	m.sshKeys = []domain.SSHKey{{Fingerprint: "SHA256:old"}}
+	m.detailView = detailSSHKeys
 	m.workspace, m.showWebsites, m.focus = true, true, focusSubscriptions
 	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyDown})
 	m = updated.(appModel)
-	if m.cursor != 1 || m.showWebsites || len(m.websites) != 0 || len(m.databases) != 0 {
+	if m.cursor != 1 || m.showWebsites || len(m.websites) != 0 || len(m.databases) != 0 || len(m.sshKeys) != 0 || m.detailView != detailDomain {
 		t.Fatalf("selection state = %#v", m)
 	}
 }

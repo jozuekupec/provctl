@@ -442,6 +442,10 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   subscription archives and shows ID, completion status, size and start time;
   inspection and restore remain explicit CLI workflows until their destructive
   confirmation and archive-verification UX has a dedicated design.
+  A follow-up UI review reset every derived detail view on subscription change,
+  preventing an empty `SSH keys`, `Cron jobs` or `Backups` title from leaking
+  into a newly selected subscription. The Help popup also now groups the
+  domain-scoped PHP action with the other domain actions.
   Subscription creation is now also available in the fullscreen picker through
   `n`: the bounded form accepts the derived subscription name and preserves the
   existing safe service defaults for user identity, home and unlimited quotas.

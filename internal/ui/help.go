@@ -70,12 +70,12 @@ func helpSections() []helpSection {
 			"a         archive selected subscription",
 			"d         permanently delete selected archived subscription",
 			"R         reconcile generated configuration for selected subscription",
-			"p         choose a PHP-FPM version for selected domain",
 		}},
 		{title: "Domains", rows: []string{
 			"n         create a domain",
 			"a / A     add or remove a domain alias",
 			"e         enable or disable selected domain",
+			"p         choose a PHP-FPM version for selected domain",
 			"D         permanently remove selected domain configuration",
 			"E         edit selected domain document root",
 			"T         edit selected proxy or redirect target",

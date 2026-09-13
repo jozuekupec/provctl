@@ -558,7 +558,7 @@ func (m appModel) clearSelectionDetails() appModel {
 	m.healthLoad.invalidate()
 	m.logsLoad.invalidate()
 	m.websites, m.databases, m.sshKeys, m.cronJobs, m.backups = nil, nil, nil, nil, nil
-	m.websiteCursor, m.detailScroll, m.outputScroll = 0, 0, 0
+	m.websiteCursor, m.detailScroll, m.outputScroll, m.detailView = 0, 0, 0, detailDomain
 	m.showWebsites = false
 	return m
 }
