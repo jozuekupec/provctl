@@ -452,6 +452,18 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   identity. Regression tests ensure every advertised key resolves and
   keybar/help remain derived from the shared registry. Modal forms retain only
   their widget-local input handling.
+  The first separate fullscreen **Manage subscription** surface is now present
+  behind `m` in the Domains panel, so the read-only Detail panel is not used as
+  a hidden administration UI. Its connected tabs follow the domain editor's
+  `Shift+Left`/`Shift+Right` convention. The Databases tab asynchronously loads
+  its list, supports `n` creation, `p` one-time password rotation, and typed
+  `D` deletion through the existing journalled services; all actions use the
+  shared confirm/progress pipeline and refresh the list where needed. Its
+  bindings, keybar and context help are entries in the same shortcut registry.
+  SSH, Cron and Backups tabs are intentionally visible placeholders only until
+  their own complete workflows are moved there; this avoids implying that the
+  old Detail lists are editable. Model tests cover loading, rotation, secret
+  non-persistence and typed deletion; full `make test` passed.
   The subscription workspace also exposes `R` for a confirmed, service-backed
   reconciliation of generated Apache configuration. It keeps the scope to the
   selected subscription, reports the no-drift result without implying a write,

@@ -18,6 +18,11 @@ const (
 	shortcutEditorTLS
 	shortcutEditorRouting
 	shortcutEditorLogs
+	shortcutAdminOverview
+	shortcutAdminDatabases
+	shortcutAdminSSH
+	shortcutAdminCron
+	shortcutAdminBackups
 )
 
 type shortcutAction string
@@ -52,6 +57,11 @@ const (
 	actionTarget        shortcutAction = "target"
 	actionAccessLog     shortcutAction = "access-log"
 	actionErrorLog      shortcutAction = "error-log"
+	actionAdmin         shortcutAction = "subscription-admin"
+	actionAdminTabNext  shortcutAction = "admin-tab-next"
+	actionAdminTabPrev  shortcutAction = "admin-tab-previous"
+	actionAdminClose    shortcutAction = "admin-close"
+	actionRotateSecret  shortcutAction = "rotate-secret"
 )
 
 type binding struct {
@@ -67,9 +77,10 @@ type binding struct {
 }
 
 var (
-	contextsAll       = []shortcutContext{shortcutPicker, shortcutDomains, shortcutDetail, shortcutLogs, shortcutOutput}
+	contextsAll       = []shortcutContext{shortcutPicker, shortcutDomains, shortcutDetail, shortcutLogs, shortcutOutput, shortcutAdminOverview, shortcutAdminDatabases, shortcutAdminSSH, shortcutAdminCron, shortcutAdminBackups}
 	contextsWorkspace = []shortcutContext{shortcutDomains, shortcutDetail, shortcutLogs, shortcutOutput}
 	contextsEditor    = []shortcutContext{shortcutEditorOverview, shortcutEditorContent, shortcutEditorRuntime, shortcutEditorTLS, shortcutEditorRouting, shortcutEditorLogs}
+	contextsAdmin     = []shortcutContext{shortcutAdminOverview, shortcutAdminDatabases, shortcutAdminSSH, shortcutAdminCron, shortcutAdminBackups}
 )
 
 // bindings is the single source of truth for normal-mode shortcuts. Form and
@@ -92,6 +103,7 @@ var bindings = []binding{
 	{Action: actionFilter, Group: "Navigation", Keys: []string{"/"}, Label: "/", Help: "filter domains", Bar: "/ filter", Short: "/", Priority: 4, Contexts: []shortcutContext{shortcutDomains}},
 	{Action: actionHealth, Group: "Actions", Keys: []string{"h"}, Label: "h", Help: "run health checks", Bar: "h health", Short: "h", Priority: 7, Contexts: []shortcutContext{shortcutDomains}},
 	{Action: actionReconcile, Group: "Actions", Keys: []string{"R"}, Label: "R", Help: "reconcile subscription configuration", Bar: "R reconcile", Short: "R", Priority: 8, Contexts: []shortcutContext{shortcutDomains}},
+	{Action: actionAdmin, Group: "Actions", Keys: []string{"m"}, Label: "m", Help: "manage subscription resources", Bar: "m manage", Short: "m", Priority: 6, Contexts: []shortcutContext{shortcutDomains}},
 	{Action: actionSettings, Group: "Other", Keys: []string{","}, Label: ",", Help: "open settings", Bar: ", settings", Short: ",", Priority: 8, Contexts: contextsAll},
 	{Action: actionHelp, Group: "Other", Keys: []string{"?"}, Label: "?", Help: "open this help", Bar: "? help", Short: "?", Priority: 0, Contexts: contextsAll},
 	{Action: actionQuit, Group: "Other", Keys: []string{"q", "ctrl+c"}, Label: "q", Help: "quit", Bar: "q quit", Short: "q", Priority: 0, Contexts: contextsAll},
@@ -110,6 +122,14 @@ var bindings = []binding{
 	{Action: actionTarget, Group: "Actions", Keys: []string{"enter", "e"}, Label: "enter / e", Help: "edit proxy or redirect target", Bar: "enter target", Short: "target", Priority: 4, Contexts: []shortcutContext{shortcutEditorRouting}},
 	{Action: actionAccessLog, Group: "Actions", Keys: []string{"enter", "l"}, Label: "enter / l", Help: "load access log", Bar: "enter access", Short: "access", Priority: 4, Contexts: []shortcutContext{shortcutEditorLogs}},
 	{Action: actionErrorLog, Group: "Actions", Keys: []string{"L"}, Label: "L", Help: "load error log", Bar: "L error", Short: "L", Priority: 5, Contexts: []shortcutContext{shortcutEditorLogs}},
+
+	{Action: actionAdminTabPrev, Group: "Navigation", Keys: []string{"shift+left"}, Label: "Shift+←", Help: "previous administration tab", Bar: "⇧←/⇧→ tabs", Short: "tabs", Priority: 2, Contexts: contextsAdmin},
+	{Action: actionAdminTabNext, Group: "Navigation", Keys: []string{"shift+right"}, Label: "Shift+→", Help: "next administration tab", Contexts: contextsAdmin},
+	{Action: actionAdminClose, Group: "Navigation", Keys: []string{"esc"}, Label: "esc", Help: "return to workspace", Bar: "esc workspace", Short: "esc", Priority: 3, Contexts: contextsAdmin},
+	{Action: actionPicker, Group: "Navigation", Keys: []string{"s"}, Label: "s", Help: "return to subscription picker", Bar: "s subscriptions", Short: "s", Priority: 1, Contexts: contextsAdmin},
+	{Action: actionCreate, Group: "Actions", Keys: []string{"n"}, Label: "n", Help: "create database", Bar: "n create", Short: "create", Priority: 4, Contexts: []shortcutContext{shortcutAdminDatabases}},
+	{Action: actionRotateSecret, Group: "Actions", Keys: []string{"p"}, Label: "p", Help: "rotate selected database password", Bar: "p password", Short: "password", Priority: 5, Contexts: []shortcutContext{shortcutAdminDatabases}},
+	{Action: actionDelete, Group: "Actions", Keys: []string{"D"}, Label: "D", Help: "delete selected database", Bar: "D delete", Short: "delete", Priority: 6, Contexts: []shortcutContext{shortcutAdminDatabases}},
 }
 
 func actionFor(context shortcutContext, key string) shortcutAction {

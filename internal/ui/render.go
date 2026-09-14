@@ -20,6 +20,8 @@ func (m appModel) View() string {
 		view = m.renderPicker()
 	} else if m.domainEditor.open {
 		view = m.renderDomainEditor()
+	} else if m.subscriptionAdmin.open {
+		view = m.renderSubscriptionAdmin()
 	} else {
 		view = m.renderWorkspace()
 	}

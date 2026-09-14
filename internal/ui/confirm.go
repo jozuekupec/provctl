@@ -60,6 +60,10 @@ func (m appModel) runConfirmed() (tea.Model, tea.Cmd) {
 		return m, m.createSubscriptionCmd(confirm)
 	case "create-database":
 		return m, m.createDatabaseCmd(confirm)
+	case "rotate-database-password":
+		return m, m.changeDatabasePasswordCmd(confirm)
+	case "delete-database":
+		return m, m.deleteDatabaseCmd(confirm)
 	case "set-tls":
 		return m, m.changeWebsiteTLSCmd(confirm)
 	case "set-php":

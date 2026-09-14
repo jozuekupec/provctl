@@ -19,6 +19,8 @@ type Deps struct {
 	LoadWebsites           func(context.Context, int64) ([]domain.Website, error)
 	LoadDatabases          func(context.Context, string) ([]domain.Database, error)
 	CreateDatabase         func(context.Context, string, string, string) (string, int64, error)
+	ChangeDatabasePassword func(context.Context, string, string) (string, int64, error)
+	DeleteDatabase         func(context.Context, string, string) (int64, error)
 	LoadSSHKeys            func(context.Context, string) ([]domain.SSHKey, error)
 	LoadCronJobs           func(context.Context, string) ([]domain.CronJob, error)
 	LoadBackups            func(context.Context, string) ([]domain.Backup, error)
@@ -146,6 +148,16 @@ type databaseCreatedMsg struct {
 	password string
 	items    []domain.Database
 }
+type databasePasswordChangedMsg struct {
+	err      error
+	name     string
+	password string
+}
+type databaseDeletedMsg struct {
+	err   error
+	name  string
+	items []domain.Database
+}
 type reconcileFinishedMsg struct {
 	err          error
 	subscription string
@@ -239,6 +251,11 @@ type settingsState struct {
 }
 
 type domainEditorState struct {
+	open bool
+	tab  int
+}
+
+type subscriptionAdminState struct {
 	open bool
 	tab  int
 }
@@ -350,6 +367,7 @@ type appModel struct {
 	cronJobs               []domain.CronJob
 	backups                []domain.Backup
 	websiteCursor          int
+	databaseCursor         int
 	showWebsites           bool
 	workspace              bool
 	focus                  focus
@@ -361,6 +379,7 @@ type appModel struct {
 	phpPicker              phpPickerState
 	settings               settingsState
 	domainEditor           domainEditorState
+	subscriptionAdmin      subscriptionAdminState
 	documentRootForm       documentRootFormState
 	websiteCreateForm      websiteCreateFormState
 	aliasForm              aliasFormState

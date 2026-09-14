@@ -301,9 +301,32 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.output = m.output.append(m.status)
 			return m, nil
 		}
-		m.databases, m.detailView, m.focus, m.status = append([]domain.Database(nil), msg.items...), detailDatabases, focusDetail, "database "+msg.name+" created"
+		m.databases, m.databaseCursor, m.status = append([]domain.Database(nil), msg.items...), clamp(m.databaseCursor, len(msg.items)), "database "+msg.name+" created"
 		m.output = m.output.append("database created: " + msg.name)
 		m.secret = secretState{open: true, title: "Database password", secret: msg.password}
+		return m, nil
+	case databasePasswordChangedMsg:
+		m.progress.active = false
+		if msg.err != nil {
+			m.status = "database password rotation failed: " + msg.err.Error()
+			m.output = m.output.append(m.status)
+			return m, nil
+		}
+		m.status = "database password rotated: " + msg.name
+		m.output = m.output.append("database password rotated: " + msg.name)
+		m.secret = secretState{open: true, title: "Database password", secret: msg.password}
+		return m, nil
+	case databaseDeletedMsg:
+		m.progress.active = false
+		if msg.err != nil {
+			m.status = "database deletion failed: " + msg.err.Error()
+			m.output = m.output.append(m.status)
+			return m, nil
+		}
+		m.databases = append([]domain.Database(nil), msg.items...)
+		m.databaseCursor = clamp(m.databaseCursor, len(m.databases))
+		m.status = "database deleted: " + msg.name
+		m.output = m.output.append("database deleted: " + msg.name)
 		return m, nil
 	case reconcileFinishedMsg:
 		m.progress.active = false

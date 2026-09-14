@@ -54,6 +54,9 @@ func (m appModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if m.domainEditor.open {
 		return m.handleDomainEditorKey(msg)
 	}
+	if m.subscriptionAdmin.open {
+		return m.handleSubscriptionAdminKey(msg)
+	}
 	if m.subscriptionFilter.active || m.websiteFilter.active {
 		return m.handleFilterKey(msg)
 	}
@@ -125,6 +128,9 @@ func (m appModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				"Regenerate managed Apache configuration from provctl state.",
 			}})
 		}
+	case actionAdmin:
+		m, command := m.openSubscriptionAdmin()
+		return m, command
 	case actionOpen:
 		m = m.openDomainEditor()
 	case actionCreate:

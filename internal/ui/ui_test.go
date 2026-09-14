@@ -964,6 +964,64 @@ func TestModel_CreateDatabaseCallsDependency(t *testing.T) {
 	}
 }
 
+func TestModel_SubscriptionAdminDatabaseMutations(t *testing.T) {
+	var rotated, deleted string
+	m := New(Deps{
+		LoadDatabases: func(context.Context, string) ([]domain.Database, error) {
+			return []domain.Database{{Name: "acme_app", User: "acme_app", Host: "localhost", Charset: "utf8mb4"}}, nil
+		},
+		ChangeDatabasePassword: func(_ context.Context, subscription, name string) (string, int64, error) {
+			rotated = subscription + "/" + name
+			return "rotated-secret", 1, nil
+		},
+		DeleteDatabase: func(_ context.Context, subscription, name string) (int64, error) {
+			deleted = subscription + "/" + name
+			return 2, nil
+		},
+	})
+	m.ready, m.width, m.height = true, 100, 28
+	m.items = []domain.Subscription{{ID: 1, Name: "acme", Status: "active"}}
+	m.workspace, m.focus = true, focusWebsites
+	updated, command := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("m")})
+	m = updated.(appModel)
+	if !m.subscriptionAdmin.open || m.subscriptionAdmin.tab != 1 {
+		t.Fatalf("admin state = %#v", m.subscriptionAdmin)
+	}
+	updated, _ = m.Update(command())
+	m = updated.(appModel)
+	if len(m.databases) != 1 || !strings.Contains(m.View(), "acme_app") {
+		t.Fatalf("database admin did not load/render: %#v", m.databases)
+	}
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("p")})
+	m = updated.(appModel)
+	if m.confirm.action != "rotate-database-password" {
+		t.Fatalf("rotation confirmation = %#v", m.confirm)
+	}
+	updated, command = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("y")})
+	m = runProgress(t, updated.(appModel), command)
+	if rotated != "acme/acme_app" || m.secret.secret != "rotated-secret" {
+		t.Fatalf("rotation = %q, secret = %#v", rotated, m.secret)
+	}
+	if strings.Contains(strings.Join(m.output.lines, "\n"), "rotated-secret") {
+		t.Fatal("rotated database password leaked into output")
+	}
+	m.secret = secretState{}
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("D")})
+	m = updated.(appModel)
+	if m.confirm.word != "acme_app" {
+		t.Fatalf("delete confirmation = %#v", m.confirm)
+	}
+	for _, character := range "acme_app" {
+		updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{character}})
+		m = updated.(appModel)
+	}
+	updated, command = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	_ = runProgress(t, updated.(appModel), command)
+	if deleted != "acme/acme_app" {
+		t.Fatalf("delete = %q", deleted)
+	}
+}
+
 func TestModel_DeleteArchivedSubscriptionRequiresTypedName(t *testing.T) {
 	deleted := false
 	m := New(Deps{DeleteSubscription: func(_ context.Context, name string, force bool) (int64, error) {
