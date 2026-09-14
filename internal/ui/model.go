@@ -23,6 +23,8 @@ type Deps struct {
 	DeleteDatabase         func(context.Context, string, string) (int64, error)
 	LoadSSHKeys            func(context.Context, string) ([]domain.SSHKey, error)
 	LoadCronJobs           func(context.Context, string) ([]domain.CronJob, error)
+	AddCronJob             func(context.Context, string, string, string, string) (int64, error)
+	RemoveCronJob          func(context.Context, string, int64) (int64, error)
 	LoadBackups            func(context.Context, string) ([]domain.Backup, error)
 	SetSSHAccess           func(context.Context, string, string) (string, int64, error)
 	AddSSHKeyFromFile      func(context.Context, string, string) (int64, error)
@@ -86,6 +88,15 @@ type sshKeyRemovedMsg struct {
 	err         error
 	fingerprint string
 	items       []domain.SSHKey
+}
+type cronJobCreatedMsg struct {
+	err   error
+	items []domain.CronJob
+}
+type cronJobRemovedMsg struct {
+	err   error
+	id    int64
+	items []domain.CronJob
 }
 
 type subscriptionsLoadedMsg struct {
@@ -228,6 +239,7 @@ type confirmState struct {
 	enabled bool
 	domain  string
 	value   string
+	note    string
 	title   string
 	lines   []string
 	word    string
@@ -316,6 +328,14 @@ type sshKeyFormState struct {
 	input textinput.Model
 }
 
+type cronFormState struct {
+	open     bool
+	field    int
+	schedule textinput.Model
+	command  textinput.Model
+	comment  textinput.Model
+}
+
 type secretState struct {
 	open   bool
 	title  string
@@ -375,6 +395,7 @@ type appModel struct {
 	websiteCursor          int
 	databaseCursor         int
 	sshKeyCursor           int
+	cronCursor             int
 	showWebsites           bool
 	workspace              bool
 	focus                  focus
@@ -395,6 +416,7 @@ type appModel struct {
 	databaseCreateForm     databaseCreateFormState
 	sshAccessForm          sshAccessFormState
 	sshKeyForm             sshKeyFormState
+	cronForm               cronFormState
 	secret                 secretState
 	pathPicker             pathPickerState
 	status                 string

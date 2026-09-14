@@ -36,6 +36,9 @@ func (m appModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if m.sshKeyForm.open {
 		return m.handleSSHKeyFormKey(msg)
 	}
+	if m.cronForm.open {
+		return m.handleCronFormKey(msg)
+	}
 	if m.secret.open {
 		return m.handleSecretKey(msg)
 	}

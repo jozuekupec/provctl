@@ -134,7 +134,10 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.output = m.output.append(m.status)
 			return m, nil
 		}
-		m.cronJobs, m.detailView, m.focus, m.status = append([]domain.CronJob(nil), msg.items...), detailCronJobs, focusDetail, "cron jobs loaded"
+		m.cronJobs, m.cronCursor, m.status = append([]domain.CronJob(nil), msg.items...), clamp(m.cronCursor, len(msg.items)), "cron jobs loaded"
+		if !m.subscriptionAdmin.open {
+			m.detailView, m.focus = detailCronJobs, focusDetail
+		}
 	case backupsLoadedMsg:
 		if m.backupsLoad.stale(msg.generation) {
 			return m, nil
@@ -188,6 +191,26 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.sshKeyCursor = clamp(m.sshKeyCursor, len(m.sshKeys))
 		m.status = "SSH key removed"
 		m.output = m.output.append("SSH key removed: " + msg.fingerprint)
+		return m, nil
+	case cronJobCreatedMsg:
+		m.progress.active = false
+		if msg.err != nil {
+			m.status = "cron job creation failed: " + msg.err.Error()
+			m.output = m.output.append(m.status)
+			return m, nil
+		}
+		m.cronJobs, m.cronCursor, m.status = append([]domain.CronJob(nil), msg.items...), clamp(m.cronCursor, len(msg.items)), "cron job created"
+		m.output = m.output.append("cron job created")
+		return m, nil
+	case cronJobRemovedMsg:
+		m.progress.active = false
+		if msg.err != nil {
+			m.status = "cron job removal failed: " + msg.err.Error()
+			m.output = m.output.append(m.status)
+			return m, nil
+		}
+		m.cronJobs, m.cronCursor, m.status = append([]domain.CronJob(nil), msg.items...), clamp(m.cronCursor, len(msg.items)), "cron job removed"
+		m.output = m.output.append(fmt.Sprintf("cron job removed: %d", msg.id))
 		return m, nil
 	case websiteChangedMsg:
 		m.progress.active = false

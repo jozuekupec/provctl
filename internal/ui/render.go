@@ -59,6 +59,9 @@ func (m appModel) View() string {
 	if m.sshKeyForm.open {
 		return m.overlayCenter(m.sshKeyFormPopup(), view)
 	}
+	if m.cronForm.open {
+		return m.overlayCenter(m.cronFormPopup(), view)
+	}
 	if m.secret.open {
 		return m.overlayCenter(m.secretPopup(), view)
 	}

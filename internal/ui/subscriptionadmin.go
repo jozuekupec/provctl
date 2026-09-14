@@ -46,18 +46,24 @@ func (m appModel) handleSubscriptionAdminKey(msg tea.KeyMsg) (tea.Model, tea.Cmd
 			m.databaseCursor = clamp(m.databaseCursor+1, len(m.databases))
 		} else if m.subscriptionAdmin.tab == 2 {
 			m.sshKeyCursor = clamp(m.sshKeyCursor+1, len(m.sshKeys))
+		} else if m.subscriptionAdmin.tab == 3 {
+			m.cronCursor = clamp(m.cronCursor+1, len(m.cronJobs))
 		}
 	case actionMovePrevious:
 		if m.subscriptionAdmin.tab == 1 {
 			m.databaseCursor = clamp(m.databaseCursor-1, len(m.databases))
 		} else if m.subscriptionAdmin.tab == 2 {
 			m.sshKeyCursor = clamp(m.sshKeyCursor-1, len(m.sshKeys))
+		} else if m.subscriptionAdmin.tab == 3 {
+			m.cronCursor = clamp(m.cronCursor-1, len(m.cronJobs))
 		}
 	case actionCreate:
 		if m.subscriptionAdmin.tab == 1 {
 			return m.openDatabaseCreateForm(), nil
 		} else if m.subscriptionAdmin.tab == 2 {
 			return m.openSSHKeyForm(), nil
+		} else if m.subscriptionAdmin.tab == 3 {
+			return m.openCronForm(), nil
 		}
 	case actionRotateSecret:
 		if database, ok := m.selectedDatabase(); ok {
@@ -68,6 +74,9 @@ func (m appModel) handleSubscriptionAdminKey(msg tea.KeyMsg) (tea.Model, tea.Cmd
 			m = m.askConfirm(confirmState{action: "delete-database", domain: database.Name, word: database.Name, title: "Delete database", lines: []string{"Database: " + database.Name, "This permanently removes the MariaDB database and local user."}})
 		} else if key, ok := m.selectedSSHKey(); ok {
 			m = m.askConfirm(confirmState{action: "remove-ssh-key", domain: key.Fingerprint, word: key.Fingerprint, title: "Remove SSH key", lines: []string{"Fingerprint: " + key.Fingerprint, "This removes the public key from the subscription account."}})
+		} else if job, ok := m.selectedCronJob(); ok {
+			word := fmt.Sprint(job.ID)
+			m = m.askConfirm(confirmState{action: "remove-cron-job", domain: word, word: word, title: "Remove cron job", lines: []string{"Cron job ID: " + word, "Schedule: " + job.Schedule, "This rewrites the generated crontab."}})
 		}
 	case actionHelp:
 		m.help = helpState{open: true, filter: newFilter()}
@@ -134,7 +143,21 @@ func (m appModel) subscriptionAdminBody(subscription domain.Subscription) string
 		}
 		return strings.Join(lines, "\n")
 	case 3:
-		return "Cron job management will move here in the next administration slice."
+		if len(m.cronJobs) == 0 {
+			return "No cron jobs.\n\nn  add a cron job"
+		}
+		lines := []string{"↑/↓  select cron job", ""}
+		for index, job := range m.cronJobs {
+			line := fmt.Sprintf("  #%d · %s · %s", job.ID, job.Schedule, job.Command)
+			if job.Comment != "" {
+				line += " · " + job.Comment
+			}
+			if index == m.cronCursor {
+				line = selectedStyle.Render("> " + strings.TrimPrefix(line, "  "))
+			}
+			lines = append(lines, line)
+		}
+		return strings.Join(lines, "\n")
 	default:
 		return "Backup creation, inspection and restore will move here after their destructive workflow is designed."
 	}
@@ -169,6 +192,9 @@ func (m appModel) startSubscriptionAdminTab() (appModel, tea.Cmd) {
 	case 2:
 		m.status = "loading SSH keys…"
 		return m.startSSHKeys()
+	case 3:
+		m.status = "loading cron jobs…"
+		return m.startCronJobs()
 	default:
 		return m, nil
 	}
@@ -193,6 +219,49 @@ func (m appModel) selectedSSHKey() (domain.SSHKey, bool) {
 		return domain.SSHKey{}, false
 	}
 	return m.sshKeys[m.sshKeyCursor], true
+}
+
+func (m appModel) loadCronJobs(ctx context.Context, generation uint64) tea.Msg {
+	subscription, ok := m.selectedSubscription()
+	if !ok || m.deps.LoadCronJobs == nil {
+		return cronJobsLoadedMsg{err: context.Canceled, generation: generation}
+	}
+	items, err := m.deps.LoadCronJobs(ctx, subscription.Name)
+	return cronJobsLoadedMsg{items: items, err: err, generation: generation}
+}
+
+func (m appModel) startCronJobs() (appModel, tea.Cmd) {
+	ctx, generation := m.cronJobsLoad.start()
+	return m, func() tea.Msg { return m.loadCronJobs(ctx, generation) }
+}
+
+func (m appModel) selectedCronJob() (domain.CronJob, bool) {
+	if m.cronCursor < 0 || m.cronCursor >= len(m.cronJobs) {
+		return domain.CronJob{}, false
+	}
+	return m.cronJobs[m.cronCursor], true
+}
+
+func (m appModel) removeCronJob(ctx context.Context, confirm confirmState, report func(int)) tea.Msg {
+	subscription, ok := m.selectedSubscription()
+	if !ok || m.deps.RemoveCronJob == nil {
+		return cronJobRemovedMsg{err: context.Canceled}
+	}
+	var id int64
+	if _, err := fmt.Sscan(confirm.domain, &id); err != nil {
+		return cronJobRemovedMsg{err: err}
+	}
+	_, err := m.deps.RemoveCronJob(ctx, subscription.Name, id)
+	if err != nil || m.deps.LoadCronJobs == nil {
+		return cronJobRemovedMsg{err: err, id: id}
+	}
+	report(1)
+	items, err := m.deps.LoadCronJobs(ctx, subscription.Name)
+	return cronJobRemovedMsg{err: err, id: id, items: items}
+}
+
+func (m appModel) removeCronJobCmd(confirm confirmState) tea.Cmd {
+	return steppedCmd("Remove cron job", []string{"rewrite generated crontab", "refresh cron job list"}, func(ctx context.Context, report func(int)) tea.Msg { return m.removeCronJob(ctx, confirm, report) })
 }
 
 func (m appModel) removeSSHKey(ctx context.Context, confirm confirmState, report func(int)) tea.Msg {

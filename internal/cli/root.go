@@ -91,6 +91,11 @@ func NewRootCommand() *cobra.Command {
 			return fmt.Errorf("open cron TUI state: %w", err)
 		}
 		defer cronRuntime.Close()
+		cronWriteRuntime, err := service.NewProductionCronRuntime(context.Background())
+		if err != nil {
+			return fmt.Errorf("open cron mutation TUI state: %w", err)
+		}
+		defer cronWriteRuntime.Close()
 		backupRuntime, err := service.NewReadOnlyBackupRuntime(context.Background(), cfg)
 		if err != nil {
 			return fmt.Errorf("open backup TUI state: %w", err)
@@ -169,7 +174,7 @@ func NewRootCommand() *cobra.Command {
 		createDatabase := func(ctx context.Context, subscription, name, credentials string) (string, int64, error) {
 			return databaseWriteRuntime.Service.CreateWithCredentials(ctx, subscription, name, credentials)
 		}
-		_, err = ui.Program(ui.Deps{LoadSubscriptions: runtime.Service.List, LoadSubscriptionUsage: runtime.Service.ListUsage, LoadWebsites: websiteRuntime.Service.List, LoadDatabases: databaseRuntime.Service.ListForSubscription, CreateDatabase: createDatabase, ChangeDatabasePassword: databaseWriteRuntime.Service.ChangePassword, DeleteDatabase: databaseWriteRuntime.Service.Delete, LoadSSHKeys: sshRuntime.Service.List, LoadCronJobs: cronRuntime.Service.List, LoadBackups: backupRuntime.Service.ListForSubscription, SetSSHAccess: sshWriteRuntime.Service.SetAccess, AddSSHKeyFromFile: sshWriteRuntime.Service.AddFromFile, RemoveSSHKey: sshWriteRuntime.Service.Remove, ReadWebsiteLogs: websiteRuntime.Service.ReadLogs, SetWebsiteEnabled: websiteWriteRuntime.Service.SetEnabled, SetWebsiteTLS: setWebsiteTLS, SetWebsiteDocumentRoot: websiteWriteRuntime.Service.SetDocumentRoot, SetWebsiteTarget: websiteWriteRuntime.Service.SetTarget, DeleteWebsite: websiteWriteRuntime.Service.Delete, CreateWebsite: createWebsiteFromUI, SetWebsiteAlias: setWebsiteAlias, CreateSubscription: createSubscription, SetSubscriptionStatus: subscriptionWriteRuntime.Service.SetStatus, DeleteSubscription: subscriptionWriteRuntime.Service.Delete, LoadPHPVersions: phpReadRuntime.Service.ListVersions, SetWebsitePHP: phpWriteRuntime.Service.Set, RunHealth: healthRuntime.Service.Run, Reconcile: reconcileRuntime.Service.Reconcile, SaveConfig: func(_ context.Context, updated config.Config) error {
+		_, err = ui.Program(ui.Deps{LoadSubscriptions: runtime.Service.List, LoadSubscriptionUsage: runtime.Service.ListUsage, LoadWebsites: websiteRuntime.Service.List, LoadDatabases: databaseRuntime.Service.ListForSubscription, CreateDatabase: createDatabase, ChangeDatabasePassword: databaseWriteRuntime.Service.ChangePassword, DeleteDatabase: databaseWriteRuntime.Service.Delete, LoadSSHKeys: sshRuntime.Service.List, LoadCronJobs: cronRuntime.Service.List, AddCronJob: cronWriteRuntime.Service.Add, RemoveCronJob: cronWriteRuntime.Service.Remove, LoadBackups: backupRuntime.Service.ListForSubscription, SetSSHAccess: sshWriteRuntime.Service.SetAccess, AddSSHKeyFromFile: sshWriteRuntime.Service.AddFromFile, RemoveSSHKey: sshWriteRuntime.Service.Remove, ReadWebsiteLogs: websiteRuntime.Service.ReadLogs, SetWebsiteEnabled: websiteWriteRuntime.Service.SetEnabled, SetWebsiteTLS: setWebsiteTLS, SetWebsiteDocumentRoot: websiteWriteRuntime.Service.SetDocumentRoot, SetWebsiteTarget: websiteWriteRuntime.Service.SetTarget, DeleteWebsite: websiteWriteRuntime.Service.Delete, CreateWebsite: createWebsiteFromUI, SetWebsiteAlias: setWebsiteAlias, CreateSubscription: createSubscription, SetSubscriptionStatus: subscriptionWriteRuntime.Service.SetStatus, DeleteSubscription: subscriptionWriteRuntime.Service.Delete, LoadPHPVersions: phpReadRuntime.Service.ListVersions, SetWebsitePHP: phpWriteRuntime.Service.Set, RunHealth: healthRuntime.Service.Run, Reconcile: reconcileRuntime.Service.Reconcile, SaveConfig: func(_ context.Context, updated config.Config) error {
 			return config.Update(meta.ConfigFile, updated)
 		}, BrowsePath: func(_ context.Context, path string, mode fsbrowse.Mode) (string, []fsbrowse.Entry, error) {
 			return fsbrowse.Browse(path, mode)

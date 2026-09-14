@@ -1065,6 +1065,52 @@ func TestModel_SubscriptionAdminRemovesSelectedSSHKey(t *testing.T) {
 	}
 }
 
+func TestModel_SubscriptionAdminCreatesCronJobWithComment(t *testing.T) {
+	var added string
+	m := New(Deps{
+		LoadDatabases: func(context.Context, string) ([]domain.Database, error) { return nil, nil },
+		LoadSSHKeys:   func(context.Context, string) ([]domain.SSHKey, error) { return nil, nil },
+		LoadCronJobs:  func(context.Context, string) ([]domain.CronJob, error) { return nil, nil },
+		AddCronJob: func(_ context.Context, subscription, schedule, command, comment string) (int64, error) {
+			added = subscription + "/" + schedule + "/" + command + "/" + comment
+			return 1, nil
+		},
+	})
+	m.ready, m.width, m.height = true, 100, 28
+	m.items = []domain.Subscription{{ID: 1, Name: "acme", Status: "active"}}
+	m.workspace, m.focus = true, focusWebsites
+	updated, command := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("m")})
+	m = updated.(appModel)
+	updated, _ = m.Update(command())
+	m = updated.(appModel)
+	for range 2 {
+		updated, command = m.Update(tea.KeyMsg{Type: tea.KeyShiftRight})
+		m = updated.(appModel)
+		updated, _ = m.Update(command())
+		m = updated.(appModel)
+	}
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("n")})
+	m = updated.(appModel)
+	for _, field := range []string{"0 2 * * *", "/usr/local/bin/backup", "nightly"} {
+		for _, character := range field {
+			updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{character}})
+			m = updated.(appModel)
+		}
+		updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyTab})
+		m = updated.(appModel)
+	}
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyCtrlS})
+	m = updated.(appModel)
+	if m.confirm.action != "create-cron-job" || m.confirm.note != "nightly" {
+		t.Fatalf("cron confirmation = %#v", m.confirm)
+	}
+	updated, command = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("y")})
+	_ = runProgress(t, updated.(appModel), command)
+	if added != "acme/0 2 * * *//usr/local/bin/backup/nightly" {
+		t.Fatalf("AddCronJob = %q", added)
+	}
+}
+
 func TestModel_DeleteArchivedSubscriptionRequiresTypedName(t *testing.T) {
 	deleted := false
 	m := New(Deps{DeleteSubscription: func(_ context.Context, name string, force bool) (int64, error) {

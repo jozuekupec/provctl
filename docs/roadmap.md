@@ -464,11 +464,15 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   keys, `n` opens the existing direct-path/file-picker add form, and typed `D`
   rewrites `authorized_keys` through the journalled SSH service. Its list keeps
   its own cursor and the key's public fingerprint is never read from the
-  account file by the UI. Cron and Backups remain intentionally visible
-  placeholders until their complete workflows are moved there; this avoids
-  implying that the old Detail lists are editable. Model tests cover loading,
-  rotation, secret non-persistence and typed deletion; full `make test`
-  passed.
+  account file by the UI. The Cron tab now loads persisted jobs with its own
+  cursor. `n` presents a bounded schedule/command/comment form, and typed `D`
+  removes the selected numeric job ID; both paths use the existing journalled
+  crontab service and the same progress popup. The model regression covers
+  exact propagation of the optional comment, so it cannot be silently lost.
+  Backups remain intentionally a visible placeholder until their complete
+  workflow is moved here; this avoids implying that the old Detail list is
+  editable. Model tests cover loading, rotation, secret non-persistence and
+  typed deletion; full `make test` passed.
   The subscription workspace also exposes `R` for a confirmed, service-backed
   reconciliation of generated Apache configuration. It keeps the scope to the
   selected subscription, reports the no-drift result without implying a write,

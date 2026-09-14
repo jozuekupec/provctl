@@ -86,6 +86,10 @@ func (m appModel) runConfirmed() (tea.Model, tea.Cmd) {
 		return m, m.addSSHKeyCmd(confirm)
 	case "remove-ssh-key":
 		return m, m.removeSSHKeyCmd(confirm)
+	case "create-cron-job":
+		return m, m.createCronJobCmd(confirm)
+	case "remove-cron-job":
+		return m, m.removeCronJobCmd(confirm)
 	default:
 		return m, m.changeWebsiteCmd(confirm)
 	}
