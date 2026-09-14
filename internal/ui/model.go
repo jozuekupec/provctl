@@ -26,6 +26,7 @@ type Deps struct {
 	AddCronJob             func(context.Context, string, string, string, string) (int64, error)
 	RemoveCronJob          func(context.Context, string, int64) (int64, error)
 	LoadBackups            func(context.Context, string) ([]domain.Backup, error)
+	CreateBackup           func(context.Context, string) (int64, error)
 	SetSSHAccess           func(context.Context, string, string) (string, int64, error)
 	AddSSHKeyFromFile      func(context.Context, string, string) (int64, error)
 	RemoveSSHKey           func(context.Context, string, string) (int64, error)
@@ -97,6 +98,11 @@ type cronJobRemovedMsg struct {
 	err   error
 	id    int64
 	items []domain.CronJob
+}
+type backupCreatedMsg struct {
+	err   error
+	id    int64
+	items []domain.Backup
 }
 
 type subscriptionsLoadedMsg struct {
@@ -396,6 +402,7 @@ type appModel struct {
 	databaseCursor         int
 	sshKeyCursor           int
 	cronCursor             int
+	backupCursor           int
 	showWebsites           bool
 	workspace              bool
 	focus                  focus

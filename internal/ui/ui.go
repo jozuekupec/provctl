@@ -148,7 +148,10 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.output = m.output.append(m.status)
 			return m, nil
 		}
-		m.backups, m.detailView, m.focus, m.status = append([]domain.Backup(nil), msg.items...), detailBackups, focusDetail, "backups loaded"
+		m.backups, m.backupCursor, m.status = append([]domain.Backup(nil), msg.items...), clamp(m.backupCursor, len(msg.items)), "backups loaded"
+		if !m.subscriptionAdmin.open {
+			m.detailView, m.focus = detailBackups, focusDetail
+		}
 	case sshAccessChangedMsg:
 		m.progress.active = false
 		if msg.err != nil {
@@ -211,6 +214,16 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.cronJobs, m.cronCursor, m.status = append([]domain.CronJob(nil), msg.items...), clamp(m.cronCursor, len(msg.items)), "cron job removed"
 		m.output = m.output.append(fmt.Sprintf("cron job removed: %d", msg.id))
+		return m, nil
+	case backupCreatedMsg:
+		m.progress.active = false
+		if msg.err != nil {
+			m.status = "backup creation failed: " + msg.err.Error()
+			m.output = m.output.append(m.status)
+			return m, nil
+		}
+		m.backups, m.backupCursor, m.status = append([]domain.Backup(nil), msg.items...), clamp(m.backupCursor, len(msg.items)), fmt.Sprintf("backup %d created", msg.id)
+		m.output = m.output.append(fmt.Sprintf("backup created: %d", msg.id))
 		return m, nil
 	case websiteChangedMsg:
 		m.progress.active = false

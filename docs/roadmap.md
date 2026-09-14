@@ -469,10 +469,13 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   removes the selected numeric job ID; both paths use the existing journalled
   crontab service and the same progress popup. The model regression covers
   exact propagation of the optional comment, so it cannot be silently lost.
-  Backups remain intentionally a visible placeholder until their complete
-  workflow is moved here; this avoids implying that the old Detail list is
-  editable. Model tests cover loading, rotation, secret non-persistence and
-  typed deletion; full `make test` passed.
+  The Backups tab now asynchronously shows persisted archive history and `n`
+  confirms creation through the existing journalled backup service before
+  refreshing the list. Restore deliberately remains CLI-only: its force mode
+  can replace a subscription and may reveal newly generated database passwords,
+  so it needs a dedicated double-confirmation and one-time-secret design rather
+  than a shortcut. Model tests cover loading, rotation, secret non-persistence,
+  typed deletion and confirmed backup creation; full `make test` passed.
   The subscription workspace also exposes `R` for a confirmed, service-backed
   reconciliation of generated Apache configuration. It keeps the scope to the
   selected subscription, reports the no-drift result without implying a write,

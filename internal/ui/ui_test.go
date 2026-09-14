@@ -1111,6 +1111,28 @@ func TestModel_SubscriptionAdminCreatesCronJobWithComment(t *testing.T) {
 	}
 }
 
+func TestModel_SubscriptionAdminCreatesBackup(t *testing.T) {
+	created := ""
+	m := New(Deps{
+		CreateBackup: func(_ context.Context, subscription string) (int64, error) { created = subscription; return 9, nil },
+		LoadBackups: func(context.Context, string) ([]domain.Backup, error) {
+			return []domain.Backup{{ID: 9, Status: "complete"}}, nil
+		},
+	})
+	m.items = []domain.Subscription{{ID: 1, Name: "acme", Status: "active"}}
+	m.workspace, m.focus, m.subscriptionAdmin = true, focusWebsites, subscriptionAdminState{open: true, tab: 4}
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("n")})
+	m = updated.(appModel)
+	if m.confirm.action != "create-backup" {
+		t.Fatalf("backup confirmation = %#v", m.confirm)
+	}
+	updated, command := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("y")})
+	m = runProgress(t, updated.(appModel), command)
+	if created != "acme" || len(m.backups) != 1 || m.backups[0].ID != 9 {
+		t.Fatalf("backup result = %q / %#v", created, m.backups)
+	}
+}
+
 func TestModel_DeleteArchivedSubscriptionRequiresTypedName(t *testing.T) {
 	deleted := false
 	m := New(Deps{DeleteSubscription: func(_ context.Context, name string, force bool) (int64, error) {

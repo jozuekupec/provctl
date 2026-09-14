@@ -48,6 +48,8 @@ func (m appModel) handleSubscriptionAdminKey(msg tea.KeyMsg) (tea.Model, tea.Cmd
 			m.sshKeyCursor = clamp(m.sshKeyCursor+1, len(m.sshKeys))
 		} else if m.subscriptionAdmin.tab == 3 {
 			m.cronCursor = clamp(m.cronCursor+1, len(m.cronJobs))
+		} else if m.subscriptionAdmin.tab == 4 {
+			m.backupCursor = clamp(m.backupCursor+1, len(m.backups))
 		}
 	case actionMovePrevious:
 		if m.subscriptionAdmin.tab == 1 {
@@ -56,6 +58,8 @@ func (m appModel) handleSubscriptionAdminKey(msg tea.KeyMsg) (tea.Model, tea.Cmd
 			m.sshKeyCursor = clamp(m.sshKeyCursor-1, len(m.sshKeys))
 		} else if m.subscriptionAdmin.tab == 3 {
 			m.cronCursor = clamp(m.cronCursor-1, len(m.cronJobs))
+		} else if m.subscriptionAdmin.tab == 4 {
+			m.backupCursor = clamp(m.backupCursor-1, len(m.backups))
 		}
 	case actionCreate:
 		if m.subscriptionAdmin.tab == 1 {
@@ -64,6 +68,11 @@ func (m appModel) handleSubscriptionAdminKey(msg tea.KeyMsg) (tea.Model, tea.Cmd
 			return m.openSSHKeyForm(), nil
 		} else if m.subscriptionAdmin.tab == 3 {
 			return m.openCronForm(), nil
+		} else if m.subscriptionAdmin.tab == 4 {
+			subscription, ok := m.selectedSubscription()
+			if ok {
+				m = m.askConfirm(confirmState{action: "create-backup", title: "Create backup", lines: []string{"Subscription: " + subscription.Name, "Create a consistent archive of files and managed databases."}})
+			}
 		}
 	case actionRotateSecret:
 		if database, ok := m.selectedDatabase(); ok {
@@ -159,7 +168,19 @@ func (m appModel) subscriptionAdminBody(subscription domain.Subscription) string
 		}
 		return strings.Join(lines, "\n")
 	default:
-		return "Backup creation, inspection and restore will move here after their destructive workflow is designed."
+		if len(m.backups) == 0 {
+			return "No backups.\n\nn  create a backup\n\nRestore remains an explicit CLI workflow."
+		}
+		lines := []string{"↑/↓  select backup", ""}
+		for index, backup := range m.backups {
+			line := fmt.Sprintf("  #%d · %s · %s · %d bytes", backup.ID, backup.Status, backup.StartedAt.UTC().Format("2006-01-02 15:04Z"), backup.SizeBytes)
+			if index == m.backupCursor {
+				line = selectedStyle.Render("> " + strings.TrimPrefix(line, "  "))
+			}
+			lines = append(lines, line)
+		}
+		lines = append(lines, "", "n  create a backup · restore remains CLI-only")
+		return strings.Join(lines, "\n")
 	}
 }
 
@@ -195,6 +216,9 @@ func (m appModel) startSubscriptionAdminTab() (appModel, tea.Cmd) {
 	case 3:
 		m.status = "loading cron jobs…"
 		return m.startCronJobs()
+	case 4:
+		m.status = "loading backups…"
+		return m.startBackups()
 	default:
 		return m, nil
 	}
@@ -262,6 +286,38 @@ func (m appModel) removeCronJob(ctx context.Context, confirm confirmState, repor
 
 func (m appModel) removeCronJobCmd(confirm confirmState) tea.Cmd {
 	return steppedCmd("Remove cron job", []string{"rewrite generated crontab", "refresh cron job list"}, func(ctx context.Context, report func(int)) tea.Msg { return m.removeCronJob(ctx, confirm, report) })
+}
+
+func (m appModel) loadBackups(ctx context.Context, generation uint64) tea.Msg {
+	subscription, ok := m.selectedSubscription()
+	if !ok || m.deps.LoadBackups == nil {
+		return backupsLoadedMsg{err: context.Canceled, generation: generation}
+	}
+	items, err := m.deps.LoadBackups(ctx, subscription.Name)
+	return backupsLoadedMsg{items: items, err: err, generation: generation}
+}
+
+func (m appModel) startBackups() (appModel, tea.Cmd) {
+	ctx, generation := m.backupsLoad.start()
+	return m, func() tea.Msg { return m.loadBackups(ctx, generation) }
+}
+
+func (m appModel) createBackup(ctx context.Context, report func(int)) tea.Msg {
+	subscription, ok := m.selectedSubscription()
+	if !ok || m.deps.CreateBackup == nil {
+		return backupCreatedMsg{err: context.Canceled}
+	}
+	id, err := m.deps.CreateBackup(ctx, subscription.Name)
+	if err != nil || m.deps.LoadBackups == nil {
+		return backupCreatedMsg{err: err, id: id}
+	}
+	report(1)
+	items, err := m.deps.LoadBackups(ctx, subscription.Name)
+	return backupCreatedMsg{err: err, id: id, items: items}
+}
+
+func (m appModel) createBackupCmd(confirm confirmState) tea.Cmd {
+	return steppedCmd("Create backup", []string{"archive files and managed databases", "refresh backup history"}, func(ctx context.Context, report func(int)) tea.Msg { return m.createBackup(ctx, report) })
 }
 
 func (m appModel) removeSSHKey(ctx context.Context, confirm confirmState, report func(int)) tea.Msg {

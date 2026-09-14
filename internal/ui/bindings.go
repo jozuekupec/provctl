@@ -134,6 +134,7 @@ var bindings = []binding{
 	{Action: actionDelete, Group: "Actions", Keys: []string{"D"}, Label: "D", Help: "remove selected SSH key", Bar: "D remove", Short: "remove", Priority: 5, Contexts: []shortcutContext{shortcutAdminSSH}},
 	{Action: actionCreate, Group: "Actions", Keys: []string{"n"}, Label: "n", Help: "add cron job", Bar: "n add", Short: "add", Priority: 4, Contexts: []shortcutContext{shortcutAdminCron}},
 	{Action: actionDelete, Group: "Actions", Keys: []string{"D"}, Label: "D", Help: "remove selected cron job", Bar: "D remove", Short: "remove", Priority: 5, Contexts: []shortcutContext{shortcutAdminCron}},
+	{Action: actionCreate, Group: "Actions", Keys: []string{"n"}, Label: "n", Help: "create subscription backup", Bar: "n backup", Short: "backup", Priority: 4, Contexts: []shortcutContext{shortcutAdminBackups}},
 }
 
 func actionFor(context shortcutContext, key string) shortcutAction {

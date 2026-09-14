@@ -90,6 +90,8 @@ func (m appModel) runConfirmed() (tea.Model, tea.Cmd) {
 		return m, m.createCronJobCmd(confirm)
 	case "remove-cron-job":
 		return m, m.removeCronJobCmd(confirm)
+	case "create-backup":
+		return m, m.createBackupCmd(confirm)
 	default:
 		return m, m.changeWebsiteCmd(confirm)
 	}
