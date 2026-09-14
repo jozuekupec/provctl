@@ -37,19 +37,27 @@ func (m appModel) handleSubscriptionAdminKey(msg tea.KeyMsg) (tea.Model, tea.Cmd
 		return m, nil
 	case actionAdminTabNext:
 		m.subscriptionAdmin.tab = (m.subscriptionAdmin.tab + 1) % len(subscriptionAdminTabs)
+		return m.startSubscriptionAdminTab()
 	case actionAdminTabPrev:
 		m.subscriptionAdmin.tab = (m.subscriptionAdmin.tab + len(subscriptionAdminTabs) - 1) % len(subscriptionAdminTabs)
+		return m.startSubscriptionAdminTab()
 	case actionMoveNext:
 		if m.subscriptionAdmin.tab == 1 {
 			m.databaseCursor = clamp(m.databaseCursor+1, len(m.databases))
+		} else if m.subscriptionAdmin.tab == 2 {
+			m.sshKeyCursor = clamp(m.sshKeyCursor+1, len(m.sshKeys))
 		}
 	case actionMovePrevious:
 		if m.subscriptionAdmin.tab == 1 {
 			m.databaseCursor = clamp(m.databaseCursor-1, len(m.databases))
+		} else if m.subscriptionAdmin.tab == 2 {
+			m.sshKeyCursor = clamp(m.sshKeyCursor-1, len(m.sshKeys))
 		}
 	case actionCreate:
 		if m.subscriptionAdmin.tab == 1 {
 			return m.openDatabaseCreateForm(), nil
+		} else if m.subscriptionAdmin.tab == 2 {
+			return m.openSSHKeyForm(), nil
 		}
 	case actionRotateSecret:
 		if database, ok := m.selectedDatabase(); ok {
@@ -58,6 +66,8 @@ func (m appModel) handleSubscriptionAdminKey(msg tea.KeyMsg) (tea.Model, tea.Cmd
 	case actionDelete:
 		if database, ok := m.selectedDatabase(); ok {
 			m = m.askConfirm(confirmState{action: "delete-database", domain: database.Name, word: database.Name, title: "Delete database", lines: []string{"Database: " + database.Name, "This permanently removes the MariaDB database and local user."}})
+		} else if key, ok := m.selectedSSHKey(); ok {
+			m = m.askConfirm(confirmState{action: "remove-ssh-key", domain: key.Fingerprint, word: key.Fingerprint, title: "Remove SSH key", lines: []string{"Fingerprint: " + key.Fingerprint, "This removes the public key from the subscription account."}})
 		}
 	case actionHelp:
 		m.help = helpState{open: true, filter: newFilter()}
@@ -108,7 +118,21 @@ func (m appModel) subscriptionAdminBody(subscription domain.Subscription) string
 		}
 		return strings.Join(lines, "\n")
 	case 2:
-		return "SSH key and access management will move here in the next administration slice."
+		if len(m.sshKeys) == 0 {
+			return "No SSH keys.\n\nn  add a public key"
+		}
+		lines := []string{"↑/↓  select SSH key", ""}
+		for index, key := range m.sshKeys {
+			line := "  " + key.Fingerprint
+			if key.Comment != "" {
+				line += " · " + key.Comment
+			}
+			if index == m.sshKeyCursor {
+				line = selectedStyle.Render("> " + strings.TrimPrefix(line, "  "))
+			}
+			lines = append(lines, line)
+		}
+		return strings.Join(lines, "\n")
 	case 3:
 		return "Cron job management will move here in the next administration slice."
 	default:
@@ -135,6 +159,58 @@ func (m appModel) loadDatabases(ctx context.Context, generation uint64) tea.Msg 
 func (m appModel) startDatabases() (appModel, tea.Cmd) {
 	ctx, generation := m.databasesLoad.start()
 	return m, func() tea.Msg { return m.loadDatabases(ctx, generation) }
+}
+
+func (m appModel) startSubscriptionAdminTab() (appModel, tea.Cmd) {
+	switch m.subscriptionAdmin.tab {
+	case 1:
+		m.status = "loading databases…"
+		return m.startDatabases()
+	case 2:
+		m.status = "loading SSH keys…"
+		return m.startSSHKeys()
+	default:
+		return m, nil
+	}
+}
+
+func (m appModel) loadSSHKeys(ctx context.Context, generation uint64) tea.Msg {
+	subscription, ok := m.selectedSubscription()
+	if !ok || m.deps.LoadSSHKeys == nil {
+		return sshKeysLoadedMsg{err: context.Canceled, generation: generation}
+	}
+	items, err := m.deps.LoadSSHKeys(ctx, subscription.Name)
+	return sshKeysLoadedMsg{items: items, err: err, generation: generation}
+}
+
+func (m appModel) startSSHKeys() (appModel, tea.Cmd) {
+	ctx, generation := m.sshKeysLoad.start()
+	return m, func() tea.Msg { return m.loadSSHKeys(ctx, generation) }
+}
+
+func (m appModel) selectedSSHKey() (domain.SSHKey, bool) {
+	if m.sshKeyCursor < 0 || m.sshKeyCursor >= len(m.sshKeys) {
+		return domain.SSHKey{}, false
+	}
+	return m.sshKeys[m.sshKeyCursor], true
+}
+
+func (m appModel) removeSSHKey(ctx context.Context, confirm confirmState, report func(int)) tea.Msg {
+	subscription, ok := m.selectedSubscription()
+	if !ok || m.deps.RemoveSSHKey == nil {
+		return sshKeyRemovedMsg{err: context.Canceled}
+	}
+	_, err := m.deps.RemoveSSHKey(ctx, subscription.Name, confirm.domain)
+	if err != nil || m.deps.LoadSSHKeys == nil {
+		return sshKeyRemovedMsg{err: err, fingerprint: confirm.domain}
+	}
+	report(1)
+	items, err := m.deps.LoadSSHKeys(ctx, subscription.Name)
+	return sshKeyRemovedMsg{err: err, fingerprint: confirm.domain, items: items}
+}
+
+func (m appModel) removeSSHKeyCmd(confirm confirmState) tea.Cmd {
+	return steppedCmd("Remove SSH key", []string{"rewrite authorized keys", "refresh SSH key list"}, func(ctx context.Context, report func(int)) tea.Msg { return m.removeSSHKey(ctx, confirm, report) })
 }
 
 func (m appModel) changeDatabasePassword(ctx context.Context, confirm confirmState) tea.Msg {

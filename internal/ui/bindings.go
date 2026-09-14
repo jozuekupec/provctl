@@ -130,6 +130,8 @@ var bindings = []binding{
 	{Action: actionCreate, Group: "Actions", Keys: []string{"n"}, Label: "n", Help: "create database", Bar: "n create", Short: "create", Priority: 4, Contexts: []shortcutContext{shortcutAdminDatabases}},
 	{Action: actionRotateSecret, Group: "Actions", Keys: []string{"p"}, Label: "p", Help: "rotate selected database password", Bar: "p password", Short: "password", Priority: 5, Contexts: []shortcutContext{shortcutAdminDatabases}},
 	{Action: actionDelete, Group: "Actions", Keys: []string{"D"}, Label: "D", Help: "delete selected database", Bar: "D delete", Short: "delete", Priority: 6, Contexts: []shortcutContext{shortcutAdminDatabases}},
+	{Action: actionCreate, Group: "Actions", Keys: []string{"n"}, Label: "n", Help: "add SSH public key", Bar: "n add key", Short: "add", Priority: 4, Contexts: []shortcutContext{shortcutAdminSSH}},
+	{Action: actionDelete, Group: "Actions", Keys: []string{"D"}, Label: "D", Help: "remove selected SSH key", Bar: "D remove", Short: "remove", Priority: 5, Contexts: []shortcutContext{shortcutAdminSSH}},
 }
 
 func actionFor(context shortcutContext, key string) shortcutAction {

@@ -120,7 +120,10 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.output = m.output.append(m.status)
 			return m, nil
 		}
-		m.sshKeys, m.detailView, m.focus, m.status = append([]domain.SSHKey(nil), msg.items...), detailSSHKeys, focusDetail, "SSH keys loaded"
+		m.sshKeys, m.sshKeyCursor, m.status = append([]domain.SSHKey(nil), msg.items...), clamp(m.sshKeyCursor, len(msg.items)), "SSH keys loaded"
+		if !m.subscriptionAdmin.open {
+			m.detailView, m.focus = detailSSHKeys, focusDetail
+		}
 	case cronJobsLoadedMsg:
 		if m.cronJobsLoad.stale(msg.generation) {
 			return m, nil
@@ -168,8 +171,23 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		m.sshKeys = append([]domain.SSHKey(nil), msg.items...)
-		m.detailView, m.focus, m.status = detailSSHKeys, focusDetail, "SSH key added"
+		if !m.subscriptionAdmin.open {
+			m.detailView, m.focus = detailSSHKeys, focusDetail
+		}
+		m.sshKeyCursor, m.status = clamp(m.sshKeyCursor, len(m.sshKeys)), "SSH key added"
 		m.output = m.output.append("SSH key added from " + msg.path)
+		return m, nil
+	case sshKeyRemovedMsg:
+		m.progress.active = false
+		if msg.err != nil {
+			m.status = "SSH key removal failed: " + msg.err.Error()
+			m.output = m.output.append(m.status)
+			return m, nil
+		}
+		m.sshKeys = append([]domain.SSHKey(nil), msg.items...)
+		m.sshKeyCursor = clamp(m.sshKeyCursor, len(m.sshKeys))
+		m.status = "SSH key removed"
+		m.output = m.output.append("SSH key removed: " + msg.fingerprint)
 		return m, nil
 	case websiteChangedMsg:
 		m.progress.active = false

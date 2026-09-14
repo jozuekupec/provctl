@@ -26,6 +26,7 @@ type Deps struct {
 	LoadBackups            func(context.Context, string) ([]domain.Backup, error)
 	SetSSHAccess           func(context.Context, string, string) (string, int64, error)
 	AddSSHKeyFromFile      func(context.Context, string, string) (int64, error)
+	RemoveSSHKey           func(context.Context, string, string) (int64, error)
 	ReadWebsiteLogs        func(context.Context, string, string, bool, int) (string, error)
 	SetWebsiteEnabled      func(context.Context, string, string, bool) (int64, error)
 	SetWebsiteTLS          func(context.Context, string, string, bool) error
@@ -80,6 +81,11 @@ type sshKeyAddedMsg struct {
 	err   error
 	path  string
 	items []domain.SSHKey
+}
+type sshKeyRemovedMsg struct {
+	err         error
+	fingerprint string
+	items       []domain.SSHKey
 }
 
 type subscriptionsLoadedMsg struct {
@@ -368,6 +374,7 @@ type appModel struct {
 	backups                []domain.Backup
 	websiteCursor          int
 	databaseCursor         int
+	sshKeyCursor           int
 	showWebsites           bool
 	workspace              bool
 	focus                  focus

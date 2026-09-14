@@ -1022,6 +1022,49 @@ func TestModel_SubscriptionAdminDatabaseMutations(t *testing.T) {
 	}
 }
 
+func TestModel_SubscriptionAdminRemovesSelectedSSHKey(t *testing.T) {
+	const fingerprint = "SHA256:example-key"
+	removed := ""
+	m := New(Deps{
+		LoadDatabases: func(context.Context, string) ([]domain.Database, error) { return nil, nil },
+		LoadSSHKeys: func(context.Context, string) ([]domain.SSHKey, error) {
+			return []domain.SSHKey{{Fingerprint: fingerprint, Comment: "admin@example.test"}}, nil
+		},
+		RemoveSSHKey: func(_ context.Context, subscription, got string) (int64, error) {
+			removed = subscription + "/" + got
+			return 1, nil
+		},
+	})
+	m.ready, m.width, m.height = true, 100, 28
+	m.items = []domain.Subscription{{ID: 1, Name: "acme", Status: "active"}}
+	m.workspace, m.focus = true, focusWebsites
+	updated, command := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("m")})
+	m = updated.(appModel)
+	updated, _ = m.Update(command())
+	m = updated.(appModel)
+	updated, command = m.Update(tea.KeyMsg{Type: tea.KeyShiftRight})
+	m = updated.(appModel)
+	updated, _ = m.Update(command())
+	m = updated.(appModel)
+	if m.subscriptionAdmin.tab != 2 || len(m.sshKeys) != 1 || !strings.Contains(m.View(), fingerprint) {
+		t.Fatalf("SSH administration did not load/render: tab=%d keys=%#v", m.subscriptionAdmin.tab, m.sshKeys)
+	}
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("D")})
+	m = updated.(appModel)
+	if m.confirm.word != fingerprint {
+		t.Fatalf("remove confirmation = %#v", m.confirm)
+	}
+	for _, character := range fingerprint {
+		updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{character}})
+		m = updated.(appModel)
+	}
+	updated, command = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	_ = runProgress(t, updated.(appModel), command)
+	if removed != "acme/"+fingerprint {
+		t.Fatalf("RemoveSSHKey = %q", removed)
+	}
+}
+
 func TestModel_DeleteArchivedSubscriptionRequiresTypedName(t *testing.T) {
 	deleted := false
 	m := New(Deps{DeleteSubscription: func(_ context.Context, name string, force bool) (int64, error) {

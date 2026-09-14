@@ -460,10 +460,15 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   `D` deletion through the existing journalled services; all actions use the
   shared confirm/progress pipeline and refresh the list where needed. Its
   bindings, keybar and context help are entries in the same shortcut registry.
-  SSH, Cron and Backups tabs are intentionally visible placeholders only until
-  their own complete workflows are moved there; this avoids implying that the
-  old Detail lists are editable. Model tests cover loading, rotation, secret
-  non-persistence and typed deletion; full `make test` passed.
+  The SSH tab now follows the same boundary: it asynchronously lists persisted
+  keys, `n` opens the existing direct-path/file-picker add form, and typed `D`
+  rewrites `authorized_keys` through the journalled SSH service. Its list keeps
+  its own cursor and the key's public fingerprint is never read from the
+  account file by the UI. Cron and Backups remain intentionally visible
+  placeholders until their complete workflows are moved there; this avoids
+  implying that the old Detail lists are editable. Model tests cover loading,
+  rotation, secret non-persistence and typed deletion; full `make test`
+  passed.
   The subscription workspace also exposes `R` for a confirmed, service-backed
   reconciliation of generated Apache configuration. It keeps the scope to the
   selected subscription, reports the no-drift result without implying a write,
