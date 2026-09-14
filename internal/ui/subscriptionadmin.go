@@ -89,6 +89,10 @@ func (m appModel) handleSubscriptionAdminKey(msg tea.KeyMsg) (tea.Model, tea.Cmd
 		}
 	case actionHelp:
 		m.help = helpState{open: true, filter: newFilter()}
+	case actionSettings:
+		return m.openSettings(), nil
+	case actionRefresh:
+		return m.startSubscriptionAdminTab()
 	}
 	return m, nil
 }

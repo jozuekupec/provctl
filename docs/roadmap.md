@@ -476,6 +476,10 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   so it needs a dedicated double-confirmation and one-time-secret design rather
   than a shortcut. Model tests cover loading, rotation, secret non-persistence,
   typed deletion and confirmed backup creation; full `make test` passed.
+  A follow-up shortcut review caught an administration-only regression: shared
+  `,` Settings and `r` Refresh bindings were advertised by its keybar but had
+  no router cases. Both now work in every administration tab; the model test
+  executes the advertised actions rather than only checking registry lookup.
   The subscription workspace also exposes `R` for a confirmed, service-backed
   reconciliation of generated Apache configuration. It keeps the scope to the
   selected subscription, reports the no-drift result without implying a write,

@@ -1133,6 +1133,26 @@ func TestModel_SubscriptionAdminCreatesBackup(t *testing.T) {
 	}
 }
 
+func TestModel_SubscriptionAdminHonorsAdvertisedSettingsAndRefresh(t *testing.T) {
+	loads := 0
+	m := New(Deps{LoadDatabases: func(context.Context, string) ([]domain.Database, error) {
+		loads++
+		return nil, nil
+	}})
+	m.items = []domain.Subscription{{ID: 1, Name: "acme", Status: "active"}}
+	m.workspace, m.subscriptionAdmin = true, subscriptionAdminState{open: true, tab: 1}
+	updated, command := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("r")})
+	m = updated.(appModel)
+	_ = command()
+	if loads != 1 {
+		t.Fatalf("refresh loads = %d, want 1", loads)
+	}
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(",")})
+	if !updated.(appModel).settings.open {
+		t.Fatal("advertised settings shortcut did not open settings")
+	}
+}
+
 func TestModel_DeleteArchivedSubscriptionRequiresTypedName(t *testing.T) {
 	deleted := false
 	m := New(Deps{DeleteSubscription: func(_ context.Context, name string, force bool) (int64, error) {
