@@ -836,11 +836,12 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
 
 **Aktuální integrační follow-up (2026-09-15):** pracovní session nemá přístup
 k `/var/lib/incus/unix.socket` (`operation not permitted`), proto zde nebyl
-proveden žádný nový E2/E3 ani Pebble test a lokální `dist/provctl` zůstává
-starší artefakt z 2026-09-13. Před dalším privilegovaným během obnov přístup
-do skupiny `incus-admin` v novém login shellu, ověř `incus list`, sestav nový
-balíček a spusť příslušný reprodukovatelný skript. Offline `make test` zůstává
-zelený pro commit `3bac246`; dokumentační commit `d670424` nemění Go kód.
+proveden žádný nový E2/E3 ani Pebble test. Standardní `dist/provctl` byl
+následně z aktuálního `main` úspěšně přegenerován a hlásí `dev`. Před dalším
+privilegovaným během obnov přístup do skupiny `incus-admin` v novém login
+shellu, ověř `incus list`, sestav nový balíček a spusť příslušný
+reprodukovatelný skript. Offline `make test` zůstává zelený pro commit
+`3bac246`; dokumentační commity po něm nemění Go kód.
 
 Unit a golden testy běží neprivilegovaně přes `make test`. Integrační ověření
 probíhá jen v Debian 13 kontejneru `pv`, nikdy na hostiteli; návrat do čistého
