@@ -75,16 +75,16 @@ func (m appModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	}
-	switch msg.String() {
-	case ",":
+	switch actionFor(m.shortcutContext(), msg.String()) {
+	case actionSettings:
 		return m.openSettings(), nil
-	case "?":
+	case actionHelp:
 		m.help = helpState{open: true, filter: newFilter()}
 		m.status = ""
 		return m, nil
-	case "q", "ctrl+c":
+	case actionQuit:
 		return m, tea.Quit
-	case "j", "down":
+	case actionMoveNext:
 		if m.focus == focusWebsites {
 			next := clamp(m.websiteCursor+1, len(m.visibleWebsites()))
 			if next != m.websiteCursor {
@@ -94,14 +94,8 @@ func (m appModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 		} else if m.focus == focusOutput {
 			m.outputScroll++
-		} else {
-			next := clamp(m.cursor+1, len(m.visibleSubscriptions()))
-			if next != m.cursor {
-				m.cursor = next
-				m = m.clearSelectionDetails()
-			}
 		}
-	case "k", "up":
+	case actionMovePrevious:
 		if m.focus == focusWebsites {
 			next := clamp(m.websiteCursor-1, len(m.visibleWebsites()))
 			if next != m.websiteCursor {
@@ -111,27 +105,19 @@ func (m appModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 		} else if m.focus == focusOutput {
 			m.outputScroll = max(0, m.outputScroll-1)
-		} else {
-			next := clamp(m.cursor-1, len(m.visibleSubscriptions()))
-			if next != m.cursor {
-				m.cursor = next
-				m = m.clearSelectionDetails()
-			}
 		}
-	case "r":
+	case actionRefresh:
 		m.status = "loading subscriptions…"
 		m, command := m.startSubscriptions()
 		return m, command
-	case "/":
-		if m.focus == focusWebsites {
-			m.websiteFilter.active = true
-			m.websiteFilter.input.Focus()
-		}
-	case "h":
+	case actionFilter:
+		m.websiteFilter.active = true
+		m.websiteFilter.input.Focus()
+	case actionHealth:
 		m.status = "running health checks…"
 		m, command := m.startHealth()
 		return m, command
-	case "R":
+	case actionReconcile:
 		subscription, ok := m.selectedSubscription()
 		if ok {
 			m = m.askConfirm(confirmState{action: "reconcile", domain: subscription.Name, title: "Reconcile configuration", lines: []string{
@@ -139,31 +125,16 @@ func (m appModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				"Regenerate managed Apache configuration from provctl state.",
 			}})
 		}
-	case "enter":
-		if m.focus == focusWebsites {
-			m = m.openDomainEditor()
-		}
-	case "d":
-		m.focus = focusDetail
-	case "o":
-		m.focus = focusOutput
-	case "n":
-		if m.focus == focusWebsites {
-			m = m.openWebsiteCreateForm()
-		}
-	case "s":
+	case actionOpen:
+		m = m.openDomainEditor()
+	case actionCreate:
+		m = m.openWebsiteCreateForm()
+	case actionPicker:
 		m.workspace, m.focus, m.status = false, focusSubscriptions, "subscription picker"
-	case "right", "tab":
+	case actionPanelNext:
 		m.focus = focusRight(m.focus)
-	case "left", "shift+tab":
+	case actionPanelPrevious:
 		m.focus = focusLeft(m.focus)
-	case "esc":
-		if m.focus == focusWebsites && m.websiteFilter.query() != "" {
-			m.websiteFilter.input.SetValue("")
-			m.websiteCursor = 0
-			return m, nil
-		}
-		m.workspace, m.focus, m.status = false, focusSubscriptions, "subscription picker"
 	}
 	return m, nil
 }
@@ -203,9 +174,17 @@ func (m appModel) handlePickerKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case actionQuit:
 		return m, tea.Quit
 	case actionMoveNext:
-		m.cursor = clamp(m.cursor+1, len(m.visibleSubscriptions()))
+		next := clamp(m.cursor+1, len(m.visibleSubscriptions()))
+		if next != m.cursor {
+			m.cursor = next
+			m = m.clearSelectionDetails()
+		}
 	case actionMovePrevious:
-		m.cursor = clamp(m.cursor-1, len(m.visibleSubscriptions()))
+		next := clamp(m.cursor-1, len(m.visibleSubscriptions()))
+		if next != m.cursor {
+			m.cursor = next
+			m = m.clearSelectionDetails()
+		}
 	case actionFilter:
 		m.subscriptionFilter.active = true
 		m.subscriptionFilter.input.Focus()

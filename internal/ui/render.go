@@ -301,7 +301,7 @@ func (m appModel) keybar() string {
 		if summary := m.subscriptionFilter.activeSummary("subscriptions", len(m.visibleSubscriptions()), len(m.items)); summary != "" {
 			return summary
 		}
-		return "↑/↓ select · enter open · n create · a archive · d delete · / filter · , settings · ? help · q quit"
+		return keybarFor(shortcutPicker)
 	}
 	if m.domainEditor.open {
 		return keybarFor(m.domainEditorContext())

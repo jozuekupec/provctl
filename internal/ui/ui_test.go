@@ -445,7 +445,7 @@ func TestModel_SwitchingSubscriptionClearsDependentData(t *testing.T) {
 	m.databases = []domain.Database{{Name: "acme_main"}}
 	m.sshKeys = []domain.SSHKey{{Fingerprint: "SHA256:old"}}
 	m.detailView = detailSSHKeys
-	m.workspace, m.showWebsites, m.focus = true, true, focusSubscriptions
+	m.workspace, m.showWebsites, m.focus = false, true, focusSubscriptions
 	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyDown})
 	m = updated.(appModel)
 	if m.cursor != 1 || m.showWebsites || len(m.websites) != 0 || len(m.databases) != 0 || len(m.sshKeys) != 0 || m.detailView != detailDomain {
@@ -1208,7 +1208,7 @@ func TestModel_HealthWritesChecksToOutput(t *testing.T) {
 		return []service.Check{{Name: "Apache", Status: service.CheckOK, Detail: "active"}}, nil
 	}})
 	m.items = []domain.Subscription{{Name: "acme"}}
-	m.workspace = true
+	m.workspace, m.focus = true, focusWebsites
 	updated, command := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("h")})
 	updated, _ = updated.(appModel).Update(command())
 	m = updated.(appModel)
