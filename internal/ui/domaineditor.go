@@ -20,23 +20,24 @@ func (m appModel) openDomainEditor() appModel {
 }
 
 func (m appModel) handleDomainEditorKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	switch msg.String() {
-	case "ctrl+c", "q":
+	action := actionFor(m.domainEditorContext(), msg.String())
+	switch action {
+	case actionQuit:
 		return m, tea.Quit
-	case "s":
+	case actionPicker:
 		m.domainEditor = domainEditorState{}
 		m.workspace, m.focus, m.status = false, focusSubscriptions, "subscription picker"
 		return m, nil
-	case "esc":
+	case actionEditorClose:
 		m.domainEditor, m.status = domainEditorState{}, "domain editor closed"
 		return m, nil
-	case "shift+right":
+	case actionEditorTabNext:
 		m.domainEditor.tab = (m.domainEditor.tab + 1) % len(domainEditorTabs)
 		return m, nil
-	case "shift+left":
+	case actionEditorTabPrev:
 		m.domainEditor.tab = (m.domainEditor.tab + len(domainEditorTabs) - 1) % len(domainEditorTabs)
 		return m, nil
-	case "?":
+	case actionHelp:
 		m.help = helpState{open: true, filter: newFilter()}
 		return m, nil
 	}
@@ -48,59 +49,51 @@ func (m appModel) domainEditorAction(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if !ok {
 		return m, nil
 	}
-	switch m.domainEditor.tab {
-	case 0:
-		if msg.String() == "enter" || msg.String() == "e" {
-			m = m.askConfirm(confirmState{action: "set-enabled", enabled: !website.Enabled, domain: website.PrimaryDomain, title: "Update domain", lines: []string{"Domain: " + website.PrimaryDomain, "Set enabled: " + map[bool]string{true: "yes", false: "no"}[!website.Enabled]}})
+	switch actionFor(m.domainEditorContext(), msg.String()) {
+	case actionToggleEnabled:
+		m = m.askConfirm(confirmState{action: "set-enabled", enabled: !website.Enabled, domain: website.PrimaryDomain, title: "Update domain", lines: []string{"Domain: " + website.PrimaryDomain, "Set enabled: " + map[bool]string{true: "yes", false: "no"}[!website.Enabled]}})
+	case actionDelete:
+		m = m.askDeleteWebsite()
+	case actionDocumentRoot:
+		m = m.openDocumentRootForm()
+	case actionPHPVersion:
+		if website.Type != domain.WebsitePHPFPM {
+			m.status = "runtime settings apply only to PHP-FPM domains"
+			return m, nil
 		}
-	case 1:
-		if msg.String() == "enter" || msg.String() == "e" {
-			m = m.openDocumentRootForm()
+		m.phpPicker = phpPickerState{open: true, loading: true}
+		m.status = "loading installed PHP-FPM versions…"
+		m, command := m.startPHPVersions()
+		return m, command
+	case actionToggleTLS:
+		enabled := !website.SSLEnabled
+		lines := []string{"Domain: " + website.PrimaryDomain}
+		if enabled {
+			lines = append(lines, "Issue a certificate and redirect HTTP to HTTPS.", "Public DNS and HTTP reachability are required.")
+		} else {
+			lines = append(lines, "Disable TLS without deleting the certificate.")
 		}
-	case 2:
-		if msg.String() == "enter" || msg.String() == "p" {
-			if website.Type != domain.WebsitePHPFPM {
-				m.status = "runtime settings apply only to PHP-FPM domains"
-				return m, nil
-			}
-			m.phpPicker = phpPickerState{open: true, loading: true}
-			m.status = "loading installed PHP-FPM versions…"
-			m, command := m.startPHPVersions()
-			return m, command
-		}
-	case 3:
-		if msg.String() == "enter" || msg.String() == "t" {
-			enabled := !website.SSLEnabled
-			lines := []string{"Domain: " + website.PrimaryDomain}
-			if enabled {
-				lines = append(lines, "Issue a certificate and redirect HTTP to HTTPS.", "Public DNS and HTTP reachability are required.")
-			} else {
-				lines = append(lines, "Disable TLS without deleting the certificate.")
-			}
-			m = m.askConfirm(confirmState{action: "set-tls", enabled: enabled, domain: website.PrimaryDomain, title: map[bool]string{true: "Enable TLS", false: "Disable TLS"}[enabled], lines: lines})
-		}
-	case 4:
-		switch msg.String() {
-		case "a":
-			m = m.openAliasForm(true)
-		case "A":
-			m = m.openAliasForm(false)
-		case "enter", "e":
-			m = m.openTargetForm()
-		}
-	case 5:
-		switch msg.String() {
-		case "enter", "l":
-			m.status = "loading access log…"
-			m, command := m.startWebsiteLogs(false)
-			return m, command
-		case "L":
-			m.status = "loading error log…"
-			m, command := m.startWebsiteLogs(true)
-			return m, command
-		}
+		m = m.askConfirm(confirmState{action: "set-tls", enabled: enabled, domain: website.PrimaryDomain, title: map[bool]string{true: "Enable TLS", false: "Disable TLS"}[enabled], lines: lines})
+	case actionAddAlias:
+		m = m.openAliasForm(true)
+	case actionRemoveAlias:
+		m = m.openAliasForm(false)
+	case actionTarget:
+		m = m.openTargetForm()
+	case actionAccessLog:
+		m.status = "loading access log…"
+		m, command := m.startWebsiteLogs(false)
+		return m, command
+	case actionErrorLog:
+		m.status = "loading error log…"
+		m, command := m.startWebsiteLogs(true)
+		return m, command
 	}
 	return m, nil
+}
+
+func (m appModel) domainEditorContext() shortcutContext {
+	return shortcutEditorOverview + shortcutContext(m.domainEditor.tab)
 }
 
 func (m appModel) domainEditorTabs() string {

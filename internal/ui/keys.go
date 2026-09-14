@@ -139,91 +139,17 @@ func (m appModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				"Regenerate managed Apache configuration from provctl state.",
 			}})
 		}
-	case "p":
-		if m.focus == focusWebsites {
-			website, ok := m.selectedWebsite()
-			if !ok || website.Type != domain.WebsitePHPFPM {
-				m.status = "select a PHP-FPM domain to change its PHP version"
-				break
-			}
-			m.phpPicker = phpPickerState{open: true, loading: true}
-			m.status = "loading installed PHP-FPM versions…"
-			m, command := m.startPHPVersions()
-			return m, command
-		}
-	case "l":
-		if m.showWebsites && len(m.websites) > 0 {
-			m.status = "loading access log…"
-			m, command := m.startWebsiteLogs(false)
-			return m, command
-		}
-	case "L":
-		if m.showWebsites && len(m.websites) > 0 {
-			m.status = "loading error log…"
-			m, command := m.startWebsiteLogs(true)
-			return m, command
-		}
 	case "enter":
 		if m.focus == focusWebsites {
 			m = m.openDomainEditor()
 		}
 	case "d":
 		m.focus = focusDetail
-	case "D":
-		if m.focus == focusWebsites {
-			m = m.askDeleteWebsite()
-		}
 	case "o":
 		m.focus = focusOutput
-	case "e":
-		if m.showWebsites {
-			website, ok := m.selectedWebsite()
-			if !ok {
-				break
-			}
-			m = m.askConfirm(confirmState{
-				action: "set-enabled", enabled: !website.Enabled, domain: website.PrimaryDomain,
-				title: "Update domain", lines: []string{"Domain: " + website.PrimaryDomain, "Set enabled: " + map[bool]string{true: "yes", false: "no"}[!website.Enabled]},
-			})
-		}
-	case "E":
-		if m.focus == focusWebsites {
-			m = m.openDocumentRootForm()
-		}
 	case "n":
 		if m.focus == focusWebsites {
 			m = m.openWebsiteCreateForm()
-		} else if m.focus == focusDetail && m.detailView == detailDatabases {
-			m = m.openDatabaseCreateForm()
-		} else if m.focus == focusDetail && m.detailView == detailSSHKeys {
-			m = m.openSSHKeyForm()
-		}
-	case "a":
-		if m.focus == focusWebsites {
-			m = m.openAliasForm(true)
-		}
-	case "A":
-		if m.focus == focusWebsites {
-			m = m.openAliasForm(false)
-		}
-	case "T":
-		if m.focus == focusWebsites {
-			m = m.openTargetForm()
-		}
-	case "t":
-		if m.focus == focusWebsites {
-			website, ok := m.selectedWebsite()
-			if !ok {
-				break
-			}
-			enabled := !website.SSLEnabled
-			lines := []string{"Domain: " + website.PrimaryDomain}
-			if enabled {
-				lines = append(lines, "Issue a certificate and redirect HTTP to HTTPS.", "Public DNS and HTTP reachability are required.")
-			} else {
-				lines = append(lines, "Disable TLS without deleting the certificate.")
-			}
-			m = m.askConfirm(confirmState{action: "set-tls", enabled: enabled, domain: website.PrimaryDomain, title: map[bool]string{true: "Enable TLS", false: "Disable TLS"}[enabled], lines: lines})
 		}
 	case "s":
 		m.workspace, m.focus, m.status = false, focusSubscriptions, "subscription picker"
@@ -271,37 +197,37 @@ func (m appModel) handleFilterKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m appModel) handlePickerKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	switch msg.String() {
-	case ",":
+	switch actionFor(shortcutPicker, msg.String()) {
+	case actionSettings:
 		return m.openSettings(), nil
-	case "q", "ctrl+c":
+	case actionQuit:
 		return m, tea.Quit
-	case "j", "down":
+	case actionMoveNext:
 		m.cursor = clamp(m.cursor+1, len(m.visibleSubscriptions()))
-	case "k", "up":
+	case actionMovePrevious:
 		m.cursor = clamp(m.cursor-1, len(m.visibleSubscriptions()))
-	case "/":
+	case actionFilter:
 		m.subscriptionFilter.active = true
 		m.subscriptionFilter.input.Focus()
-	case "?":
+	case actionHelp:
 		m.help = helpState{open: true, filter: newFilter()}
 		m.status = ""
-	case "r":
+	case actionRefresh:
 		m.status = "loading subscriptions…"
 		m, command := m.startSubscriptions()
 		return m, command
-	case "a":
+	case actionArchive:
 		subscription, ok := m.selectedSubscription()
 		if ok && subscription.Status != "archived" {
 			m = m.askConfirm(confirmState{action: "archived", domain: subscription.Name, title: "Archive subscription", lines: []string{"Subscription: " + subscription.Name, "Archiving is required before permanent deletion."}})
 		}
-	case "d":
+	case actionDelete:
 		m = m.askDeleteSubscription()
-	case "u":
+	case actionSSHAccess:
 		m = m.openSSHAccessForm()
-	case "n":
+	case actionCreate:
 		m = m.openSubscriptionCreateForm()
-	case "enter":
+	case actionOpen:
 		if len(m.visibleSubscriptions()) == 0 {
 			return m, nil
 		}

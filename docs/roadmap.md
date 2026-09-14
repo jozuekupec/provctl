@@ -446,6 +446,11 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   of concatenating multi-line styled strings. `Shift+Left` and `Shift+Right`
   now change tabs; ordinary arrows do not. A minimum-terminal geometry test
   covers the tab width and every rendered frame row.
+  Shortcut declarations are now centralized in `internal/ui/bindings.go`.
+  Each row binds an action to contexts and supplies both its Help and keybar
+  forms; picker and domain-editor routing consume the same action identity.
+  Regression tests ensure every advertised key resolves and keybar/help remain
+  derived from the shared registry.
   The subscription workspace also exposes `R` for a confirmed, service-backed
   reconciliation of generated Apache configuration. It keeps the scope to the
   selected subscription, reports the no-drift result without implying a write,

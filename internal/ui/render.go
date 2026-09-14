@@ -90,7 +90,7 @@ func (m appModel) domainEditorBody(website domain.Website) string {
 	phpVersion := valueOrDash(website.PHPVersion)
 	switch m.domainEditor.tab {
 	case 0:
-		return strings.Join([]string{"Domain: " + website.PrimaryDomain, "Subscription: " + subscription.Name, "Type: " + string(website.Type), "Status: " + map[bool]string{true: "enabled", false: "disabled"}[website.Enabled], "", "Enter  toggle enabled state"}, "\n")
+		return strings.Join([]string{"Domain: " + website.PrimaryDomain, "Subscription: " + subscription.Name, "Type: " + string(website.Type), "Status: " + map[bool]string{true: "enabled", false: "disabled"}[website.Enabled], "", "Enter  toggle enabled state", "D      permanently delete domain configuration"}, "\n")
 	case 1:
 		return strings.Join([]string{"Document root: " + valueOrDash(website.DocumentRoot), "Home: " + valueOrDash(subscription.Home), "", "Enter  choose a document root"}, "\n")
 	case 2:
@@ -304,21 +304,28 @@ func (m appModel) keybar() string {
 		return "↑/↓ select · enter open · n create · a archive · d delete · / filter · , settings · ? help · q quit"
 	}
 	if m.domainEditor.open {
-		return "⇧←/⇧→ tabs · enter action · esc workspace · s subscriptions · ? help · q quit"
+		return keybarFor(m.domainEditorContext())
 	}
 	if m.focus == focusWebsites {
 		if summary := m.websiteFilter.activeSummary("domains", len(m.visibleWebsites()), len(m.websites)); summary != "" {
 			return summary
 		}
 	}
+	return keybarFor(m.shortcutContext())
+}
+
+func (m appModel) shortcutContext() shortcutContext {
+	if !m.workspace {
+		return shortcutPicker
+	}
 	switch m.focus {
 	case focusWebsites:
-		return "←/→ panels · ↑/↓ select · enter edit · n create · D delete · a/A aliases · p PHP · e toggle · E root · T target · t TLS · l/L logs · s subscriptions"
+		return shortcutDomains
 	case focusDetail:
-		return "←/→ panels · read-only preview · s subscriptions · ? help"
+		return shortcutDetail
 	case focusLogs:
-		return "←/→ panels · ↑/↓ scroll · l/L logs · s subscriptions · ? help"
+		return shortcutLogs
 	default:
-		return "←/→ panels · ↑/↓ scroll · h health · R reconcile · s subscriptions · ? help"
+		return shortcutOutput
 	}
 }

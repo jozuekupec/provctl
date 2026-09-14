@@ -55,49 +55,13 @@ type helpSection struct {
 }
 
 func (m appModel) helpSections() []helpSection {
-	navigation := helpSection{title: "Navigation", rows: []string{
-		"↑/↓       select an item or scroll the focused panel",
-		"←/→       move between workspace panels",
-		"s         return to subscription picker",
-	}}
 	if !m.workspace {
-		return []helpSection{navigation, {title: "Subscriptions", rows: []string{
-			"enter     open selected subscription", "n         create a subscription", "a         archive selected subscription", "d         delete archived subscription", "r / /     refresh or filter", " ,        edit configuration settings",
-		}}, {title: "General", rows: []string{"?         this help", "q         quit"}}}
+		return helpFor(shortcutPicker)
 	}
-	return []helpSection{
-		{title: "Navigation", rows: []string{
-			"↑/↓       select an item or scroll the focused panel",
-			"←/→       move between workspace panels",
-			"enter     edit selected domain",
-			"s         return to subscription picker",
-		}},
-		{title: "Subscriptions", rows: []string{
-			"r         refresh subscriptions",
-			"/         filter domains",
-			"n         create a subscription (from picker)",
-			"a         archive selected subscription",
-			"d         permanently delete selected archived subscription",
-			"u         set SSH access mode (from picker)",
-		}},
-		{title: "Domains", rows: []string{
-			"n         create a domain",
-			"a / A     add or remove a domain alias",
-			"e         enable or disable selected domain",
-			"p         choose a PHP-FPM version for selected domain",
-			"D         permanently remove selected domain configuration",
-			"E         edit selected domain document root",
-			"T         edit selected proxy or redirect target",
-			"t         enable or disable TLS for selected domain",
-			"l / L     load access or error log",
-			"h         run health checks",
-		}},
-		{title: "General", rows: []string{
-			",         edit configuration settings",
-			"?         open this help",
-			"q         quit",
-		}},
+	if m.domainEditor.open {
+		return helpFor(m.domainEditorContext())
 	}
+	return helpFor(m.shortcutContext())
 }
 
 func (m appModel) filteredHelpRows() []string {

@@ -270,7 +270,8 @@ func TestModel_DocumentRootFormConfirmsAndUpdatesSelectedDomain(t *testing.T) {
 	m.items = []domain.Subscription{{ID: 1, Name: "acme"}}
 	m.websites = []domain.Website{{ID: 2, PrimaryDomain: "example.test", Type: domain.WebsiteStatic, DocumentRoot: "/vhosts/acme/public"}}
 	m.workspace, m.showWebsites, m.focus = true, true, focusWebsites
-	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("E")})
+	m.domainEditor = domainEditorState{open: true, tab: 1}
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	m = updated.(appModel)
 	if !m.documentRootForm.open {
 		t.Fatal("document root form did not open")
@@ -360,6 +361,7 @@ func TestModel_AliasFormAppliesAndRefreshes(t *testing.T) {
 	m.items = []domain.Subscription{{ID: 1, Name: "acme"}}
 	m.websites = []domain.Website{{PrimaryDomain: "example.test", Type: domain.WebsiteStatic}}
 	m.workspace, m.showWebsites, m.focus = true, true, focusWebsites
+	m.domainEditor = domainEditorState{open: true, tab: 4}
 	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("a")})
 	m = updated.(appModel)
 	if !m.aliasForm.open || !m.aliasForm.add {
@@ -396,7 +398,8 @@ func TestModel_TargetFormUpdatesRedirect(t *testing.T) {
 	m.items = []domain.Subscription{{ID: 1, Name: "acme"}}
 	m.websites = []domain.Website{{PrimaryDomain: "go.example.test", Type: domain.WebsiteRedirect, Target: "https://old.example.test", RedirectCode: 301}}
 	m.workspace, m.showWebsites, m.focus = true, true, focusWebsites
-	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("T")})
+	m.domainEditor = domainEditorState{open: true, tab: 4}
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	m = updated.(appModel)
 	m.targetForm.input.SetValue("https://new.example.test")
 	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyRight})
@@ -538,6 +541,7 @@ func TestModel_ConfirmWebsiteToggleCallsDependency(t *testing.T) {
 	}})
 	m.items = []domain.Subscription{{ID: 1, Name: "acme"}}
 	m.workspace, m.websites, m.showWebsites = true, []domain.Website{{PrimaryDomain: "example.test", Enabled: true}}, true
+	m.domainEditor = domainEditorState{open: true}
 	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("e")})
 	m = updated.(appModel)
 	if m.confirm.action == "" {
@@ -563,6 +567,7 @@ func TestModel_FilteredWebsiteToggleUsesVisibleSelection(t *testing.T) {
 	m.workspace, m.showWebsites, m.focus = true, true, focusWebsites
 	m.websites = []domain.Website{{PrimaryDomain: "first.test", Enabled: true}, {PrimaryDomain: "second.test", Enabled: true}}
 	m.websiteFilter.input.SetValue("second")
+	m.domainEditor = domainEditorState{open: true}
 	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("e")})
 	m = updated.(appModel)
 	updated, command := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("y")})
@@ -584,6 +589,7 @@ func TestModel_TLSToggleCallsDependency(t *testing.T) {
 	m.items = []domain.Subscription{{ID: 1, Name: "acme"}}
 	m.workspace, m.showWebsites, m.focus = true, true, focusWebsites
 	m.websites = []domain.Website{{PrimaryDomain: "example.test", SSLEnabled: false}}
+	m.domainEditor = domainEditorState{open: true, tab: 3}
 	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("t")})
 	m = updated.(appModel)
 	if m.confirm.action != "set-tls" || !m.confirm.enabled {
@@ -610,6 +616,7 @@ func TestModel_PHPVersionPickerChangesSelectedDomain(t *testing.T) {
 	m.items = []domain.Subscription{{ID: 1, Name: "acme", Status: "active"}}
 	m.workspace, m.showWebsites, m.focus = true, true, focusWebsites
 	m.websites = []domain.Website{{ID: 1, PrimaryDomain: "app.example.test", Type: domain.WebsitePHPFPM, PHPVersion: "8.3"}}
+	m.domainEditor = domainEditorState{open: true, tab: 2}
 	updated, command := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("p")})
 	m = updated.(appModel)
 	if !m.phpPicker.open || !m.phpPicker.loading {
@@ -644,6 +651,7 @@ func TestModel_PHPVersionPickerRejectsCurrentVersionWithoutMutation(t *testing.T
 	m.items = []domain.Subscription{{ID: 1, Name: "acme", Status: "active"}}
 	m.workspace, m.showWebsites, m.focus = true, true, focusWebsites
 	m.websites = []domain.Website{{ID: 1, PrimaryDomain: "app.example.test", Type: domain.WebsitePHPFPM, PHPVersion: "8.4"}}
+	m.domainEditor = domainEditorState{open: true, tab: 2}
 	updated, command := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("p")})
 	m = updated.(appModel)
 	updated, _ = m.Update(command())
@@ -798,10 +806,11 @@ func TestModel_AppliedHelpFilterAlsoFitsPopup(t *testing.T) {
 func TestModel_HelpFilterDropsUnmatchedSections(t *testing.T) {
 	m := New(Deps{})
 	m.workspace, m.showWebsites, m.focus = true, true, focusWebsites
+	m.domainEditor = domainEditorState{open: true, tab: 3}
 	m.help = helpState{open: true, filter: newFilter()}
 	m.help.filter.input.SetValue("TLS")
 	rows := strings.Join(m.filteredHelpRows(), "\n")
-	if !strings.Contains(rows, "Domains") || strings.Contains(rows, "Subscriptions") {
+	if !strings.Contains(rows, "Actions") || strings.Contains(rows, "Navigation\n↑/↓") {
 		t.Fatalf("filtered help sections = %q", rows)
 	}
 }
@@ -810,7 +819,7 @@ func TestModel_HelpTreatsDetailAsReadOnly(t *testing.T) {
 	m := New(Deps{})
 	m.workspace, m.focus, m.detailView = true, focusDetail, detailDatabases
 	rows := strings.Join(m.filteredHelpRows(), "\n")
-	if strings.Contains(rows, "create database") || !strings.Contains(rows, "edit selected domain") {
+	if strings.Contains(rows, "create database") || !strings.Contains(rows, "move to next workspace panel") {
 		t.Fatalf("read-only detail help = %q", rows)
 	}
 }
@@ -873,11 +882,11 @@ func TestModel_CreateSubscriptionCallsDependency(t *testing.T) {
 			return []domain.Subscription{{ID: 1, Name: "acme", Status: "active"}}, nil
 		},
 	})
-	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("n")})
-	m = updated.(appModel)
+	m = m.openSubscriptionCreateForm()
 	if !m.subscriptionCreateForm.open {
 		t.Fatal("subscription creation form did not open")
 	}
+	var updated tea.Model
 	for _, character := range "acme" {
 		updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{character}})
 		m = updated.(appModel)
@@ -934,11 +943,11 @@ func TestModel_CreateDatabaseCallsDependency(t *testing.T) {
 	})
 	m.items = []domain.Subscription{{ID: 1, Name: "acme", Status: "active"}}
 	m.workspace, m.focus, m.detailView = true, focusDetail, detailDatabases
-	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("n")})
-	m = updated.(appModel)
+	m = m.openDatabaseCreateForm()
 	if !m.databaseCreateForm.open {
 		t.Fatal("database creation form did not open")
 	}
+	var updated tea.Model
 	for _, character := range "app" {
 		updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{character}})
 		m = updated.(appModel)
@@ -995,6 +1004,7 @@ func TestModel_DeleteWebsiteRequiresTypedDomain(t *testing.T) {
 	m.workspace, m.showWebsites, m.focus = true, true, focusWebsites
 	m.items = []domain.Subscription{{ID: 1, Name: "acme", Status: "active"}}
 	m.websites = []domain.Website{{ID: 2, PrimaryDomain: "api.example.test", Type: domain.WebsiteStatic}}
+	m.domainEditor = domainEditorState{open: true}
 	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("D")})
 	m = updated.(appModel)
 	if m.confirm.action != "delete-website" || m.confirm.word != "api.example.test" {
@@ -1124,13 +1134,12 @@ func TestModel_AddSSHKeyUsesServiceAndRefreshesKeys(t *testing.T) {
 	})
 	m.workspace, m.focus, m.detailView = true, focusDetail, detailSSHKeys
 	m.items = []domain.Subscription{{ID: 1, Name: "acme"}}
-	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("n")})
-	m = updated.(appModel)
+	m = m.openSSHKeyForm()
 	if !m.sshKeyForm.open {
 		t.Fatal("SSH key form did not open")
 	}
 	m.sshKeyForm.input.SetValue("/tmp/operator.pub")
-	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyCtrlS})
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyCtrlS})
 	m = updated.(appModel)
 	updated, command := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("y")})
 	m = runProgress(t, updated.(appModel), command)
@@ -1153,6 +1162,7 @@ func TestModel_ConfirmationCannotStartDuplicateMutation(t *testing.T) {
 	m.items = []domain.Subscription{{Name: "acme", Status: "active"}}
 	m.websites = []domain.Website{{PrimaryDomain: "acme.test", Enabled: true}}
 	m.workspace, m.showWebsites, m.focus = true, true, focusWebsites
+	m.domainEditor = domainEditorState{open: true}
 	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("e")})
 	m = updated.(appModel)
 	updated, command := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("y")})
@@ -1216,6 +1226,7 @@ func TestModel_LoadWebsiteLogsWritesOutput(t *testing.T) {
 	}})
 	m.items = []domain.Subscription{{Name: "acme"}}
 	m.workspace, m.websites, m.showWebsites = true, []domain.Website{{PrimaryDomain: "example.test"}}, true
+	m.domainEditor = domainEditorState{open: true, tab: 5}
 	updated, command := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("l")})
 	updated, _ = updated.(appModel).Update(command())
 	m = updated.(appModel)
