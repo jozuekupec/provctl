@@ -42,6 +42,17 @@ open a directory, Space to select it, and confirm the selected absolute path.
 In the Domains panel, `E` opens the equivalent document-root editor for a
 selected static or PHP-FPM site; it uses the same picker and confirmation.
 
+Press `m` in the Domains panel to open **Manage subscription**. The connected
+tabs use Shift+Left/Right; `n` creates the resource on the active tab and
+`D` removes the selected database, SSH key, or cron job only after typing its
+name, fingerprint, or ID. Database password rotation is `p` and its generated
+secret appears once in a separate dialog, never in Output. The Backups tab
+lists archives and can create one; restore remains an explicit CLI operation
+because it can replace a subscription and generate new database passwords.
+Use `s` from the workspace, domain editor, or administration screen to return
+to the full-screen subscription picker. `?` always shows the shortcuts for the
+current surface.
+
 For scripted document-root changes, use `sudo provctl website docroot set
 <subscription> <domain> <absolute-path>`. The target must already exist and,
 after symlinks are resolved, remain inside the subscription home; the command
