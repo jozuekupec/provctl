@@ -660,6 +660,25 @@ Po smazání adopovaného webu ověř, že jeho legacy lineage v
 `/etc/letsencrypt/live/` zůstal zachovaný. Běžný snapshot `clean` Pebble
 neobsahuje, proto je tento follow-up oddělený od standardního E2 průchodu.
 
+### T17b — adopt s existujícím TLS lineage
+
+T17b vytvoří na izolované instanci funkční legacy vhost, vydá jeho certifikát
+přes Pebble a teprve pak provede adopci. Ověřuje přechod původního webrootu na
+centrální ACME webroot, TLS vhost, forced renewal a zachování cizího lineage po
+smazání provctl website. Nezasahuje do interaktivního `pv`, pokud použiješ
+debug instanci a její snapshot:
+
+```bash
+PATH=/home/linuxbrew/.linuxbrew/bin:$PATH \
+PROVCTL_E2_INSTANCE=pv-tls-debug-20260913 \
+PROVCTL_E2_SNAPSHOT=isolated-clean \
+PROVCTL_E2_REGENERATE_NIC=true \
+  ./scripts/tests/t17-adopt-tls.sh dist/provctl_*.deb /tmp/provctl-pebble
+```
+
+Skript vždy obnoví zvolený snapshot. Vyžaduje lokální checkout upstream
+Pebble stejně jako T16 a není součástí `run-all.sh`.
+
 ### T18 — lokální APT repozitář
 
 ```bash
@@ -860,7 +879,8 @@ scripts/
     ├── t06-piuparts-upgrade.sh
     ├── t10-isolation.sh    # POVINNÝ po každé změně práv nebo šablon
     ├── t16-ssl.sh
-    └── t17-adopt.sh
+    ├── t17-adopt.sh
+    └── t17-adopt-tls.sh  # Pebble TLS lineage adoption; separate from run-all
 ```
 
 `run-all.sh` přijímá aktuální `.deb` a volitelně starší `.deb` pro T06:
@@ -901,6 +921,7 @@ který připojuje `/proc`; neprovádí žádnou operaci nad hostitelským projek
 [ ] scripts/tests/run-all.sh               (E2)
 [ ] t10-isolation.sh zvlášť a pozorně      (E2)
 [ ] t17-adopt.sh                           (E2)
+[ ] t17-adopt-tls.sh proti Pebble          (E3)
 [ ] t16-ssl.sh proti Pebble                (E3)
 [ ] lokální file:// APT repo               (E2)
 [ ] git tag vX.Y.Z~rc1  → suite testing

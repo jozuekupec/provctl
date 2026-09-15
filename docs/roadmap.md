@@ -719,7 +719,7 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   ověřil fingerprint, kandidáta `0.1.1` z
   `https://jozuekupec.github.io/provctl/debian` a úspěšně nainstalovaný
   `provctl --version` `0.1.1`; kontejner byl po testu smazán.
-- [~] **M10 — migrace:**
+- [x] **M10 — migrace:**
   Statická revize TLS adopce 2026-09-13 odstranila Pebble blokér: renewal
   manager dříve vždy volal `certbot renew --dry-run`, který Certbotu pro
   lokální ACME server přepíše directory na veřejný staging endpoint. Při
@@ -839,6 +839,14 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   TLS disable. T16 nyní Pebble spouští přes transientní `systemd` unit, protože
   Incus při ukončení jednorázového `exec` scope ukončí běžný background proces.
   Reálný Pebble test *adoptovaného* TLS lineage zůstává samostatný follow-up.
+  **M10 completed 2026-09-16:** nový izolovaný T17b vytvořil funkční legacy
+  Apache web a jeho externě vlastněný Pebble certifikát, následně data adoptoval
+  do `migrated-tls`, ověřil TLS vhost s původním lineage, změněný renewal
+  webroot, skutečný forced renewal i zachování Certbot souborů po smazání
+  provctl website. Spolu s T17 tak pokrývá odmítnutí aktivní kolize i bezpečný
+  přesun reálné struktury. Automatická obnova po pádu během reconfigure a
+  retence recovery kopií jsou vědomé budoucí provozní follow-upy, ne podmínka
+  dokončeného migračního kontraktu.
 
 ## Pravidla ověřování
 
