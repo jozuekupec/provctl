@@ -49,7 +49,7 @@ run 'status=$(curl -sS -o /dev/null -w "%{http_code}" -H "Host: a.test" http://1
 run 'if runuser -u www-data -- cat /var/www/vhosts/alfa/sites/a.test/app/secret.txt >/dev/null 2>&1; then echo "www-data read alfa secret" >&2; exit 1; fi'
 
 # Sessions stay private to their subscription.
-run 'grep -F "php_admin_value[session.save_path] = /var/www/vhosts/alfa/tmp/sessions" /etc/php/*/fpm/pool.d/provctl-alfa.conf'
+run 'grep -F "php_admin_value[session.save_path] = /var/www/vhosts/alfa/tmp/sessions" /etc/php/*/fpm/pool.d/provctl-alfa-a.test.conf'
 run 'if runuser -u beta -- ls /var/www/vhosts/alfa/tmp/sessions >/dev/null 2>&1; then echo "beta listed alfa sessions" >&2; exit 1; fi'
 
 # The root-owned log directory must reject a new symlink, not merely an

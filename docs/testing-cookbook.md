@@ -472,7 +472,7 @@ incus file push /tmp/evil.php pv/var/www/vhosts/beta/sites/b.test/public/evil.ph
 **Test 4 — session isolation:**
 
 ```bash
-./scripts/e2.sh sh 'grep session.save_path /etc/php/*/fpm/pool.d/provctl-alfa.conf'
+./scripts/e2.sh sh 'grep session.save_path /etc/php/*/fpm/pool.d/provctl-alfa-a.test.conf'
 ./scripts/e2.sh sh 'sudo -u beta ls /var/www/vhosts/alfa/tmp/sessions 2>&1'
 ```
 **Očekávané:** cesta je uvnitř home alfy; beta ji nepřečte.

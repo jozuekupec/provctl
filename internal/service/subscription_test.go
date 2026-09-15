@@ -15,6 +15,7 @@ import (
 
 	"provctl/internal/config"
 	"provctl/internal/domain"
+	"provctl/internal/meta"
 	"provctl/internal/plan"
 	"provctl/internal/system"
 	"provctl/internal/system/fake"
@@ -23,6 +24,12 @@ import (
 type subscriptionFS struct {
 	directories map[string]bool
 	failPath    string
+	chownCalls  []subscriptionChown
+}
+
+type subscriptionChown struct {
+	path     string
+	uid, gid int
 }
 
 func (fs *subscriptionFS) Stat(path string) (os.FileInfo, error) {
@@ -42,7 +49,10 @@ func (fs *subscriptionFS) MkdirAll(path string, _ os.FileMode) error {
 	fs.directories[path] = true
 	return nil
 }
-func (fs *subscriptionFS) Chown(string, int, int) error             { return nil }
+func (fs *subscriptionFS) Chown(path string, uid, gid int) error {
+	fs.chownCalls = append(fs.chownCalls, subscriptionChown{path: path, uid: uid, gid: gid})
+	return nil
+}
 func (fs *subscriptionFS) Chmod(string, os.FileMode) error          { return nil }
 func (fs *subscriptionFS) Symlink(string, string) error             { return nil }
 func (fs *subscriptionFS) ReadDir(string) ([]os.DirEntry, error)    { return nil, nil }
@@ -261,6 +271,13 @@ func TestSubscriptionService_CreateCreatesSystemAndDatabaseState(t *testing.T) {
 	if !fs.directories[filepath.Join("/vhosts", "acme", "tmp", "sessions")] {
 		t.Error("session directory was not created")
 	}
+	logDirectory := filepath.Join(meta.LogDir, "acme")
+	if !fs.directories[logDirectory] {
+		t.Error("subscription log directory was not created")
+	}
+	if !containsSubscriptionChown(fs.chownCalls, subscriptionChown{path: logDirectory, uid: 0, gid: 5000}) {
+		t.Errorf("subscription log directory was not owned by root:subscription: %#v", fs.chownCalls)
+	}
 	if journal.status != plan.OperationDone {
 		t.Errorf("journal status = %s, want done", journal.status)
 	}
@@ -311,12 +328,21 @@ func TestSubscriptionService_PrepareCreateDoesNotChangeState(t *testing.T) {
 	if users.created || users.deleted || len(fs.directories) != 0 || len(store.values) != 0 {
 		t.Error("PrepareCreate() changed system or database state")
 	}
-	if got, want := len(operation.Steps), 9; got != want {
+	if got, want := len(operation.Steps), 10; got != want {
 		t.Errorf("plan step count = %d, want %d", got, want)
 	}
 	if operation.Steps[0].Preview == "" {
 		t.Error("user-creation preview is empty")
 	}
+}
+
+func containsSubscriptionChown(values []subscriptionChown, want subscriptionChown) bool {
+	for _, value := range values {
+		if value == want {
+			return true
+		}
+	}
+	return false
 }
 
 func TestSubscriptionService_ShowReturnsStoredSubscription(t *testing.T) {

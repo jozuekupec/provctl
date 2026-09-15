@@ -378,6 +378,8 @@ func (service SubscriptionService) createPlan(subscription domain.Subscription) 
 	steps := []plan.Step{{Name: "create Unix user", Preview: fmt.Sprintf("/usr/sbin/useradd --uid %d --home %s --shell %s --user-group --no-create-home %s", subscription.UnixUID, subscription.Home, meta.NoLoginShell, subscription.UnixUser), Do: func(ctx context.Context) error {
 		return service.Users.Create(ctx, system.CreateUserOptions{Name: subscription.UnixUser, UID: subscription.UnixUID, Home: subscription.Home, Shell: meta.NoLoginShell, UserGroup: true, NoCreateHome: true})
 	}, Undo: func(ctx context.Context) error { return service.Users.Delete(ctx, subscription.UnixUser, false) }}}
+	logDirectory := filepath.Join(meta.LogDir, subscription.Name)
+	steps = append(steps, plan.Step{Name: "create subscription log directory", Preview: fmt.Sprintf("mkdir -m 0750 %s; chown root:%d %s", logDirectory, subscription.UnixUID, logDirectory), Do: service.createSubscriptionLogDirectory(logDirectory, subscription.UnixUID), Undo: func(context.Context) error { return service.FS.Remove(logDirectory) }})
 	for _, directory := range directories {
 		directory := directory
 		preview := fmt.Sprintf("mkdir -m %04o %s; chown %d:%d %s", directory.mode, directory.path, subscription.UnixUID, subscription.UnixUID, directory.path)
@@ -496,6 +498,25 @@ func (service SubscriptionService) createDirectory(path string, uid int, mode os
 			return fmt.Errorf("own %s: %w", path, err)
 		}
 		if err := service.FS.Chmod(path, mode); err != nil {
+			_ = service.FS.Remove(path)
+			return fmt.Errorf("set permissions on %s: %w", path, err)
+		}
+		return nil
+	}
+}
+
+// createSubscriptionLogDirectory grants the subscription group traversal of
+// its own logs while keeping every other subscription out.
+func (service SubscriptionService) createSubscriptionLogDirectory(path string, gid int) func(context.Context) error {
+	return func(context.Context) error {
+		if err := service.FS.MkdirAll(path, 0o750); err != nil {
+			return fmt.Errorf("create %s: %w", path, err)
+		}
+		if err := service.FS.Chown(path, 0, gid); err != nil {
+			_ = service.FS.Remove(path)
+			return fmt.Errorf("own %s: %w", path, err)
+		}
+		if err := service.FS.Chmod(path, 0o750); err != nil {
 			_ = service.FS.Remove(path)
 			return fmt.Errorf("set permissions on %s: %w", path, err)
 		}

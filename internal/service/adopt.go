@@ -392,6 +392,8 @@ func (service SubscriptionService) adoptPlan(store subscriptionAdoptStore, renew
 		}
 		return service.Users.LockPassword(ctx, subscription.UnixUser)
 	}, Undo: func(ctx context.Context) error { return service.Users.Delete(ctx, subscription.UnixUser, false) }})
+	logParent := filepath.Join(meta.LogDir, subscription.Name)
+	steps = append(steps, plan.Step{Name: "create subscription log directory", Preview: "create " + logParent, Do: service.createSubscriptionLogDirectory(logParent, subscription.UnixUID), Undo: func(context.Context) error { return service.FS.Remove(logParent) }})
 	for _, directory := range []struct {
 		name, path string
 		mode       os.FileMode
