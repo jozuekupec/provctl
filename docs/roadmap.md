@@ -831,17 +831,22 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   archivní záloha, PHP-FPM pool, Apache `configtest` a HTTP odpověď (`200`) byly
   ověřeny a `pv` byl vrácen na `clean`. Zbývá Pebble větev pro skutečný Certbot
   renewal config a TLS-lineage sjednocení.
+  **Revalidace 2026-09-16:** aktuální balíček
+  `0.0.0+git.4b91a52` prošel izolovaným T17 proti
+  `pv-tls-debug-20260913`: live legacy vhost byl odmítnut před mutací a po
+  explicitním vypnutí se document root bezpečně adoptoval. T16 téhož balíčku
+  současně prošel skutečným Pebble HTTP-01 issuance, renewal, deploy hookem a
+  TLS disable. T16 nyní Pebble spouští přes transientní `systemd` unit, protože
+  Incus při ukončení jednorázového `exec` scope ukončí běžný background proces.
+  Reálný Pebble test *adoptovaného* TLS lineage zůstává samostatný follow-up.
 
 ## Pravidla ověřování
 
-**Aktuální integrační follow-up (2026-09-15):** pracovní session nemá přístup
-k `/var/lib/incus/unix.socket` (`operation not permitted`), proto zde nebyl
-proveden žádný nový E2/E3 ani Pebble test. Standardní `dist/provctl` byl
-následně z aktuálního `main` úspěšně přegenerován a hlásí `dev`. Před dalším
-privilegovaným během obnov přístup do skupiny `incus-admin` v novém login
-shellu, ověř `incus list`, sestav nový balíček a spusť příslušný
-reprodukovatelný skript. Offline `make test` zůstává zelený pro commit
-`3bac246`; dokumentační commity po něm nemění Go kód.
+**Aktuální integrační stav (2026-09-16):** běh mimo filesystem sandboxu má
+přístup k Incus skupině `incus-admin`. Aktuální `dist` balíček
+`0.0.0+git.4b91a52` prošel offline `make test`, izolovaným E2 T17 a E3 T16.
+Oba scénáře použily `pv-tls-debug-20260913` s `isolated-clean` snapshotem;
+interaktivní `pv` nebyl změněn. T16 po skončení ověřeně obnovil snapshot.
 
 Unit a golden testy běží neprivilegovaně přes `make test`. Integrační ověření
 probíhá jen v Debian 13 kontejneru `pv`, nikdy na hostiteli; návrat do čistého

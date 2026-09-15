@@ -53,16 +53,16 @@ incus file push --quiet -r "$pebble_source/test/certs/localhost" "$instance/root
 
 run "export DEBIAN_FRONTEND=noninteractive; { apt-get -qq update && apt-get -qq install -y adduser apache2 certbot cron curl openssl php-fpm zstd && dpkg -i /root/$package_name; } >/tmp/provctl-t16-install.log 2>&1 || { cat /tmp/provctl-t16-install.log >&2; exit 1; }"
 run 'provctl bootstrap --install-missing --yes'
-run 'install -d -m 0755 /root/pebble/test/certs && chmod 0755 /root/pebble/pebble && printf "127.0.0.1 ssl.test pebble\\n" >>/etc/hosts && cd /root/pebble; PEBBLE_VA_NOSLEEP=1 PEBBLE_WFE_NONCEREJECT=0 ./pebble -config ./pebble-config.json >/tmp/provctl-pebble.log 2>&1 & echo $! >/run/provctl-pebble.pid; sleep 1; test -s /run/provctl-pebble.pid && kill -0 "$(cat /run/provctl-pebble.pid)" || { cat /tmp/provctl-pebble.log >&2; exit 1; }'
+run 'install -d -m 0755 /root/pebble/test/certs && chmod 0755 /root/pebble/pebble && printf "127.0.0.1 ssl.test pebble\\n" >>/etc/hosts && systemd-run --quiet --unit=provctl-pebble --collect --setenv=PEBBLE_VA_NOSLEEP=1 --setenv=PEBBLE_WFE_NONCEREJECT=0 --working-directory=/root/pebble /root/pebble/pebble -config /root/pebble/pebble-config.json && sleep 1; systemctl is-active --quiet provctl-pebble || { journalctl -u provctl-pebble --no-pager >&2; exit 1; }'
 # Pebble's HTTPS listener uses its static test CA; its /roots endpoint instead
 # exposes the dynamically generated issuer of certificates it will issue.
-run 'install -m 0644 /root/pebble/pebble.minica.pem /usr/local/share/ca-certificates/provctl-pebble-server.crt && update-ca-certificates >/dev/null; ready=false; for attempt in $(seq 1 20); do if curl --noproxy "*" --insecure --connect-timeout 2 --max-time 3 -sf https://pebble:15000/roots/0 >/dev/null; then ready=true && break; fi; sleep 1; done; test "$ready" = true || { cat /tmp/provctl-pebble.log >&2; exit 1; }'
+run 'install -m 0644 /root/pebble/pebble.minica.pem /usr/local/share/ca-certificates/provctl-pebble-server.crt && update-ca-certificates >/dev/null; ready=false; for attempt in $(seq 1 20); do if curl --noproxy "*" --insecure --connect-timeout 2 --max-time 3 -sf https://127.0.0.1:15000/roots/0 >/dev/null; then ready=true && break; fi; sleep 1; done; test "$ready" = true || { echo "Pebble management endpoint is not ready" >&2; ss -ltnp >&2 || true; curl --noproxy "*" --insecure -v --connect-timeout 2 --max-time 3 https://127.0.0.1:15000/roots/0 >&2 || true; journalctl -u provctl-pebble --no-pager >&2 || true; exit 1; }'
 run 'sed -i "s|email = \"\"|email = \"test@example.test\"|; s|staging = true|staging = false|; s|server = \"\"|server = \"https://pebble:14000/dir\"|" /etc/provctl/config.toml'
 run 'provctl subscription create acme && provctl website create acme ssl.test --type php-fpm'
 
 # --force is intentional: ssl.test resolves to pv loopback, while validateDNS
 # correctly excludes loopback addresses from its set of server interfaces.
-run 'provctl ssl enable acme ssl.test --force'
+run 'provctl ssl enable acme ssl.test --force || { status=$?; echo "ssl enable failed (exit $status)" >&2; test -f /var/log/letsencrypt/letsencrypt.log && tail -n 80 /var/log/letsencrypt/letsencrypt.log >&2 || true; test -f /var/log/provctl/audit.jsonl && tail -n 40 /var/log/provctl/audit.jsonl >&2 || true; exit "$status"; }'
 run 'lineage=$(provctl ssl status acme ssl.test | sed -n "s/^lineage: //p"); test -n "$lineage" && test -f "/etc/letsencrypt/live/$lineage/fullchain.pem" && apache2ctl configtest && curl -skI https://ssl.test/ >/dev/null'
 # ssl enable defaults to force HTTPS; the ACME path must remain HTTP-only.
 run 'test "$(curl --noproxy "*" -s -o /dev/null -w "%{http_code}" http://ssl.test/)" = 301 && test "$(curl --noproxy "*" -s -o /dev/null -w "%{http_code}" http://ssl.test/.well-known/acme-challenge/x)" = 404'
