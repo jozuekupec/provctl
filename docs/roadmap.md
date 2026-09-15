@@ -862,6 +862,14 @@ přístup k Incus skupině `incus-admin`. Aktuální `dist` balíček
 `0.0.0+git.4b91a52` prošel offline `make test`, izolovaným E2 T17 a E3 T16.
 Oba scénáře použily `pv-tls-debug-20260913` s `isolated-clean` snapshotem;
 interaktivní `pv` nebyl změněn. T16 po skončení ověřeně obnovil snapshot.
+**Release revalidace 2026-09-16:** balíček `0.0.0+git.4c0cd79` prošel celý
+izolovaný gate `run-all` (T04 package structure, T05 piuparts install/purge,
+T10 filesystem/PHP/log isolation a T17 adoption). T10 při tom odhalil
+zastaralé očekávání jména per-domain PHP-FPM poolu a skutečnou chybu práv
+parent log adresáře: nová subscription nyní vytváří
+`/var/log/provctl/<subscription>` jako `root:<subscription> 0750`; vlastník
+čte své `0640` logy, zatímco cizí subscription i `www-data` zůstávají
+odmítnuté. Stejný invariant platí pro adopci.
 
 Unit a golden testy běží neprivilegovaně přes `make test`. Integrační ověření
 probíhá jen v Debian 13 kontejneru `pv`, nikdy na hostiteli; návrat do čistého
