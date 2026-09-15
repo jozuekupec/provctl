@@ -606,6 +606,13 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   odstraněných buněk, nikoli cílovou šířku, a proto skrýval krátké cesty i
   názvy. Prohlížeč nyní správně zobrazuje adresář i položky; regresní test a
   nově nasazený balíček v `pv` to ověřují.
+  **Statické review 2026-09-16:** produkční `internal/ui` neobchází `Deps`
+  přímým filesystemovým, procesovým, SQLite ani systémovým přístupem;
+  `go test ./internal/ui ./internal/arch -race -count=1` ověřil routing a
+  package boundaries. Zkratkový registry test dále potvrzuje, že každá
+  inzerovaná normální akce má router. Nenahrazuje to jediný zbývající důkaz:
+  člověk musí projít aktuální TUI v reálném terminálu, zejména fullscreen
+  editor a destruktivní restore z CLI.
 - [x] **M9 — distribuce:** je přidána deklarace `packaging/nfpm.yaml` pro
   jediný `provctl` `.deb`, config je `noreplace`, šablony jsou běžný obsah a
   balíček deklaruje pouze potřebné Debian závislosti. `scripts/build-deb.sh`
