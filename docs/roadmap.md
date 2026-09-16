@@ -268,7 +268,7 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   Opakovaný E2 průchod pak reattachment ověřil: `backup list` po forced
   restore vypisuje oba záznamy, marker z původní zálohy je obnoven a Apache
   configtest zůstává zelený. Kontejner byl vrácen na `clean` a běží.
-- [~] **M8 — TUI:** původní čtyřpanelový prototyp je funkční, ale po ruční
+- [x] **M8 — TUI:** původní čtyřpanelový prototyp je funkční, ale po ruční
   kontrole se ukázal jako UX nedostatečný: layout může oříznout horní řádek,
   navigace, nápověda, filtry a potvrzení neodpovídají referenčnímu `branchctl`.
   Schválený nástupnický návrh je v
@@ -439,9 +439,9 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   and Logs tabs. Each tab exposes only its related existing operation, while
   the shared confirmation/progress flow returns to the same editor. `Esc`
   returns to the workspace and `s` to the picker. The historical Detail-based
-  administration text below is superseded: the remaining M8 work is a
-  separate subscription-administration editor for database, SSH, cron and
-  backup actions, not a return to editable Detail rows.
+  administration text below is superseded: database, SSH, cron and backup
+  history stay read-only until each has a separately designed safe modal
+  workflow; they do not turn Detail back into an editable control surface.
   The editor tab strip uses branchctl's ANSI-aware horizontal joining instead
   of concatenating multi-line styled strings. `Shift+Left` and `Shift+Right`
   now change tabs; ordinary arrows do not. A minimum-terminal geometry test
@@ -598,9 +598,7 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   `staging` a PHP-FPM/static demo weby. Spouští se přes `incus exec` v reálném
   terminálu; po kontrole lze stav bezpečně obnovit ze snapshotu `clean` nebo
   znovu otevřít `tui-ready`.
-  M8 zůstává otevřený pouze pro průběžnou ruční interaktivní kontrolu a
-  samostatně navržené destruktivní workflow (například restore backupu);
-  databáze, cron a backup history jsou záměrně read-only, dokud pro jejich
+  Databáze, cron a backup history jsou záměrně read-only, dokud pro jejich
   mutace nevznikne stejně bezpečný modalní návrh. Reálná TUI reprodukce
   2026-09-13 opravila file browser: `ansi.TruncateLeft` přijímá počet
   odstraněných buněk, nikoli cílovou šířku, a proto skrýval krátké cesty i
@@ -610,14 +608,16 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   přímým filesystemovým, procesovým, SQLite ani systémovým přístupem;
   `go test ./internal/ui ./internal/arch -race -count=1` ověřil routing a
   package boundaries. Zkratkový registry test dále potvrzuje, že každá
-  inzerovaná normální akce má router. Nenahrazuje to jediný zbývající důkaz:
-  člověk musí projít aktuální TUI v reálném terminálu, zejména fullscreen
-  editor a destruktivní restore z CLI.
+  inzerovaná normální akce má router.
   Pro opakovatelnou ruční kontrolu nyní
   `scripts/dev/run-tui-test.sh` jediným příkazem obnoví izolovanou fixture
   `pv-tls-debug-20260913/tui-ssh-key-picker`, sestaví aktuální `.deb`,
   nainstaluje jej a otevře TUI v terminálu volajícího. Postup je popsán v
   [testing-cookbook.md](testing-cookbook.md#ruční-tui-smoke-test-jedním-příkazem).
+  **Ruční acceptance 2026-09-16:** aktuální build `0.0.0+git.7345962` byl
+  nasazený do této fixture a uživatel v reálném terminálu potvrdil správný
+  layout i ovládání TUI. M8 je tím uzavřený. Destruktivní `backup restore`
+  zůstává úmyslně samostatným CLI workflow, nikoli chybějící TUI funkcí.
 - [x] **M9 — distribuce:** je přidána deklarace `packaging/nfpm.yaml` pro
   jediný `provctl` `.deb`, config je `noreplace`, šablony jsou běžný obsah a
   balíček deklaruje pouze potřebné Debian závislosti. `scripts/build-deb.sh`
