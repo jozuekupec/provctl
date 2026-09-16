@@ -415,9 +415,10 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.phpPicker.items = append([]service.PHPFPMVersion(nil), msg.items...)
 		m.phpPicker.cursor = clamp(m.phpPicker.cursor, len(m.phpPicker.items))
-		if website, ok := m.selectedWebsite(); ok {
+		selected := m.phpPickerSelectedVersion()
+		if selected != "" {
 			for index, item := range m.phpPicker.items {
-				if item.Version == website.PHPVersion {
+				if item.Version == selected {
 					m.phpPicker.cursor = index
 					break
 				}

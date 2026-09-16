@@ -15,13 +15,13 @@ func (m appModel) phpPickerPopup() string {
 		lines = append(lines, "", "No installed PHP-FPM versions found.")
 	} else {
 		lines = append(lines, "")
-		website, _ := m.selectedWebsite()
+		selected := m.phpPickerSelectedVersion()
 		for index, item := range m.phpPicker.items {
 			state := "inactive"
 			if item.Active {
 				state = "active"
 			}
-			if item.Version == website.PHPVersion {
+			if item.Version == selected {
 				state += " · selected"
 			}
 			line := fmt.Sprintf("  PHP %-4s %s", item.Version, state)
@@ -33,4 +33,16 @@ func (m appModel) phpPickerPopup() string {
 	}
 	footer := dimStyle.Render("↑/↓ select · enter continue · esc cancel")
 	return panel("PHP-FPM version", popupFooter(lines, footer, height), width, height, true)
+}
+
+func (m appModel) phpPickerSelectedVersion() string {
+	if m.phpPicker.target == phpPickerSettings {
+		field := m.activeSetting()
+		if isPHPDefaultVersionSetting(field) {
+			return m.settings.values[field]
+		}
+		return ""
+	}
+	website, _ := m.selectedWebsite()
+	return website.PHPVersion
 }

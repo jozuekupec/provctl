@@ -65,11 +65,11 @@ func (m appModel) View() string {
 	if m.secret.open {
 		return m.overlayCenter(m.secretPopup(), view)
 	}
-	if m.settings.open {
-		return m.overlayCenter(m.settingsPopup(), view)
-	}
 	if m.phpPicker.open {
 		return m.overlayCenter(m.phpPickerPopup(), view)
+	}
+	if m.settings.open {
+		return m.overlayCenter(m.settingsPopup(), view)
 	}
 	if m.confirm.action != "" {
 		return m.overlayCenter(m.confirmPopup(), view)

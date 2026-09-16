@@ -120,6 +120,17 @@ func (m appModel) saveSettingsCmd() tea.Cmd {
 	return func() tea.Msg { return m.saveSettings(context.Background()) }
 }
 
+func isPHPDefaultVersionSetting(field int) bool {
+	return field >= 0 && settingFields[field].section == "php" && settingFields[field].key == "default_version"
+}
+
+func (m appModel) openSettingsPHPVersionPicker() (appModel, tea.Cmd) {
+	m = m.persistSettingInput()
+	m.phpPicker = phpPickerState{open: true, loading: true, target: phpPickerSettings}
+	m.status = "loading installed PHP-FPM versions…"
+	return m.startPHPVersions()
+}
+
 func (m appModel) handleSettingsKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.Type {
 	case tea.KeyCtrlC:
@@ -130,6 +141,9 @@ func (m appModel) handleSettingsKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case tea.KeyCtrlS, tea.KeyEnter:
 		if _, isPath := settingPathMode(m.activeSetting()); isPath && msg.Type == tea.KeyEnter {
 			return m.openPathPickerForSetting()
+		}
+		if isPHPDefaultVersionSetting(m.activeSetting()) && msg.Type == tea.KeyEnter {
+			return m.openSettingsPHPVersionPicker()
 		}
 		m.status = "saving settings…"
 		return m, m.saveSettingsCmd()
@@ -182,6 +196,8 @@ func (m appModel) settingsPopup() string {
 	enterHint := "enter/ctrl+s save"
 	if _, isPath := settingPathMode(m.activeSetting()); isPath {
 		enterHint = "enter browse · ctrl+s save"
+	} else if isPHPDefaultVersionSetting(m.activeSetting()) {
+		enterHint = "enter choose PHP · ctrl+s save"
 	}
 	return popupBox(m, popupOpts{Size: popupLarge, Fit: fitFixed, Title: "Settings", Body: popupWrap(body, inner), Footer: []string{dimStyle.Render("⇧←/⇧→ scope · tab/↑/↓ field · ←/→ toggle · " + enterHint + " · esc cancel")}})
 }

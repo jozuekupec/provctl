@@ -138,6 +138,34 @@ func TestModel_SettingsPopupFitsTerminal(t *testing.T) {
 	}
 }
 
+func TestModel_SettingsPHPVersionPickerUsesInstalledVersion(t *testing.T) {
+	m := New(Deps{
+		Config: config.Config{PHP: config.PHP{DefaultVersion: "8.3"}},
+		LoadPHPVersions: func(context.Context) ([]service.PHPFPMVersion, error) {
+			return []service.PHPFPMVersion{{Version: "8.3", Active: true}, {Version: "8.4", Active: true}}, nil
+		},
+	})
+	m.width, m.height = 100, 28
+	m = m.openSettings()
+	m = m.changeSettingsScope(3)
+	updated, command := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = updated.(appModel)
+	if !m.phpPicker.open || !m.phpPicker.loading || m.phpPicker.target != phpPickerSettings || command == nil {
+		t.Fatalf("settings PHP picker = %#v, command=%v", m.phpPicker, command != nil)
+	}
+	updated, _ = m.Update(command())
+	m = updated.(appModel)
+	if m.phpPicker.cursor != 0 || !strings.Contains(m.phpPickerPopup(), "selected") {
+		t.Fatalf("settings PHP picker did not mark configured version: %#v\n%s", m.phpPicker, m.phpPickerPopup())
+	}
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
+	updated, _ = updated.(appModel).Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = updated.(appModel)
+	if m.phpPicker.open || m.settings.values[m.activeSetting()] != "8.4" || !strings.Contains(m.status, "save settings") {
+		t.Fatalf("settings PHP selection = picker:%v value:%q status:%q", m.phpPicker.open, m.settings.values[m.activeSetting()], m.status)
+	}
+}
+
 func TestModel_SettingsTabsFitMinimumTerminal(t *testing.T) {
 	m := New(Deps{})
 	m.width, m.height = minWidth, minHeight

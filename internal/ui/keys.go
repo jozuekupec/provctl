@@ -42,11 +42,11 @@ func (m appModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if m.secret.open {
 		return m.handleSecretKey(msg)
 	}
-	if m.settings.open {
-		return m.handleSettingsKey(msg)
-	}
 	if m.phpPicker.open {
 		return m.handlePHPPickerKey(msg)
+	}
+	if m.settings.open {
+		return m.handleSettingsKey(msg)
 	}
 	if m.help.open {
 		return m.handleHelpKey(msg)
@@ -248,6 +248,16 @@ func (m appModel) handlePHPPickerKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		version := m.phpPicker.items[m.phpPicker.cursor].Version
+		if m.phpPicker.target == phpPickerSettings {
+			field := m.activeSetting()
+			if !isPHPDefaultVersionSetting(field) {
+				m.phpPicker, m.status = phpPickerState{}, "PHP version picker has no Settings field"
+				return m, nil
+			}
+			m.settings.values[field] = version
+			m.phpPicker, m.status = phpPickerState{}, "default PHP-FPM version set to "+version+"; save settings to apply"
+			return m.focusSettingInput(), nil
+		}
 		subscription, subscriptionOK := m.selectedSubscription()
 		website, websiteOK := m.selectedWebsite()
 		if !subscriptionOK || !websiteOK || website.Type != domain.WebsitePHPFPM {

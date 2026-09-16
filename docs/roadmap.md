@@ -923,3 +923,15 @@ mechanismy. Nejde o změnu provctl a kontejner byl následně obnoven na `clean`
 Ve stejný den proxy website úspěšně předala odpověď z lokálního upstreamu a
 redirect website vrátila očekávané `302` a `Location`; i po tomto testu byl
 kontejner obnoven na `clean`.
+
+## Follow-up scope after v0.1
+
+- [~] **TUI administration refinements:** Settings now uses the installed
+  PHP-FPM version picker for `php.default_version`; selection stays pending
+  until `Ctrl+S`, and the same popup marks the configured value. Remaining
+  work is editable cron jobs with a schedule preview and a per-domain custom
+  Apache log directory.
+- [ ] **Official-release Docker server test:** build a disposable Debian 13
+  systemd-capable container that installs `provctl` only from the signed
+  GitHub Pages APT repository, then exercises bootstrap and a real hosted
+  website lifecycle.

@@ -264,7 +264,15 @@ type phpPickerState struct {
 	loading bool
 	cursor  int
 	items   []service.PHPFPMVersion
+	target  phpPickerTarget
 }
+
+type phpPickerTarget uint8
+
+const (
+	phpPickerDomain phpPickerTarget = iota
+	phpPickerSettings
+)
 
 type settingsState struct {
 	open   bool
