@@ -312,6 +312,25 @@ přihlas nebo použij `sg incus-admin -c '…'`). `reset` čeká až 30 sekund n
 systemd a vrátí úspěch také pro očekávaný stav `degraded`; před každým
 mutujícím scénářem jej spusť znovu.
 
+### Ruční TUI smoke test jedním příkazem
+
+`scripts/dev/run-tui-test.sh` je určený výhradně pro ruční kontrolu v reálném
+terminálu. Standardně obnoví izolovaný kontejner `pv-tls-debug-20260913` na
+fixture `tui-ssh-key-picker`, sestaví právě checkoutnutý balíček, nainstaluje
+jej do kontejneru a bez mezikroku otevře TUI. Vybraný kontejner se obnovuje,
+proto jej nikdy nenastavuj na pracovní `pv`.
+
+```bash
+./scripts/dev/run-tui-test.sh
+```
+
+Volitelně lze předat již sestavený `.deb`, například pro reprodukci konkrétní
+verze. `q` ukončí TUI a vrátí se do hostitelského shellu:
+
+```bash
+./scripts/dev/run-tui-test.sh dist/provctl_0.0.0+git.bfc8d57_amd64.deb
+```
+
 Pokud ne, funguje stejně `lxd` (snap) nebo přejdi na E4 (VM). Docker se pro tohle **nedoporučuje** — bez systemd nemá `systemctl` co dělat a testoval bys jinou cestu kódem než produkční.
 
 ### Vytvoření a zlatý snapshot

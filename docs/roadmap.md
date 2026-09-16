@@ -613,6 +613,11 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   inzerovaná normální akce má router. Nenahrazuje to jediný zbývající důkaz:
   člověk musí projít aktuální TUI v reálném terminálu, zejména fullscreen
   editor a destruktivní restore z CLI.
+  Pro opakovatelnou ruční kontrolu nyní
+  `scripts/dev/run-tui-test.sh` jediným příkazem obnoví izolovanou fixture
+  `pv-tls-debug-20260913/tui-ssh-key-picker`, sestaví aktuální `.deb`,
+  nainstaluje jej a otevře TUI v terminálu volajícího. Postup je popsán v
+  [testing-cookbook.md](testing-cookbook.md#ruční-tui-smoke-test-jedním-příkazem).
 - [x] **M9 — distribuce:** je přidána deklarace `packaging/nfpm.yaml` pro
   jediný `provctl` `.deb`, config je `noreplace`, šablony jsou běžný obsah a
   balíček deklaruje pouze potřebné Debian závislosti. `scripts/build-deb.sh`
