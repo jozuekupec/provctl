@@ -35,6 +35,7 @@ type Deps struct {
 	SetWebsiteEnabled      func(context.Context, string, string, bool) (int64, error)
 	SetWebsiteTLS          func(context.Context, string, string, bool) error
 	SetWebsiteDocumentRoot func(context.Context, string, string, string) (int64, error)
+	SetWebsiteLogDirectory func(context.Context, string, string, string) (int64, error)
 	CreateWebsite          func(context.Context, string, string, domain.WebsiteType, string, int) (int64, error)
 	SetWebsiteAlias        func(context.Context, string, string, string, bool) (int64, error)
 	SetWebsiteTarget       func(context.Context, string, string, string, int) (int64, error)
@@ -135,6 +136,12 @@ type websiteDocumentRootChangedMsg struct {
 	err    error
 	domain string
 	root   string
+	items  []domain.Website
+}
+type websiteLogDirectoryChangedMsg struct {
+	err    error
+	domain string
+	path   string
 	items  []domain.Website
 }
 type websiteCreatedMsg struct {
@@ -305,6 +312,12 @@ type documentRootFormState struct {
 	input   textinput.Model
 }
 
+type logDirectoryFormState struct {
+	open    bool
+	website domain.Website
+	input   textinput.Model
+}
+
 type websiteCreateFormState struct {
 	open      bool
 	field     int
@@ -369,6 +382,7 @@ type pathPickerTarget uint8
 const (
 	pathPickerSettings pathPickerTarget = iota
 	pathPickerDocumentRoot
+	pathPickerLogDirectory
 	pathPickerSSHKey
 )
 
@@ -432,6 +446,7 @@ type appModel struct {
 	domainEditor           domainEditorState
 	subscriptionAdmin      subscriptionAdminState
 	documentRootForm       documentRootFormState
+	logDirectoryForm       logDirectoryFormState
 	websiteCreateForm      websiteCreateFormState
 	aliasForm              aliasFormState
 	targetForm             targetFormState

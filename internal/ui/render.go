@@ -2,9 +2,11 @@ package ui
 
 import (
 	"fmt"
+	"path/filepath"
 	"strings"
 
 	"provctl/internal/domain"
+	"provctl/internal/meta"
 	"provctl/internal/service"
 )
 
@@ -37,6 +39,9 @@ func (m appModel) View() string {
 	}
 	if m.documentRootForm.open {
 		return m.overlayCenter(m.documentRootFormPopup(), view)
+	}
+	if m.logDirectoryForm.open {
+		return m.overlayCenter(m.logDirectoryFormPopup(), view)
 	}
 	if m.websiteCreateForm.open {
 		return m.overlayCenter(m.websiteCreateFormPopup(), view)
@@ -120,7 +125,11 @@ func (m appModel) domainEditorBody(website domain.Website) string {
 		}
 		return strings.Join(lines, "\n")
 	default:
-		return "Enter  load access log\nL      load error log"
+		logDirectory := website.LogDirectory
+		if logDirectory == "" {
+			logDirectory = filepath.Join(meta.LogDir, subscription.Name, website.PrimaryDomain) + " (default)"
+		}
+		return strings.Join([]string{"Log directory: " + logDirectory, "", "Enter  load access log", "L      load error log", "e      change log directory"}, "\n")
 	}
 }
 

@@ -16,19 +16,20 @@ const (
 )
 
 type Website struct {
-	ID             int64
-	SubscriptionID int64
-	Type           WebsiteType
-	PrimaryDomain  string
-	Aliases        []string
-	DocumentRoot   string
-	Target         string
-	RedirectCode   int
-	PHPVersion     string
-	Enabled        bool
-	SSLEnabled     bool
-	ForceHTTPS     bool
-	HSTS           bool
+	ID              int64
+	SubscriptionID  int64
+	Type            WebsiteType
+	PrimaryDomain   string
+	Aliases         []string
+	DocumentRoot    string
+	LogDirectory    string
+	Target          string
+	RedirectCode    int
+	PHPVersion      string
+	Enabled         bool
+	SSLEnabled      bool
+	ForceHTTPS      bool
+	HSTS            bool
 	CertificateName string
 }
 

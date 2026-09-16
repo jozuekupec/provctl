@@ -15,6 +15,9 @@ func (m appModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if m.documentRootForm.open {
 		return m.handleDocumentRootFormKey(msg)
 	}
+	if m.logDirectoryForm.open {
+		return m.handleLogDirectoryFormKey(msg)
+	}
 	if m.websiteCreateForm.open {
 		return m.handleWebsiteCreateFormKey(msg)
 	}

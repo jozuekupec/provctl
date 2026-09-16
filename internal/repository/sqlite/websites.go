@@ -35,7 +35,7 @@ func (repository *Repository) WebsiteCertificateName(ctx context.Context, subscr
 
 // ListWebsites returns websites belonging to one subscription, ordered by domain.
 func (repository *Repository) ListWebsites(ctx context.Context, subscriptionID int64) ([]domain.Website, error) {
-	rows, err := repository.DB.QueryContext(ctx, `SELECT w.id, w.subscription_id, w.type, d.name, COALESCE(w.document_root, ''), COALESCE(w.target, ''), COALESCE(w.redirect_code, 0), COALESCE(w.php_version, ''), w.enabled, w.ssl_enabled, w.force_https, w.hsts, COALESCE(w.certificate_name, '') FROM websites w JOIN domains d ON d.website_id = w.id AND d.is_primary = 1 WHERE w.subscription_id = ? ORDER BY d.name`, subscriptionID)
+	rows, err := repository.DB.QueryContext(ctx, `SELECT w.id, w.subscription_id, w.type, d.name, COALESCE(w.document_root, ''), COALESCE(w.log_directory, ''), COALESCE(w.target, ''), COALESCE(w.redirect_code, 0), COALESCE(w.php_version, ''), w.enabled, w.ssl_enabled, w.force_https, w.hsts, COALESCE(w.certificate_name, '') FROM websites w JOIN domains d ON d.website_id = w.id AND d.is_primary = 1 WHERE w.subscription_id = ? ORDER BY d.name`, subscriptionID)
 	if err != nil {
 		return nil, fmt.Errorf("list websites: %w", err)
 	}
@@ -43,7 +43,7 @@ func (repository *Repository) ListWebsites(ctx context.Context, subscriptionID i
 	var websites []domain.Website
 	for rows.Next() {
 		var website domain.Website
-		if err := rows.Scan(&website.ID, &website.SubscriptionID, &website.Type, &website.PrimaryDomain, &website.DocumentRoot, &website.Target, &website.RedirectCode, &website.PHPVersion, &website.Enabled, &website.SSLEnabled, &website.ForceHTTPS, &website.HSTS, &website.CertificateName); err != nil {
+		if err := rows.Scan(&website.ID, &website.SubscriptionID, &website.Type, &website.PrimaryDomain, &website.DocumentRoot, &website.LogDirectory, &website.Target, &website.RedirectCode, &website.PHPVersion, &website.Enabled, &website.SSLEnabled, &website.ForceHTTPS, &website.HSTS, &website.CertificateName); err != nil {
 			return nil, fmt.Errorf("scan website: %w", err)
 		}
 		websites = append(websites, website)
@@ -96,7 +96,7 @@ func (repository *Repository) CreateWebsite(ctx context.Context, website domain.
 	}
 	defer transaction.Rollback()
 	now := time.Now().UTC().Format(time.RFC3339)
-	result, err := transaction.ExecContext(ctx, `INSERT INTO websites (subscription_id, type, document_root, target, redirect_code, php_version, enabled, ssl_enabled, force_https, hsts, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, website.SubscriptionID, website.Type, nullable(website.DocumentRoot), nullable(website.Target), nullableInt(website.RedirectCode), nullable(website.PHPVersion), website.Enabled, website.SSLEnabled, website.ForceHTTPS, website.HSTS, now, now)
+	result, err := transaction.ExecContext(ctx, `INSERT INTO websites (subscription_id, type, document_root, log_directory, target, redirect_code, php_version, enabled, ssl_enabled, force_https, hsts, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, website.SubscriptionID, website.Type, nullable(website.DocumentRoot), nullable(website.LogDirectory), nullable(website.Target), nullableInt(website.RedirectCode), nullable(website.PHPVersion), website.Enabled, website.SSLEnabled, website.ForceHTTPS, website.HSTS, now, now)
 	if err != nil {
 		return 0, fmt.Errorf("insert website: %w", err)
 	}
@@ -193,6 +193,22 @@ func (repository *Repository) SetWebsiteDocumentRoot(ctx context.Context, websit
 	count, err := result.RowsAffected()
 	if err != nil {
 		return fmt.Errorf("count website document root update: %w", err)
+	}
+	if count != 1 {
+		return fmt.Errorf("website %d not found", websiteID)
+	}
+	return nil
+}
+
+// SetWebsiteLogDirectory persists an explicitly configured Apache log directory.
+func (repository *Repository) SetWebsiteLogDirectory(ctx context.Context, websiteID int64, logDirectory string) error {
+	result, err := repository.DB.ExecContext(ctx, `UPDATE websites SET log_directory = ?, updated_at = ? WHERE id = ?`, nullable(logDirectory), time.Now().UTC().Format(time.RFC3339), websiteID)
+	if err != nil {
+		return fmt.Errorf("update website log directory: %w", err)
+	}
+	count, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("count website log directory update: %w", err)
 	}
 	if count != 1 {
 		return fmt.Errorf("website %d not found", websiteID)

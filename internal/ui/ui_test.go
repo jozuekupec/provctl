@@ -673,6 +673,41 @@ func TestModel_PHPVersionPickerChangesSelectedDomain(t *testing.T) {
 	}
 }
 
+func TestModel_DomainLogDirectoryFormUsesServiceAndRefreshes(t *testing.T) {
+	path := "/var/log/provctl/acme/apps/example.test"
+	var changed string
+	m := New(Deps{
+		SetWebsiteLogDirectory: func(_ context.Context, subscription, domain, directory string) (int64, error) {
+			changed = subscription + "/" + domain + "/" + directory
+			return 1, nil
+		},
+		LoadWebsites: func(context.Context, int64) ([]domain.Website, error) {
+			return []domain.Website{{ID: 1, PrimaryDomain: "example.test", Type: domain.WebsiteStatic, LogDirectory: path}}, nil
+		},
+	})
+	m.ready, m.width, m.height = true, 100, 28
+	m.items = []domain.Subscription{{ID: 1, Name: "acme", Status: "active"}}
+	m.workspace, m.showWebsites, m.focus = true, true, focusWebsites
+	m.websites = []domain.Website{{ID: 1, PrimaryDomain: "example.test", Type: domain.WebsiteStatic}}
+	m.domainEditor = domainEditorState{open: true, tab: 5}
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("e")})
+	m = updated.(appModel)
+	if !m.logDirectoryForm.open || !strings.Contains(m.logDirectoryFormPopup(), "Change log directory") {
+		t.Fatalf("log directory form = %#v", m.logDirectoryForm)
+	}
+	m.logDirectoryForm.input.SetValue(path)
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyCtrlS})
+	m = updated.(appModel)
+	if m.confirm.action != "set-log-directory" || m.confirm.value != path {
+		t.Fatalf("log directory confirmation = %#v", m.confirm)
+	}
+	updated, command := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("y")})
+	m = runProgress(t, updated.(appModel), command)
+	if changed != "acme/example.test/"+path || len(m.websites) != 1 || m.websites[0].LogDirectory != path {
+		t.Fatalf("changed=%q websites=%#v", changed, m.websites)
+	}
+}
+
 func TestModel_PHPVersionPickerRejectsCurrentVersionWithoutMutation(t *testing.T) {
 	m := New(Deps{LoadPHPVersions: func(context.Context) ([]service.PHPFPMVersion, error) {
 		return []service.PHPFPMVersion{{Version: "8.4", Active: true}}, nil

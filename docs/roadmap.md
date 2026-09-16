@@ -932,7 +932,11 @@ kontejner obnoven na `clean`.
   creates a job and `Enter`/`e` edits the selected job through the same modal
   form; it previews the next local server execution, keeps the job ID stable,
   rewrites the generated crontab transactionally, and confirms the change.
-  Remaining work is a per-domain custom Apache log directory.
+  Each domain's Logs tab now also displays its default or explicit Apache log
+  directory; `e` opens a path-picker-backed form and confirmation. The
+  persisted override is constrained to `/var/log/provctl/<subscription>/…`,
+  created as `root:<subscription> 0750`, and reflected by log reads, HTTP and
+  TLS vhosts. `website logdir set` exposes the same validated service path.
 - [ ] **Official-release Docker server test:** build a disposable Debian 13
   systemd-capable container that installs `provctl` only from the signed
   GitHub Pages APT repository, then exercises bootstrap and a real hosted

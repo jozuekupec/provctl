@@ -272,6 +272,18 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.websites = append([]domain.Website(nil), msg.items...)
 		}
 		return m, nil
+	case websiteLogDirectoryChangedMsg:
+		m.progress.active = false
+		if msg.err != nil {
+			m.status = "log directory change failed: " + msg.err.Error()
+			m.output = m.output.append(m.status)
+			return m, nil
+		}
+		m.websites = append([]domain.Website(nil), msg.items...)
+		m.websiteCursor = clamp(m.websiteCursor, len(m.visibleWebsites()))
+		m.status = "log directory changed for " + msg.domain
+		m.output = m.output.append("log directory " + msg.domain + " → " + msg.path)
+		return m, nil
 	case websiteCreatedMsg:
 		m.progress.active = false
 		if msg.err != nil {

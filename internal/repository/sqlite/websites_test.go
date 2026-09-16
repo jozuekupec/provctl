@@ -131,6 +131,34 @@ func TestRepository_SetWebsiteDocumentRootUpdatesPersistedState(t *testing.T) {
 	}
 }
 
+func TestRepository_SetWebsiteLogDirectoryUpdatesPersistedState(t *testing.T) {
+	repository, err := Open(context.Background(), filepath.Join(t.TempDir(), "provctl.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer repository.Close()
+	ctx := context.Background()
+	if err := repository.CreateSubscription(ctx, domain.Subscription{Name: "acme", UnixUser: "acme", UnixUID: 5000, Home: "/vhosts/acme", PHPMaxChildren: 10, PHPMemoryLimit: "256M", PHPUploadMax: "64M", PHPMaxExecTime: 60, SSHAccess: "none"}); err != nil {
+		t.Fatal(err)
+	}
+	subscription, err := repository.SubscriptionByName(ctx, "acme")
+	if err != nil {
+		t.Fatal(err)
+	}
+	websiteID, err := repository.CreateWebsite(ctx, domain.Website{SubscriptionID: subscription.ID, Type: domain.WebsiteStatic, PrimaryDomain: "example.test", DocumentRoot: "/vhosts/acme/sites/example.test/public", Enabled: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	directory := "/var/log/provctl/acme/apps/example.test"
+	if err := repository.SetWebsiteLogDirectory(ctx, websiteID, directory); err != nil {
+		t.Fatal(err)
+	}
+	websites, err := repository.ListWebsites(ctx, subscription.ID)
+	if err != nil || len(websites) != 1 || websites[0].LogDirectory != directory {
+		t.Fatalf("websites = %#v, %v", websites, err)
+	}
+}
+
 func TestRepository_SetWebsiteSSLUpdatesPersistedState(t *testing.T) {
 	repository, err := Open(context.Background(), filepath.Join(t.TempDir(), "provctl.db"))
 	if err != nil {

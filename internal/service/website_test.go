@@ -35,8 +35,14 @@ type websiteStore struct {
 type documentRootStore struct {
 	websiteStore
 	root         string
+	logDirectory string
 	target       string
 	redirectCode int
+}
+
+func (store *documentRootStore) SetWebsiteLogDirectory(_ context.Context, _ int64, directory string) error {
+	store.logDirectory = directory
+	return nil
 }
 
 func (store *documentRootStore) SetWebsiteDocumentRoot(_ context.Context, _ int64, root string) error {
@@ -61,6 +67,7 @@ func (websiteStore) CertificateByWebsite(context.Context, int64) (domain.Certifi
 func (websiteStore) DeleteCertificateByWebsite(context.Context, int64) error     { return nil }
 func (websiteStore) SetWebsiteEnabled(context.Context, int64, bool) error        { return nil }
 func (websiteStore) SetWebsiteDocumentRoot(context.Context, int64, string) error { return nil }
+func (websiteStore) SetWebsiteLogDirectory(context.Context, int64, string) error { return nil }
 func (websiteStore) SetWebsiteTarget(context.Context, int64, string, int) error  { return nil }
 func (websiteStore) SetWebsiteSSL(context.Context, int64, bool, bool) error      { return nil }
 func (websiteStore) AddWebsiteAlias(context.Context, int64, string) error        { return nil }
@@ -184,6 +191,26 @@ func TestValidateWebsiteDocumentRootRejectsTraversalAndOutsideHome(t *testing.T)
 	}
 	if got, err := validateWebsiteDocumentRoot(fs, "/vhosts/acme", "/vhosts/acme/public"); err != nil || got != "/vhosts/acme/public" {
 		t.Fatalf("valid root = %q, %v", got, err)
+	}
+}
+
+func TestWebsiteService_SetLogDirectoryRestrictsAndPersistsOverride(t *testing.T) {
+	store := &documentRootStore{websiteStore: websiteStore{subscription: domain.Subscription{ID: 1, Name: "acme", UnixUID: 5000, Home: "/vhosts/acme"}, websites: []domain.Website{{ID: 4, SubscriptionID: 1, Type: domain.WebsiteStatic, PrimaryDomain: "example.test", DocumentRoot: "/vhosts/acme/sites/example.test/public"}}}}
+	fs := &subscriptionFS{directories: map[string]bool{}}
+	service := WebsiteService{FS: fs, Store: store, Apache: websiteApache{}, Executor: plan.Executor{Journal: &subscriptionJournal{}, Locker: subscriptionLocker{}}, Config: config.Config{Paths: config.Paths{ACMEChallenge: "/var/lib/provctl/acme-challenge"}, Apache: config.Apache{SitesAvailable: "/etc/apache2/sites-available", ProxyTimeout: 60}}}
+	directory := "/var/log/provctl/acme/apps/example.test"
+	operation, err := service.PrepareSetLogDirectory(context.Background(), "acme", "example.test", directory)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.Executor.Run(context.Background(), operation); err != nil {
+		t.Fatal(err)
+	}
+	if store.logDirectory != directory || !fs.directories[directory] {
+		t.Fatalf("log directory = %q, dirs=%#v", store.logDirectory, fs.directories)
+	}
+	if _, err := service.PrepareSetLogDirectory(context.Background(), "acme", "example.test", "/tmp/logs"); err == nil {
+		t.Fatal("outside log directory was accepted")
 	}
 }
 

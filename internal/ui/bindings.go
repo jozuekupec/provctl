@@ -58,6 +58,7 @@ const (
 	actionTarget        shortcutAction = "target"
 	actionAccessLog     shortcutAction = "access-log"
 	actionErrorLog      shortcutAction = "error-log"
+	actionLogDirectory  shortcutAction = "log-directory"
 	actionAdmin         shortcutAction = "subscription-admin"
 	actionAdminTabNext  shortcutAction = "admin-tab-next"
 	actionAdminTabPrev  shortcutAction = "admin-tab-previous"
@@ -123,6 +124,7 @@ var bindings = []binding{
 	{Action: actionTarget, Group: "Actions", Keys: []string{"enter", "e"}, Label: "enter / e", Help: "edit proxy or redirect target", Bar: "enter target", Short: "target", Priority: 4, Contexts: []shortcutContext{shortcutEditorRouting}},
 	{Action: actionAccessLog, Group: "Actions", Keys: []string{"enter", "l"}, Label: "enter / l", Help: "load access log", Bar: "enter access", Short: "access", Priority: 4, Contexts: []shortcutContext{shortcutEditorLogs}},
 	{Action: actionErrorLog, Group: "Actions", Keys: []string{"L"}, Label: "L", Help: "load error log", Bar: "L error", Short: "L", Priority: 5, Contexts: []shortcutContext{shortcutEditorLogs}},
+	{Action: actionLogDirectory, Group: "Actions", Keys: []string{"e"}, Label: "e", Help: "change log directory", Bar: "e log dir", Short: "log dir", Priority: 6, Contexts: []shortcutContext{shortcutEditorLogs}},
 
 	{Action: actionAdminTabPrev, Group: "Navigation", Keys: []string{"shift+left"}, Label: "Shift+←", Help: "previous administration tab", Bar: "⇧←/⇧→ tabs", Short: "tabs", Priority: 2, Contexts: contextsAdmin},
 	{Action: actionAdminTabNext, Group: "Navigation", Keys: []string{"shift+right"}, Label: "Shift+→", Help: "next administration tab", Contexts: contextsAdmin},

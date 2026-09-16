@@ -62,6 +62,14 @@ func (m appModel) openPathPickerForDocumentRoot() (appModel, tea.Cmd) {
 	return m, m.listPathCmd(m.documentRootForm.input.Value(), m.pathPicker.generation)
 }
 
+func (m appModel) openPathPickerForLogDirectory() (appModel, tea.Cmd) {
+	input := newFilter().input
+	input.Prompt = ""
+	input.SetValue(m.logDirectoryForm.input.Value())
+	m.pathPicker = pathPickerState{open: true, target: pathPickerLogDirectory, mode: fsbrowse.Dirs, loading: true, generation: m.pathPicker.generation + 1, filter: newFilter(), pathInput: input}
+	return m, m.listPathCmd(m.logDirectoryForm.input.Value(), m.pathPicker.generation)
+}
+
 func (m appModel) openPathPickerForSSHKey() (appModel, tea.Cmd) {
 	input := newFilter().input
 	input.Prompt = ""
@@ -148,6 +156,8 @@ func (m appModel) acceptPath(path string) appModel {
 	switch m.pathPicker.target {
 	case pathPickerDocumentRoot:
 		m.documentRootForm.input.SetValue(absolute)
+	case pathPickerLogDirectory:
+		m.logDirectoryForm.input.SetValue(absolute)
 	case pathPickerSSHKey:
 		m.sshKeyForm.input.SetValue(absolute)
 	default:
@@ -156,6 +166,10 @@ func (m appModel) acceptPath(path string) appModel {
 	m.pathPicker = pathPickerState{}
 	if m.documentRootForm.open {
 		m.documentRootForm.input.Focus()
+		return m
+	}
+	if m.logDirectoryForm.open {
+		m.logDirectoryForm.input.Focus()
 		return m
 	}
 	if m.sshKeyForm.open {

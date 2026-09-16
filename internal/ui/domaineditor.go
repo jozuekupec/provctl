@@ -88,6 +88,8 @@ func (m appModel) domainEditorAction(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.status = "loading error log…"
 		m, command := m.startWebsiteLogs(true)
 		return m, command
+	case actionLogDirectory:
+		m = m.openLogDirectoryForm()
 	}
 	return m, nil
 }

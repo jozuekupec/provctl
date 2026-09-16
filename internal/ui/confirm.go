@@ -70,6 +70,8 @@ func (m appModel) runConfirmed() (tea.Model, tea.Cmd) {
 		return m, m.changeWebsitePHPCmd(confirm)
 	case "set-document-root":
 		return m, m.changeWebsiteDocumentRootCmd(confirm)
+	case "set-log-directory":
+		return m, m.changeWebsiteLogDirectoryCmd(confirm)
 	case "create-website":
 		return m, m.createWebsiteCmd(confirm)
 	case "set-alias":

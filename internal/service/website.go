@@ -26,6 +26,7 @@ type WebsiteStore interface {
 	DeleteCertificateByWebsite(context.Context, int64) error
 	SetWebsiteEnabled(context.Context, int64, bool) error
 	SetWebsiteDocumentRoot(context.Context, int64, string) error
+	SetWebsiteLogDirectory(context.Context, int64, string) error
 	SetWebsiteTarget(context.Context, int64, string, int) error
 	SetWebsiteSSL(context.Context, int64, bool, bool) error
 	AddWebsiteAlias(context.Context, int64, string) error
@@ -66,9 +67,11 @@ func (service WebsiteService) ReadLogs(ctx context.Context, subscriptionName, pr
 	if err != nil {
 		return "", err
 	}
+	var website domain.Website
 	found := false
-	for _, website := range websites {
-		if website.PrimaryDomain == primaryDomain {
+	for _, candidate := range websites {
+		if candidate.PrimaryDomain == primaryDomain {
+			website = candidate
 			found = true
 			break
 		}
@@ -80,7 +83,7 @@ func (service WebsiteService) ReadLogs(ctx context.Context, subscriptionName, pr
 	if errorLog {
 		name = "error.log"
 	}
-	contents, err := service.FS.ReadFile(filepath.Join(meta.LogDir, subscriptionName, primaryDomain, name))
+	contents, err := service.FS.ReadFile(filepath.Join(service.websiteLogDirectory(subscriptionName, website), name))
 	if err != nil {
 		return "", fmt.Errorf("read website log: %w", err)
 	}
@@ -275,7 +278,7 @@ func (service WebsiteService) PrepareAlias(ctx context.Context, subscriptionName
 // persisted website. It is shared by lifecycle services so generated config
 // stays consistent across website and certificate operations.
 func (service WebsiteService) RenderVHost(subscriptionName string, website domain.Website) ([]byte, error) {
-	logDir := filepath.Join(meta.LogDir, subscriptionName, website.PrimaryDomain)
+	logDir := service.websiteLogDirectory(subscriptionName, website)
 	var (
 		httpContents []byte
 		err          error
@@ -300,6 +303,13 @@ func (service WebsiteService) RenderVHost(subscriptionName string, website domai
 		return nil, err
 	}
 	return append(append(httpContents, '\n'), tlsContents...), nil
+}
+
+func (service WebsiteService) websiteLogDirectory(subscriptionName string, website domain.Website) string {
+	if website.LogDirectory != "" {
+		return website.LogDirectory
+	}
+	return filepath.Join(meta.LogDir, subscriptionName, website.PrimaryDomain)
 }
 
 func (service WebsiteService) renderTLSVHost(subscriptionName string, website domain.Website, logDir string) ([]byte, error) {
@@ -344,6 +354,79 @@ func (service WebsiteService) SetDocumentRoot(ctx context.Context, subscriptionN
 		return 0, err
 	}
 	return service.Executor.Run(ctx, operation)
+}
+
+// SetLogDirectory changes the Apache access/error-log parent for one domain.
+// Overrides stay within the subscription's protected provctl log root.
+func (service WebsiteService) SetLogDirectory(ctx context.Context, subscriptionName, primaryDomain, logDirectory string) (int64, error) {
+	operation, err := service.PrepareSetLogDirectory(ctx, subscriptionName, primaryDomain, logDirectory)
+	if err != nil {
+		return 0, err
+	}
+	return service.Executor.Run(ctx, operation)
+}
+
+func (service WebsiteService) PrepareSetLogDirectory(ctx context.Context, subscriptionName, primaryDomain, logDirectory string) (plan.Plan, error) {
+	if service.FS == nil || service.Apache == nil {
+		return plan.Plan{}, fmt.Errorf("filesystem and Apache vhost applier are required")
+	}
+	if err := domain.ValidateSubscriptionName(subscriptionName); err != nil {
+		return plan.Plan{}, err
+	}
+	if err := domain.ValidateDomain(primaryDomain); err != nil {
+		return plan.Plan{}, err
+	}
+	subscription, err := service.Store.SubscriptionByName(ctx, subscriptionName)
+	if err != nil {
+		return plan.Plan{}, err
+	}
+	website, err := service.websiteByDomain(ctx, subscription, primaryDomain)
+	if err != nil {
+		return plan.Plan{}, err
+	}
+	resolved, err := validateWebsiteLogDirectory(subscriptionName, logDirectory)
+	if err != nil {
+		return plan.Plan{}, err
+	}
+	if website.LogDirectory == resolved {
+		return plan.Plan{}, fmt.Errorf("website %q already uses log directory %q", primaryDomain, resolved)
+	}
+	updated := website
+	updated.LogDirectory = resolved
+	contents, err := service.RenderVHost(subscriptionName, updated)
+	if err != nil {
+		return plan.Plan{}, err
+	}
+	vhostPath := filepath.Join(service.Config.Apache.SitesAvailable, meta.FilePrefix+subscriptionName+"-"+primaryDomain+".conf")
+	var undoApache func(context.Context) error
+	steps := []plan.Step{{Name: "create website log directory", Preview: fmt.Sprintf("mkdir -m 0750 %s; chown root:%d %s", resolved, subscription.UnixUID, resolved), Do: service.createOwnedDirectory(resolved, 0, subscription.UnixUID, 0o750), Undo: func(context.Context) error { return nil }}, {Name: "update Apache log directory", Preview: "write " + vhostPath, Do: func(ctx context.Context) error {
+		var applyErr error
+		undoApache, applyErr = service.Apache.Apply(ctx, vhostPath, contents)
+		return applyErr
+	}, Undo: func(ctx context.Context) error {
+		if undoApache == nil {
+			return nil
+		}
+		return undoApache(ctx)
+	}}, {Name: "record website log directory", Preview: "set log directory in SQLite", Do: func(ctx context.Context) error {
+		return service.Store.SetWebsiteLogDirectory(ctx, website.ID, resolved)
+	}, Undo: func(ctx context.Context) error {
+		return service.Store.SetWebsiteLogDirectory(ctx, website.ID, website.LogDirectory)
+	}}}
+	return plan.Plan{Action: "website.set-log-directory", Target: subscriptionName + "/" + primaryDomain, Steps: steps}, nil
+}
+
+func validateWebsiteLogDirectory(subscriptionName, logDirectory string) (string, error) {
+	if logDirectory == "" || !filepath.IsAbs(logDirectory) {
+		return "", fmt.Errorf("log directory must be an absolute path")
+	}
+	clean := filepath.Clean(logDirectory)
+	root := filepath.Join(meta.LogDir, subscriptionName)
+	relative, err := filepath.Rel(root, clean)
+	if err != nil || relative == "." || relative == ".." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) || filepath.IsAbs(relative) {
+		return "", fmt.Errorf("log directory %q must be inside %q", logDirectory, root)
+	}
+	return clean, nil
 }
 
 // SetTarget changes a proxy upstream or redirect destination without changing
