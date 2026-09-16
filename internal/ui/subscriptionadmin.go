@@ -74,6 +74,12 @@ func (m appModel) handleSubscriptionAdminKey(msg tea.KeyMsg) (tea.Model, tea.Cmd
 				m = m.askConfirm(confirmState{action: "create-backup", title: "Create backup", lines: []string{"Subscription: " + subscription.Name, "Create a consistent archive of files and managed databases."}})
 			}
 		}
+	case actionEdit:
+		if m.subscriptionAdmin.tab == 3 {
+			if job, ok := m.selectedCronJob(); ok {
+				return m.openCronEditForm(job), nil
+			}
+		}
 	case actionRotateSecret:
 		if database, ok := m.selectedDatabase(); ok {
 			m = m.askConfirm(confirmState{action: "rotate-database-password", domain: database.Name, title: "Rotate database password", lines: []string{"Database: " + database.Name, "The current password will stop working immediately.", "The new password is shown exactly once."}})

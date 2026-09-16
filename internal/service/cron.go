@@ -18,6 +18,7 @@ type CronStore interface {
 	SubscriptionByName(context.Context, string) (domain.Subscription, error)
 	ListCronJobs(context.Context, int64) ([]domain.CronJob, error)
 	CreateCronJob(context.Context, domain.CronJob) (int64, error)
+	UpdateCronJob(context.Context, domain.CronJob) error
 	DeleteCronJob(context.Context, int64, int64) error
 }
 
@@ -106,6 +107,65 @@ func (service CronService) PrepareAdd(ctx context.Context, subscriptionName, sch
 		return err
 	}, Undo: func(ctx context.Context) error { return service.Store.DeleteCronJob(ctx, subscription.ID, job.ID) }}}
 	return plan.Plan{Action: "cron.add", Target: subscription.Name, Steps: steps}, nil
+}
+
+// Update rewrites one generated cron entry without changing its stable ID.
+func (service CronService) Update(ctx context.Context, subscriptionName string, jobID int64, schedule, command, comment string) (int64, error) {
+	operation, err := service.PrepareUpdate(ctx, subscriptionName, jobID, schedule, command, comment)
+	if err != nil {
+		return 0, err
+	}
+	return service.Executor.Run(ctx, operation)
+}
+
+func (service CronService) PrepareUpdate(ctx context.Context, subscriptionName string, jobID int64, schedule, command, comment string) (plan.Plan, error) {
+	if jobID < 1 {
+		return plan.Plan{}, fmt.Errorf("cron job ID must be positive")
+	}
+	if err := domain.ValidateCronSchedule(schedule); err != nil {
+		return plan.Plan{}, err
+	}
+	if err := domain.ValidateCronCommand(command); err != nil {
+		return plan.Plan{}, err
+	}
+	if err := domain.ValidateCronComment(comment); err != nil {
+		return plan.Plan{}, err
+	}
+	subscription, jobs, err := service.subscriptionJobs(ctx, subscriptionName)
+	if err != nil {
+		return plan.Plan{}, err
+	}
+	var previous domain.CronJob
+	desired := append([]domain.CronJob(nil), jobs...)
+	for index := range desired {
+		if desired[index].ID != jobID {
+			continue
+		}
+		previous = desired[index]
+		desired[index].Schedule, desired[index].Command, desired[index].Comment = schedule, command, comment
+		break
+	}
+	if previous.ID == 0 {
+		return plan.Plan{}, fmt.Errorf("cron job %d not found", jobID)
+	}
+	updated := previous
+	updated.Schedule, updated.Command, updated.Comment = schedule, command, comment
+	var undoCrontab func(context.Context) error
+	steps := []plan.Step{{Name: "write generated crontab", Preview: "write crontab for " + subscription.UnixUser, Do: func(ctx context.Context) error {
+		var writeErr error
+		undoCrontab, writeErr = service.writeCrontab(ctx, subscription, desired)
+		return writeErr
+	}, Undo: func(ctx context.Context) error {
+		if undoCrontab == nil {
+			return nil
+		}
+		return undoCrontab(ctx)
+	}}, {Name: "update cron job in SQLite", Preview: fmt.Sprintf("update cron job %d", jobID), Do: func(ctx context.Context) error {
+		return service.Store.UpdateCronJob(ctx, updated)
+	}, Undo: func(ctx context.Context) error {
+		return service.Store.UpdateCronJob(ctx, previous)
+	}}}
+	return plan.Plan{Action: "cron.update", Target: fmt.Sprintf("%s/%d", subscription.Name, jobID), Steps: steps}, nil
 }
 
 func (service CronService) Remove(ctx context.Context, subscriptionName string, jobID int64) (int64, error) {

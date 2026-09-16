@@ -88,6 +88,8 @@ func (m appModel) runConfirmed() (tea.Model, tea.Cmd) {
 		return m, m.removeSSHKeyCmd(confirm)
 	case "create-cron-job":
 		return m, m.createCronJobCmd(confirm)
+	case "update-cron-job":
+		return m, m.updateCronJobCmd(confirm)
 	case "remove-cron-job":
 		return m, m.removeCronJobCmd(confirm)
 	case "create-backup":

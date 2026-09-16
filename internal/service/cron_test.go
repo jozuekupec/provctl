@@ -31,6 +31,15 @@ func (store *cronStore) CreateCronJob(_ context.Context, job domain.CronJob) (in
 	store.jobs = append(store.jobs, job)
 	return job.ID, nil
 }
+func (store *cronStore) UpdateCronJob(_ context.Context, updated domain.CronJob) error {
+	for index, job := range store.jobs {
+		if job.ID == updated.ID && job.SubscriptionID == updated.SubscriptionID {
+			store.jobs[index] = updated
+			return nil
+		}
+	}
+	return fmt.Errorf("not found")
+}
 func (store *cronStore) DeleteCronJob(_ context.Context, _ int64, id int64) error {
 	for index, job := range store.jobs {
 		if job.ID == id {
@@ -67,6 +76,20 @@ func TestCronService_RemoveRewritesCrontabAndDeletesJob(t *testing.T) {
 	}
 	if len(store.jobs) != 0 || len(commands.Calls) != 2 || !commands.Calls[1].HasStdin {
 		t.Errorf("jobs=%#v commands=%#v", store.jobs, commands.Calls)
+	}
+}
+
+func TestCronService_UpdateRewritesCronAndPreservesID(t *testing.T) {
+	store := &cronStore{subscription: domain.Subscription{ID: 4, Name: "acme", UnixUser: "acme", Status: "active"}, jobs: []domain.CronJob{{ID: 9, SubscriptionID: 4, Schedule: "@daily", Command: "/usr/bin/true", Enabled: true, Comment: "old"}}}
+	commands := &fake.Commander{}
+	if _, err := newCronService(store, commands).Update(context.Background(), "acme", 9, "0 * * * *", "/usr/local/bin/task", "new"); err != nil {
+		t.Fatal(err)
+	}
+	if got := store.jobs[0]; got.ID != 9 || got.Schedule != "0 * * * *" || got.Command != "/usr/local/bin/task" || got.Comment != "new" {
+		t.Errorf("updated job = %#v", got)
+	}
+	if len(commands.Calls) != 2 || !commands.Calls[1].HasStdin {
+		t.Errorf("commands = %#v", commands.Calls)
 	}
 }
 

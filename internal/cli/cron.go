@@ -15,7 +15,37 @@ import (
 
 func newCronCommand() *cobra.Command {
 	command := &cobra.Command{Use: "cron", Short: "manage generated subscription crontabs"}
-	command.AddCommand(newCronListCommand(), newCronAddCommand(), newCronRemoveCommand())
+	command.AddCommand(newCronListCommand(), newCronAddCommand(), newCronEditCommand(), newCronRemoveCommand())
+	return command
+}
+
+func newCronEditCommand() *cobra.Command {
+	var configPath, comment string
+	command := &cobra.Command{Use: "edit <subscription> <job-id> <schedule> <command>", Short: "edit a generated cron job", Args: cobra.ExactArgs(4), RunE: func(command *cobra.Command, args []string) error {
+		jobID, err := strconv.ParseInt(args[1], 10, 64)
+		if err != nil {
+			return fmt.Errorf("parse cron job ID: %w", err)
+		}
+		cfg, err := config.Load(configPath)
+		if err != nil {
+			return fmt.Errorf("load configuration: %w", err)
+		}
+		runtime, err := service.NewProductionCronRuntime(context.Background())
+		if err != nil {
+			return fmt.Errorf("open cron state: %w", err)
+		}
+		defer runtime.Close()
+		ctx, cancel := context.WithTimeout(context.Background(), time.Duration(cfg.Limits.LockTimeoutSeconds)*time.Second)
+		defer cancel()
+		operationID, err := runtime.Service.Update(ctx, args[0], jobID, args[2], args[3], comment)
+		if err != nil {
+			return err
+		}
+		_, err = fmt.Fprintf(command.OutOrStdout(), "Updated cron job %d for subscription %q (operation %d).\n", jobID, args[0], operationID)
+		return err
+	}}
+	command.Flags().StringVar(&configPath, "config", meta.ConfigFile, "path to config.toml")
+	command.Flags().StringVar(&comment, "comment", "", "optional generated crontab comment")
 	return command
 }
 

@@ -928,9 +928,11 @@ kontejner obnoven na `clean`.
 
 - [~] **TUI administration refinements:** Settings now uses the installed
   PHP-FPM version picker for `php.default_version`; selection stays pending
-  until `Ctrl+S`, and the same popup marks the configured value. Remaining
-  work is editable cron jobs with a schedule preview and a per-domain custom
-  Apache log directory.
+  until `Ctrl+S`, and the same popup marks the configured value. Cron's `n`
+  creates a job and `Enter`/`e` edits the selected job through the same modal
+  form; it previews the next local server execution, keeps the job ID stable,
+  rewrites the generated crontab transactionally, and confirms the change.
+  Remaining work is a per-domain custom Apache log directory.
 - [ ] **Official-release Docker server test:** build a disposable Debian 13
   systemd-capable container that installs `provctl` only from the signed
   GitHub Pages APT repository, then exercises bootstrap and a real hosted

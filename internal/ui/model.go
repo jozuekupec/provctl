@@ -24,6 +24,7 @@ type Deps struct {
 	LoadSSHKeys            func(context.Context, string) ([]domain.SSHKey, error)
 	LoadCronJobs           func(context.Context, string) ([]domain.CronJob, error)
 	AddCronJob             func(context.Context, string, string, string, string) (int64, error)
+	UpdateCronJob          func(context.Context, string, int64, string, string, string) (int64, error)
 	RemoveCronJob          func(context.Context, string, int64) (int64, error)
 	LoadBackups            func(context.Context, string) ([]domain.Backup, error)
 	CreateBackup           func(context.Context, string) (int64, error)
@@ -92,6 +93,11 @@ type sshKeyRemovedMsg struct {
 }
 type cronJobCreatedMsg struct {
 	err   error
+	items []domain.CronJob
+}
+type cronJobUpdatedMsg struct {
+	err   error
+	id    int64
 	items []domain.CronJob
 }
 type cronJobRemovedMsg struct {
@@ -251,6 +257,7 @@ type confirmState struct {
 	word    string
 	input   textinput.Model
 	err     string
+	jobID   int64
 }
 
 type helpState struct {
@@ -343,11 +350,12 @@ type sshKeyFormState struct {
 }
 
 type cronFormState struct {
-	open     bool
-	field    int
-	schedule textinput.Model
-	command  textinput.Model
-	comment  textinput.Model
+	open      bool
+	field     int
+	editingID int64
+	schedule  textinput.Model
+	command   textinput.Model
+	comment   textinput.Model
 }
 
 type secretState struct {

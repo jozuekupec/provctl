@@ -2,6 +2,7 @@ package ui
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -1136,6 +1137,41 @@ func TestModel_SubscriptionAdminCreatesCronJobWithComment(t *testing.T) {
 	_ = runProgress(t, updated.(appModel), command)
 	if added != "acme/0 2 * * *//usr/local/bin/backup/nightly" {
 		t.Fatalf("AddCronJob = %q", added)
+	}
+}
+
+func TestModel_SubscriptionAdminEditsCronJobWithPreview(t *testing.T) {
+	var updatedCall string
+	job := domain.CronJob{ID: 7, SubscriptionID: 1, Schedule: "@daily", Command: "/usr/bin/true", Enabled: true, Comment: "old"}
+	m := New(Deps{
+		LoadCronJobs: func(context.Context, string) ([]domain.CronJob, error) { return []domain.CronJob{job}, nil },
+		UpdateCronJob: func(_ context.Context, subscription string, id int64, schedule, command, comment string) (int64, error) {
+			updatedCall = subscription + "/" + fmt.Sprint(id) + "/" + schedule + "/" + command + "/" + comment
+			job.Schedule, job.Command, job.Comment = schedule, command, comment
+			return 1, nil
+		},
+	})
+	m.ready, m.width, m.height = true, 100, 28
+	m.items = []domain.Subscription{{ID: 1, Name: "acme", Status: "active"}}
+	m.workspace, m.subscriptionAdmin = true, subscriptionAdminState{open: true, tab: 3}
+	m.cronJobs = []domain.CronJob{job}
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("e")})
+	m = updated.(appModel)
+	if !m.cronForm.open || m.cronForm.editingID != 7 || !strings.Contains(m.cronFormPopup(), "Next run:") {
+		t.Fatalf("cron edit form = %#v\n%s", m.cronForm, m.cronFormPopup())
+	}
+	m.cronForm.schedule.SetValue("0 * * * *")
+	m.cronForm.command.SetValue("/usr/local/bin/task")
+	m.cronForm.comment.SetValue("hourly")
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyCtrlS})
+	m = updated.(appModel)
+	if m.confirm.action != "update-cron-job" || m.confirm.jobID != 7 || !strings.Contains(strings.Join(m.confirm.lines, "\n"), "Next run:") {
+		t.Fatalf("cron update confirmation = %#v", m.confirm)
+	}
+	updated, command := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("y")})
+	_ = runProgress(t, updated.(appModel), command)
+	if updatedCall != "acme/7/0 * * * *//usr/local/bin/task/hourly" {
+		t.Fatalf("UpdateCronJob = %q", updatedCall)
 	}
 }
 

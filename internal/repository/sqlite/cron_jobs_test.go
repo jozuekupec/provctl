@@ -34,3 +34,30 @@ func TestRepository_CronJobsLifecycle(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestRepository_UpdateCronJobKeepsIdentity(t *testing.T) {
+	repository, err := Open(context.Background(), filepath.Join(t.TempDir(), "provctl.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer repository.Close()
+	ctx := context.Background()
+	if err := repository.CreateSubscription(ctx, domain.Subscription{Name: "acme", UnixUser: "acme", UnixUID: 5000, Home: "/vhosts/acme", PHPMaxChildren: 10, PHPMemoryLimit: "256M", PHPUploadMax: "64M", PHPMaxExecTime: 60, SSHAccess: "none"}); err != nil {
+		t.Fatal(err)
+	}
+	subscription, err := repository.SubscriptionByName(ctx, "acme")
+	if err != nil {
+		t.Fatal(err)
+	}
+	id, err := repository.CreateCronJob(ctx, domain.CronJob{SubscriptionID: subscription.ID, Schedule: "@daily", Command: "/usr/bin/true", Enabled: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := repository.UpdateCronJob(ctx, domain.CronJob{ID: id, SubscriptionID: subscription.ID, Schedule: "@hourly", Command: "/usr/local/bin/task", Enabled: true, Comment: "updated"}); err != nil {
+		t.Fatal(err)
+	}
+	jobs, err := repository.ListCronJobs(ctx, subscription.ID)
+	if err != nil || len(jobs) != 1 || jobs[0].ID != id || jobs[0].Schedule != "@hourly" || jobs[0].Comment != "updated" {
+		t.Fatalf("updated cron jobs = %#v, %v", jobs, err)
+	}
+}

@@ -215,6 +215,16 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.cronJobs, m.cronCursor, m.status = append([]domain.CronJob(nil), msg.items...), clamp(m.cronCursor, len(msg.items)), "cron job removed"
 		m.output = m.output.append(fmt.Sprintf("cron job removed: %d", msg.id))
 		return m, nil
+	case cronJobUpdatedMsg:
+		m.progress.active = false
+		if msg.err != nil {
+			m.status = "cron job update failed: " + msg.err.Error()
+			m.output = m.output.append(m.status)
+			return m, nil
+		}
+		m.cronJobs, m.cronCursor, m.status = append([]domain.CronJob(nil), msg.items...), clamp(m.cronCursor, len(msg.items)), "cron job updated"
+		m.output = m.output.append(fmt.Sprintf("cron job updated: %d", msg.id))
+		return m, nil
 	case backupCreatedMsg:
 		m.progress.active = false
 		if msg.err != nil {

@@ -31,6 +31,7 @@ const (
 	actionMoveNext      shortcutAction = "move-next"
 	actionMovePrevious  shortcutAction = "move-previous"
 	actionOpen          shortcutAction = "open"
+	actionEdit          shortcutAction = "edit"
 	actionCreate        shortcutAction = "create"
 	actionArchive       shortcutAction = "archive"
 	actionDelete        shortcutAction = "delete"
@@ -133,7 +134,8 @@ var bindings = []binding{
 	{Action: actionCreate, Group: "Actions", Keys: []string{"n"}, Label: "n", Help: "add SSH public key", Bar: "n add key", Short: "add", Priority: 4, Contexts: []shortcutContext{shortcutAdminSSH}},
 	{Action: actionDelete, Group: "Actions", Keys: []string{"D"}, Label: "D", Help: "remove selected SSH key", Bar: "D remove", Short: "remove", Priority: 5, Contexts: []shortcutContext{shortcutAdminSSH}},
 	{Action: actionCreate, Group: "Actions", Keys: []string{"n"}, Label: "n", Help: "add cron job", Bar: "n add", Short: "add", Priority: 4, Contexts: []shortcutContext{shortcutAdminCron}},
-	{Action: actionDelete, Group: "Actions", Keys: []string{"D"}, Label: "D", Help: "remove selected cron job", Bar: "D remove", Short: "remove", Priority: 5, Contexts: []shortcutContext{shortcutAdminCron}},
+	{Action: actionEdit, Group: "Actions", Keys: []string{"enter", "e"}, Label: "enter / e", Help: "edit selected cron job", Bar: "enter edit", Short: "edit", Priority: 5, Contexts: []shortcutContext{shortcutAdminCron}},
+	{Action: actionDelete, Group: "Actions", Keys: []string{"D"}, Label: "D", Help: "remove selected cron job", Bar: "D remove", Short: "remove", Priority: 6, Contexts: []shortcutContext{shortcutAdminCron}},
 	{Action: actionCreate, Group: "Actions", Keys: []string{"n"}, Label: "n", Help: "create subscription backup", Bar: "n backup", Short: "backup", Priority: 4, Contexts: []shortcutContext{shortcutAdminBackups}},
 }
 

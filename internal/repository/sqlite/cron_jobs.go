@@ -40,6 +40,22 @@ func (repository *Repository) CreateCronJob(ctx context.Context, job domain.Cron
 	return id, nil
 }
 
+// UpdateCronJob updates one persisted job without changing its identity.
+func (repository *Repository) UpdateCronJob(ctx context.Context, job domain.CronJob) error {
+	result, err := repository.DB.ExecContext(ctx, `UPDATE cron_jobs SET schedule = ?, command = ?, enabled = ?, comment = ? WHERE subscription_id = ? AND id = ?`, job.Schedule, job.Command, job.Enabled, nullable(job.Comment), job.SubscriptionID, job.ID)
+	if err != nil {
+		return fmt.Errorf("update cron job %d: %w", job.ID, err)
+	}
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("count cron job update: %w", err)
+	}
+	if rows != 1 {
+		return fmt.Errorf("cron job %d not found", job.ID)
+	}
+	return nil
+}
+
 func (repository *Repository) DeleteCronJob(ctx context.Context, subscriptionID, id int64) error {
 	result, err := repository.DB.ExecContext(ctx, `DELETE FROM cron_jobs WHERE subscription_id = ? AND id = ?`, subscriptionID, id)
 	if err != nil {
