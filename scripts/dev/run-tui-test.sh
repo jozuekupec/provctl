@@ -57,6 +57,9 @@ if [ "$state" = "RUNNING" ]; then
 	incus stop --force "$instance"
 fi
 incus snapshot restore "$instance" "$snapshot"
+# A non-stateful snapshot can retain the source container's volatile MAC.
+# Regenerate it before start so this isolated fixture cannot collide with pv.
+incus config unset "$instance" volatile.eth0.hwaddr 2>/dev/null || true
 if [ "$(incus list "$instance" --format csv -c s)" != "RUNNING" ]; then
 	incus start "$instance"
 fi
@@ -75,7 +78,10 @@ done
 }
 
 incus file push --quiet "$package" "$instance/tmp/provctl-tui-test.deb"
-incus exec "$instance" -- apt install -y /tmp/provctl-tui-test.deb
+# Fixtures can contain a development package whose Debian version sorts above
+# the current Git build; the fixture is disposable, so this replacement is
+# deliberate.
+incus exec "$instance" -- apt install -y --allow-downgrades /tmp/provctl-tui-test.deb
 
 echo "Opening provctl in $instance from snapshot $snapshot. Press q to quit."
 exec incus exec "$instance" -- /usr/bin/provctl
