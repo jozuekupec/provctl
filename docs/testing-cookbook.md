@@ -331,6 +331,25 @@ verze. `q` ukončí TUI a vrátí se do hostitelského shellu:
 ./scripts/dev/run-tui-test.sh dist/provctl_0.0.0+git.bfc8d57_amd64.deb
 ```
 
+### Docker: ostrý test veřejného release
+
+`scripts/test-release-docker.sh` nestaví lokální balíček. Vytvoří čistý
+Debian 13 systemd kontejner, stáhne veřejný signing key a `provctl` pouze z
+GitHub Pages APT repository, pak ověří bootstrap, doctor, static subscription
+a Apache HTTP lifecycle. Vyžaduje Docker daemon a pro systemd používá
+`--privileged`; nesdílí workspace ani žádnou hostitelskou cestu.
+
+```bash
+./scripts/test-release-docker.sh
+```
+
+Výchozí očekávaná veřejná verze je `0.1.1`. Po novém release ji explicitně
+změň, aby test neakceptoval nečekaný starší balíček:
+
+```bash
+PROVCTL_EXPECTED_VERSION=0.1.2 ./scripts/test-release-docker.sh
+```
+
 Pokud ne, funguje stejně `lxd` (snap) nebo přejdi na E4 (VM). Docker se pro tohle **nedoporučuje** — bez systemd nemá `systemctl` co dělat a testoval bys jinou cestu kódem než produkční.
 
 ### Vytvoření a zlatý snapshot

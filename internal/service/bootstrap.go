@@ -19,6 +19,7 @@ import (
 
 type BootstrapService struct {
 	FS          system.FS
+	Systemd     system.Systemd
 	Modules     ApacheModules
 	Certificate DefaultCertificate
 	Apache      BootstrapApache
@@ -54,7 +55,7 @@ func NewProductionBootstrapRuntime(ctx context.Context, cfg config.Config) (*Boo
 	}
 	commander := system.ExecCommander{}
 	systemd := system.CommandSystemd{Commander: commander}
-	return &BootstrapRuntime{Service: BootstrapService{FS: fs, Modules: ApacheModules{FS: fs, AvailablePath: "/etc/apache2/mods-available", EnabledPath: "/etc/apache2/mods-enabled"}, Certificate: DefaultCertificate{FS: fs, Commands: commander, Directory: meta.DefaultSSLDir, Certificate: meta.DefaultSSLCertificate, Key: meta.DefaultSSLKey}, Apache: Apache{FS: fs, Commands: commander, Systemd: systemd, Service: cfg.Apache.Service}, Executor: productionExecutor(repository), Config: cfg, AuditGroup: auditGroup}, repository: repository}, nil
+	return &BootstrapRuntime{Service: BootstrapService{FS: fs, Systemd: systemd, Modules: ApacheModules{FS: fs, AvailablePath: "/etc/apache2/mods-available", EnabledPath: "/etc/apache2/mods-enabled"}, Certificate: DefaultCertificate{FS: fs, Commands: commander, Directory: meta.DefaultSSLDir, Certificate: meta.DefaultSSLCertificate, Key: meta.DefaultSSLKey}, Apache: Apache{FS: fs, Commands: commander, Systemd: systemd, Service: cfg.Apache.Service}, Executor: productionExecutor(repository), Config: cfg, AuditGroup: auditGroup}, repository: repository}, nil
 }
 func (runtime *BootstrapRuntime) Close() error { return runtime.repository.Close() }
 func NewBootstrapPreview(cfg config.Config) (BootstrapService, error) {
@@ -65,7 +66,7 @@ func NewBootstrapPreview(cfg config.Config) (BootstrapService, error) {
 	fs := system.OSFS{}
 	commander := system.ExecCommander{}
 	systemd := system.CommandSystemd{Commander: commander}
-	return BootstrapService{FS: fs, Modules: ApacheModules{FS: fs, AvailablePath: "/etc/apache2/mods-available", EnabledPath: "/etc/apache2/mods-enabled"}, Certificate: DefaultCertificate{FS: fs, Commands: commander, Directory: meta.DefaultSSLDir, Certificate: meta.DefaultSSLCertificate, Key: meta.DefaultSSLKey}, Apache: Apache{FS: fs, Commands: commander, Systemd: systemd, Service: cfg.Apache.Service}, Config: cfg, AuditGroup: auditGroup}, nil
+	return BootstrapService{FS: fs, Systemd: systemd, Modules: ApacheModules{FS: fs, AvailablePath: "/etc/apache2/mods-available", EnabledPath: "/etc/apache2/mods-enabled"}, Certificate: DefaultCertificate{FS: fs, Commands: commander, Directory: meta.DefaultSSLDir, Certificate: meta.DefaultSSLCertificate, Key: meta.DefaultSSLKey}, Apache: Apache{FS: fs, Commands: commander, Systemd: systemd, Service: cfg.Apache.Service}, Config: cfg, AuditGroup: auditGroup}, nil
 }
 func (service BootstrapService) Run(ctx context.Context) (int64, bool, error) {
 	return service.RunWithSkip(ctx, nil)
@@ -116,6 +117,10 @@ func (service BootstrapService) PrepareWithSkip(ctx context.Context, skipped []s
 	return operation, nil
 }
 func (service BootstrapService) Prepare(ctx context.Context) (plan.Plan, error) {
+	serviceSteps, err := service.requiredServiceSteps(ctx)
+	if err != nil {
+		return plan.Plan{}, err
+	}
 	contents, err := render.RenderDefaultApacheVHost(render.DefaultApacheVHost{CertificateFile: meta.DefaultSSLCertificate, KeyFile: meta.DefaultSSLKey})
 	if err != nil {
 		return plan.Plan{}, err
@@ -133,7 +138,8 @@ func (service BootstrapService) Prepare(ctx context.Context) (plan.Plan, error) 
 		{path: meta.LogDir, mode: 0o751, name: "create log directory", gid: service.AuditGroup, previousModes: []os.FileMode{0o750}},
 		{path: service.Config.Paths.VHosts, mode: 0o755, name: "create vhosts root"},
 	}
-	steps := make([]plan.Step, 0, 10)
+	steps := make([]plan.Step, 0, 10+len(serviceSteps))
+	steps = append(steps, serviceSteps...)
 	for _, directory := range directories {
 		needed, err := directory.needs(service.FS)
 		if err != nil {
@@ -222,6 +228,51 @@ func (service BootstrapService) Prepare(ctx context.Context) (plan.Plan, error) 
 		steps = append(steps, plan.Step{Name: "validate and reload Apache", Preview: "apachectl configtest and reload " + service.Config.Apache.Service, Do: service.Apache.ValidateAndReload})
 	}
 	return plan.Plan{Action: "bootstrap", Target: "server", Steps: steps}, nil
+}
+
+// requiredServiceSteps starts package-provided daemons that were deliberately
+// held back by Debian's policy-rc.d during non-interactive installation. It is
+// also useful after a host reboot: bootstrap is expected to leave its required
+// runtime services ready for the doctor checks that immediately follow.
+func (service BootstrapService) requiredServiceSteps(ctx context.Context) ([]plan.Step, error) {
+	if service.Systemd == nil {
+		return nil, nil
+	}
+	units := []string{service.Config.Apache.Service}
+	if service.Config.MariaDB.Enabled {
+		units = append(units, "mariadb.service")
+	}
+	entries, err := service.FS.ReadDir(meta.PHPConfigDir)
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return nil, fmt.Errorf("inspect PHP-FPM configuration directory: %w", err)
+	}
+	if err == nil {
+		for _, entry := range entries {
+			if entry.IsDir() {
+				if _, err := service.FS.Stat(filepath.Join(meta.PHPConfigDir, entry.Name(), "fpm", "pool.d")); err == nil {
+					units = append(units, "php"+entry.Name()+"-fpm")
+				}
+			}
+		}
+	}
+	steps := make([]plan.Step, 0, len(units))
+	for _, unit := range units {
+		active, err := service.Systemd.IsActive(ctx, unit)
+		if err != nil {
+			return nil, fmt.Errorf("inspect required service %q: %w", unit, err)
+		}
+		if active {
+			continue
+		}
+		unit := unit
+		steps = append(steps, plan.Step{Name: "start required service " + unit, Preview: "systemctl start " + unit, Do: func(ctx context.Context) error {
+			if err := service.Systemd.Start(ctx, unit); err != nil {
+				return fmt.Errorf("start required service %q: %w", unit, err)
+			}
+			return nil
+		}})
+	}
+	return steps, nil
 }
 
 type managedDirectory struct {

@@ -9,6 +9,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
+
 	"provctl/internal/config"
 	"provctl/internal/meta"
 	"provctl/internal/plan"
@@ -127,6 +129,25 @@ func (bootstrapCommander) RunWithStdin(context.Context, io.Reader, string, ...st
 	return system.Result{}, nil
 }
 
+type bootstrapSystemd struct {
+	active  map[string]bool
+	started []string
+}
+
+func (*bootstrapSystemd) Reload(context.Context, string) error  { return nil }
+func (*bootstrapSystemd) Restart(context.Context, string) error { return nil }
+func (systemd *bootstrapSystemd) Start(_ context.Context, unit string) error {
+	systemd.active[unit] = true
+	systemd.started = append(systemd.started, unit)
+	return nil
+}
+func (*bootstrapSystemd) Stop(context.Context, string) error { return nil }
+func (systemd *bootstrapSystemd) IsActive(_ context.Context, unit string) (bool, error) {
+	return systemd.active[unit], nil
+}
+func (*bootstrapSystemd) Enable(context.Context, string) error  { return nil }
+func (*bootstrapSystemd) Disable(context.Context, string) error { return nil }
+
 func TestBootstrap_PrepareReturnsNoStepsWhenReady(t *testing.T) {
 	fs, cfg := readyBootstrapFS(t)
 	operation, err := bootstrapService(fs, cfg).Prepare(context.Background())
@@ -154,6 +175,30 @@ func TestBootstrap_PrepareAddsMissingSystemDirectories(t *testing.T) {
 		if got := operation.Steps[index].Name; got != want {
 			t.Errorf("step %d = %q, want %q", index, got, want)
 		}
+	}
+}
+
+func TestBootstrap_PrepareStartsInactiveRequiredServices(t *testing.T) {
+	fs, cfg := readyBootstrapFS(t)
+	cfg.MariaDB.Enabled = true
+	systemd := &bootstrapSystemd{active: map[string]bool{}}
+	service := bootstrapService(fs, cfg)
+	service.Systemd = systemd
+
+	operation, err := service.Prepare(context.Background())
+	if err != nil {
+		t.Fatalf("Prepare() error = %v", err)
+	}
+	if got, want := len(operation.Steps), 3; got != want {
+		t.Fatalf("steps = %d, want %d", got, want)
+	}
+	for _, step := range operation.Steps {
+		if err := step.Do(context.Background()); err != nil {
+			t.Fatalf("%s: %v", step.Name, err)
+		}
+	}
+	if diff := cmp.Diff([]string{"apache2", "mariadb.service"}, systemd.started); diff != "" {
+		t.Errorf("started services mismatch (-want +got):\n%s", diff)
 	}
 }
 
