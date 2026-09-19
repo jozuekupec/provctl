@@ -937,12 +937,14 @@ kontejner obnoven na `clean`.
   persisted override is constrained to `/var/log/provctl/<subscription>/…`,
   created as `root:<subscription> 0750`, and reflected by log reads, HTTP and
   TLS vhosts. `website logdir set` exposes the same validated service path.
-- [~] **Official-release Docker server test:** added a disposable Debian 13
+- [x] **Official-release Docker server test:** added a disposable Debian 13
   systemd-capable container that installs `provctl` only from the signed
   GitHub Pages APT repository, then exercises bootstrap, doctor, subscription
   creation and a real Apache static-site enable/disable lifecycle. The first
   run against `0.1.1` found that Debian's non-interactive `policy-rc.d` leaves
-  newly installed PHP-FPM and MariaDB inactive; bootstrap then correctly
-  fails its doctor check. Bootstrap now explicitly starts inactive required
-  services before applying its artifacts. Publish and validate `0.1.2` before
-  marking this scenario complete.
+  newly installed PHP-FPM and MariaDB inactive; `v0.1.2` starts inactive
+  required services before applying its artifacts. A clean, privileged Docker
+  server installed the signed Pages `0.1.2` package, completed bootstrap and
+  doctor with all checks OK, served the static site, removed that site's
+  content when disabled (while allowing Apache's catch-all response), then
+  served it again after enable.

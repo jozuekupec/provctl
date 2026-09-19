@@ -7,7 +7,7 @@ set -eu
 repo=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 image=${PROVCTL_DOCKER_IMAGE:-provctl-release-server:test}
 name="provctl-release-test-$$"
-expected=${PROVCTL_EXPECTED_VERSION:-0.1.1}
+expected=${PROVCTL_EXPECTED_VERSION:-0.1.2}
 
 cleanup() {
 	docker rm --force "$name" >/dev/null 2>&1 || true

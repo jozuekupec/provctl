@@ -33,8 +33,11 @@ curl --fail --silent --show-error --resolve release.test:80:127.0.0.1 http://rel
 test -s /var/log/provctl/release/release.test/access.log
 
 provctl website disable release release.test
-if curl --silent --show-error --resolve release.test:80:127.0.0.1 http://release.test/ >/dev/null; then
-	echo "disabled website still served HTTP" >&2
+
+# Apache may correctly fall back to its generated catch-all vhost with HTTP
+# 200. What must disappear is this subscription's own content, not TCP/HTTP.
+if curl --silent --show-error --resolve release.test:80:127.0.0.1 http://release.test/ | grep -q 'release smoke'; then
+	echo "disabled website still served its own content" >&2
 	exit 1
 fi
 provctl website enable release release.test

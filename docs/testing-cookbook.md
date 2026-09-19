@@ -343,11 +343,11 @@ a Apache HTTP lifecycle. Vyžaduje Docker daemon a pro systemd používá
 ./scripts/test-release-docker.sh
 ```
 
-Výchozí očekávaná veřejná verze je `0.1.1`. Po novém release ji explicitně
+Výchozí očekávaná veřejná verze je `0.1.2`. Po novém release ji explicitně
 změň, aby test neakceptoval nečekaný starší balíček:
 
 ```bash
-PROVCTL_EXPECTED_VERSION=0.1.2 ./scripts/test-release-docker.sh
+PROVCTL_EXPECTED_VERSION=0.1.3 ./scripts/test-release-docker.sh
 ```
 
 Pokud ne, funguje stejně `lxd` (snap) nebo přejdi na E4 (VM). Docker se pro tohle **nedoporučuje** — bez systemd nemá `systemctl` co dělat a testoval bys jinou cestu kódem než produkční.
