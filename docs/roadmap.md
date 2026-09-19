@@ -947,4 +947,6 @@ kontejner obnoven na `clean`.
   server installed the signed Pages `0.1.2` package, completed bootstrap and
   doctor with all checks OK, served the static site, removed that site's
   content when disabled (while allowing Apache's catch-all response), then
-  served it again after enable.
+  served it again after enable. Because privileged systemd Docker containers
+  can contend with a desktop host's cgroups and disk I/O, the helper now
+  requires `PROVCTL_ALLOW_PRIVILEGED=1`; local E2 validation remains Incus.

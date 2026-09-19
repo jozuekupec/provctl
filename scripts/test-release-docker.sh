@@ -4,6 +4,13 @@
 # never mounts the workspace or host paths into the container.
 set -eu
 
+if [ "${PROVCTL_ALLOW_PRIVILEGED:-}" != "1" ]; then
+	echo "refusing privileged Docker server test on this host" >&2
+	echo "use the Incus E2 environment, or run only in a disposable VM with:" >&2
+	echo "  PROVCTL_ALLOW_PRIVILEGED=1 $0" >&2
+	exit 2
+fi
+
 repo=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 image=${PROVCTL_DOCKER_IMAGE:-provctl-release-server:test}
 name="provctl-release-test-$$"

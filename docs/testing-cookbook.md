@@ -337,10 +337,13 @@ verze. `q` ukončí TUI a vrátí se do hostitelského shellu:
 Debian 13 systemd kontejner, stáhne veřejný signing key a `provctl` pouze z
 GitHub Pages APT repository, pak ověří bootstrap, doctor, static subscription
 a Apache HTTP lifecycle. Vyžaduje Docker daemon a pro systemd používá
-`--privileged`; nesdílí workspace ani žádnou hostitelskou cestu.
+`--privileged`; nesdílí workspace ani žádnou hostitelskou cestu. Privilegovaný
+systemd kontejner ale může na běžném desktopovém hostu soupeřit o cgroups a
+diskové I/O. Lokálně proto používej přednostně E2 v Incusu. Docker scénář
+spouštěj jen v jednorázové VM nebo CI a potvrď jej explicitně:
 
 ```bash
-./scripts/test-release-docker.sh
+PROVCTL_ALLOW_PRIVILEGED=1 ./scripts/test-release-docker.sh
 ```
 
 Výchozí očekávaná veřejná verze je `0.1.2`. Po novém release ji explicitně
