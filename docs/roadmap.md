@@ -926,7 +926,7 @@ kontejner obnoven na `clean`.
 
 ## Follow-up scope after v0.1
 
-- [~] **TUI administration refinements:** Settings now uses the installed
+- [x] **TUI administration refinements:** Settings now uses the installed
   PHP-FPM version picker for `php.default_version`; selection stays pending
   until `Ctrl+S`, and the same popup marks the configured value. Cron's `n`
   creates a job and `Enter`/`e` edits the selected job through the same modal
@@ -937,6 +937,12 @@ kontejner obnoven na `clean`.
   persisted override is constrained to `/var/log/provctl/<subscription>/…`,
   created as `root:<subscription> 0750`, and reflected by log reads, HTTP and
   TLS vhosts. `website logdir set` exposes the same validated service path.
+  The focused TUI suite passed with the race detector. The current package
+  (`0.0.0+git.3a33814`) also passed T04 and the isolated Incus T10 server
+  test: bootstrap, Apache, PHP-FPM, two subscriptions, HTTP isolation,
+  private sessions and log permissions. The test container was restored to
+  `isolated-clean`; the local full suite remains pending only until
+  `staticcheck` is again available on PATH.
 - [x] **Official-release Docker server test:** added a disposable Debian 13
   systemd-capable container that installs `provctl` only from the signed
   GitHub Pages APT repository, then exercises bootstrap, doctor, subscription
