@@ -963,9 +963,16 @@ kontejner obnoven na `clean`.
   context-scoped progress stream: the immutable step list followed by running,
   done, failed and rolled-back transitions. The stream deliberately omits
   command previews and errors to keep terminal progress safe. Its focused
-  executor test and the service suite pass with `-race`. The next slice wires
-  this stream into Bubble Tea and migrates PHP-FPM first, then the remaining
-  service-backed mutations.
+  executor test and the service suite pass with `-race`. Bubble Tea now
+  transports that stream through its existing operation channel: once an
+  executor starts, the generic apply placeholder is replaced by its actual
+  plan steps, while a UI-only post-operation refresh remains last. PHP-FPM
+  therefore already shows pool, socket, vhost and SQLite steps from its real
+  plan; all other mutations using `plan.Executor` inherit the same behavior
+  without per-form wiring. Rollbacks render distinctly. A focused UI test
+  proves replacement and preservation of the refresh step. Remaining work is
+  to migrate mutations that do not yet use an executor (notably the TLS
+  certificate path) and remove their temporary UI-owned labels.
 
 - [x] **TUI administration refinements:** Settings now uses the installed
   PHP-FPM version picker for `php.default_version`; selection stays pending

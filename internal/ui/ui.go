@@ -61,6 +61,22 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.progress.steps[msg.index].state = msg.state
 		}
 		return m, waitProgress(m.progress.ch)
+	case progressPlanMsg:
+		if len(msg.event.Steps) > 0 {
+			steps := make([]progressStep, 0, len(msg.event.Steps)+len(m.progress.steps))
+			for _, step := range msg.event.Steps {
+				steps = append(steps, progressStep{label: step.Name, state: progressStepState(step.Status)})
+			}
+			// The first UI label is the executor placeholder. Preserve only
+			// follow-up work such as refreshing an already-mutated list.
+			if len(m.progress.steps) > 1 {
+				steps = append(steps, m.progress.steps[1:]...)
+			}
+			m.progress.steps = steps
+		} else if msg.event.Index >= 0 && msg.event.Index < len(m.progress.steps) {
+			m.progress.steps[msg.event.Index].state = progressStepState(msg.event.Status)
+		}
+		return m, waitProgress(m.progress.ch)
 	case subscriptionsLoadedMsg:
 		if m.subscriptions.stale(msg.generation) {
 			return m, nil

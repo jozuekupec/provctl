@@ -16,8 +16,23 @@ import (
 	"provctl/internal/config"
 	"provctl/internal/domain"
 	"provctl/internal/fsbrowse"
+	"provctl/internal/plan"
 	"provctl/internal/service"
+	"provctl/internal/system"
 )
+
+type uiPlanJournal struct{}
+
+func (uiPlanJournal) Start(context.Context, plan.Snapshot) (int64, error) { return 1, nil }
+func (uiPlanJournal) Update(context.Context, int64, plan.OperationStatus, plan.Snapshot, string) error {
+	return nil
+}
+
+type uiPlanLocker struct{}
+
+func (uiPlanLocker) Lock(context.Context, string) (system.Unlock, error) {
+	return func() error { return nil }, nil
+}
 
 func TestModel_LoadAndNavigateSubscriptions(t *testing.T) {
 	m := New(Deps{LoadSubscriptions: func(context.Context) ([]domain.Subscription, error) {
@@ -838,6 +853,37 @@ func TestModel_FailedProgressWaitsForDismissal(t *testing.T) {
 	}
 	if !strings.Contains(m.status, "website change failed") || !strings.Contains(strings.Join(m.output.lines, "\n"), "Apache validation failed") {
 		t.Fatalf("deferred result was not applied: status=%q output=%#v", m.status, m.output)
+	}
+}
+
+func TestModel_PlanProgressReplacesApplyPlaceholder(t *testing.T) {
+	m := New(Deps{})
+	command := steppedCmd("Switch PHP-FPM", []string{"apply PHP-FPM configuration", "refresh domain list"}, func(ctx context.Context, report func(int)) tea.Msg {
+		_, err := (plan.Executor{Journal: uiPlanJournal{}, Locker: uiPlanLocker{}}).Run(ctx, plan.Plan{Action: "php.set", Target: "acme/app.example.test", Steps: []plan.Step{
+			{Name: "install PHP-FPM pool", Do: func(context.Context) error { return nil }},
+			{Name: "regenerate Apache vhost", Do: func(context.Context) error { return nil }},
+		}})
+		report(1)
+		return websitePHPChangedMsg{err: err, domain: "app.example.test", version: "8.3", items: []domain.Website{{PrimaryDomain: "app.example.test", PHPVersion: "8.3"}}}
+	})
+
+	seenPlan := false
+	for range 12 {
+		message := command()
+		updated, next := m.Update(message)
+		m, command = updated.(appModel), next
+		if strings.Contains(m.progress.render(), "install PHP-FPM pool") {
+			seenPlan = true
+			if strings.Contains(m.progress.render(), "apply PHP-FPM configuration") || !strings.Contains(m.progress.render(), "refresh domain list") {
+				t.Fatalf("progress steps = %q", m.progress.render())
+			}
+		}
+		if !m.progress.active {
+			break
+		}
+	}
+	if !seenPlan {
+		t.Fatal("typed plan steps never reached the progress popup")
 	}
 }
 

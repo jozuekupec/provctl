@@ -6,6 +6,8 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+
+	"provctl/internal/plan"
 )
 
 type stepState int
@@ -15,6 +17,7 @@ const (
 	stepRunning
 	stepDone
 	stepFailed
+	stepRolledBack
 )
 
 type progressStep struct {
@@ -44,6 +47,10 @@ type progressStepMsg struct {
 	state stepState
 }
 
+// progressPlanMsg transports executor-owned plan transitions into Update.
+// The executor never knows about Bubble Tea or terminal rendering.
+type progressPlanMsg struct{ event plan.ProgressEvent }
+
 func waitProgress(ch chan tea.Msg) tea.Cmd {
 	return func() tea.Msg { return <-ch }
 }
@@ -55,13 +62,21 @@ func steppedCmd(title string, labels []string, work func(context.Context, func(i
 	for index, label := range labels {
 		steps[index] = progressStep{label: label, state: stepPending}
 	}
-	ch := make(chan tea.Msg, len(steps)*2+2)
+	ch := make(chan tea.Msg, 256)
 	return func() tea.Msg {
 		go func() {
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 			defer cancel()
-			ch <- progressStartMsg{title: title, steps: steps, ch: ch, cancel: cancel}
+			planStepCount := 0
 			current := -1
+			ctx = plan.WithProgress(ctx, func(event plan.ProgressEvent) {
+				if len(event.Steps) > 0 {
+					planStepCount = len(event.Steps)
+					current = -1
+				}
+				ch <- progressPlanMsg{event: event}
+			})
+			ch <- progressStartMsg{title: title, steps: steps, ch: ch, cancel: cancel}
 			report := func(index int) {
 				if index < 0 || index >= len(steps) || index == current {
 					return
@@ -70,6 +85,9 @@ func steppedCmd(title string, labels []string, work func(context.Context, func(i
 					ch <- progressStepMsg{index: current, state: stepDone}
 				}
 				current = index
+				if planStepCount > 0 && index > 0 {
+					current = planStepCount + index - 1
+				}
 				ch <- progressStepMsg{index: current, state: stepRunning}
 			}
 			report(0)
@@ -156,6 +174,21 @@ func isMutationResult(message tea.Msg) bool {
 	return false
 }
 
+func progressStepState(status plan.StepStatus) stepState {
+	switch status {
+	case plan.StepRunning:
+		return stepRunning
+	case plan.StepDone:
+		return stepDone
+	case plan.StepFailed:
+		return stepFailed
+	case plan.StepRolledBack:
+		return stepRolledBack
+	default:
+		return stepPending
+	}
+}
+
 func (progress progressState) render() string {
 	lines := make([]string, 0, len(progress.steps))
 	for _, step := range progress.steps {
@@ -167,6 +200,8 @@ func (progress progressState) render() string {
 			glyph = "✓"
 		case stepFailed:
 			glyph = "!"
+		case stepRolledBack:
+			glyph = "↶"
 		}
 		lines = append(lines, glyph+" "+step.label)
 	}
