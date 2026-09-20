@@ -958,3 +958,15 @@ kontejner obnoven na `clean`.
   served it again after enable. Because privileged systemd Docker containers
   can contend with a desktop host's cgroups and disk I/O, the helper now
   requires `PROVCTL_ALLOW_PRIVILEGED=1`; local E2 validation remains Incus.
+- [x] **v0.1.4 public APT server validation:** a Debian 13 Incus system
+  container verified the public signing-key fingerprint, installed `0.1.3`
+  and then upgraded to `0.1.4` exclusively from GitHub Pages. Bootstrap and
+  doctor passed; the scenario exercised subscription quotas, PHP-FPM/static/
+  proxy/redirect vhosts with real Apache responses, per-domain PHP, document
+  root, log directory, alias, enable/disable, reconcile, database credentials
+  and password rotation, SSH access and keys, cron create/edit/remove, backup
+  create/inspect/restore dry-run, and subscription suspend/resume/archive/
+  double-confirmed delete. This run found and fixed the proxy/redirect health
+  false-positive recorded in M7. The official `0.1.4` artifact also passed
+  T16 against Pebble: HTTP-01 issuance, forced renewal, deploy hook, and TLS
+  disable. Both scenarios restored `isolated-clean` afterward.
