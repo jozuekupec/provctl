@@ -1039,3 +1039,18 @@ kontejner obnoven na `clean`.
   false-positive recorded in M7. The official `0.1.4` artifact also passed
   T16 against Pebble: HTTP-01 issuance, forced renewal, deploy hook, and TLS
   disable. Both scenarios restored `isolated-clean` afterward.
+
+- [x] **v0.1.5 release and public APT validation (2026-09-20):** tag `v0.1.5`
+  was built from validated commit `140a15a`. GitHub Actions completed its test,
+  amd64/arm64 package, GitHub Release, and signed GitHub Pages publication
+  jobs successfully. A fresh Debian 13 Incus system container followed the
+  README exactly: it verified primary fingerprint
+  `578A5B0F5AABFB5851803D05FE92B73E4B3967C4`, selected `0.1.5` from the
+  public `stable` suite, installed it with dependencies, then completed the
+  explicit bootstrap. `doctor` confirmed Apache, required modules, Certbot
+  deploy hook, PHP-FPM 8.4 and MariaDB; one standard Debian advisory remains
+  about both the Certbot timer and `/etc/cron.d/certbot`. The release also
+  created a quota-limited PHP-FPM subscription and served its document root
+  through Apache. The disposable release container and obsolete
+  `pv-tls-debug-20260913` fixture (including 13 stale snapshots) were deleted;
+  only active `pv` and its `clean`/`pre-tls-debug-20260913` snapshots remain.
