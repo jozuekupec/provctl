@@ -19,6 +19,29 @@ subscription name use the ordinary domain validators. `--copy` is opt-in;
 the default is an atomic rename on the same filesystem. Cross-filesystem
 renames fail with an actionable message rather than silently copying data.
 
+### Ownership and container-runtime contract
+
+Every data-bearing adoption (`php-fpm` today; `static` when it is added) must
+finish by recursively assigning the adopted document root to the newly
+allocated subscription UID and GID. This is a required, journaled plan step
+after the move or copy, not an operator follow-up: the deployed PHP-FPM pool
+and any managed process must be able to write only as that subscription user.
+The existing PHP-FPM implementation uses explicit `chown --recursive --
+<uid>:<gid> <document-root>` arguments through the command seam; future
+website types must preserve that behavior and test both its preview and call.
+
+Proxy adoption is different: an Apache proxy has no intrinsic document root,
+and provctl must not guess or rewrite arbitrary Docker Compose files. A proxy
+adoption may record the upstream and Apache/TLS artifacts, while a container
+backed application needs an explicit runtime mapping from the new subscription
+UID/GID to its image's environment (for example `UID` and `GID`). The scorely
+Compose setup is the reference shape: PHP and Apache images receive those
+values through environment variables. A future proxy-adopt form/CLI must show
+the allocated UID/GID and either require an explicit, declared compose-env
+mapping or leave the runtime unchanged with a clear manual-action warning.
+It must never silently modify a project-owned `.env` file or grant the
+subscription user privileged Docker-daemon access.
+
 ## Plan order
 
 ### Accepted TLS identity decision

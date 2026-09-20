@@ -861,6 +861,14 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
   přesun reálné struktury. Automatická obnova po pádu během reconfigure a
   retence recovery kopií jsou vědomé budoucí provozní follow-upy, ne podmínka
   dokončeného migračního kontraktu.
+  **Rozšíření adopce 2026-09-20:** současná adopce je záměrně CLI-only a
+  PHP-FPM-only, ale již po transferu rekursivně převádí document root na nově
+  přidělený subscription UID/GID. Návrh nyní tento krok pro data-bearing typy
+  zavazuje i do budoucna. Static adopce bude stejný přesun bez FPM poolu;
+  proxy/redirect adopce budou převzetím vhostu, upstreamu či cíle bez domnělého
+  document rootu. Kontejnerový runtime musí dostat explicitní UID/GID mapping
+  (například `UID`/`GID` environment), ale provctl nikdy potichu nepřepíše
+  projektový Compose `.env` ani subscriptionu nedá privilegovaný Docker socket.
 
 ## Pravidla ověřování
 
