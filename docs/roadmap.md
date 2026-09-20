@@ -995,8 +995,22 @@ kontejner obnoven na `clean`.
   (`0.0.0+git.3a33814`) also passed T04 and the isolated Incus T10 server
   test: bootstrap, Apache, PHP-FPM, two subscriptions, HTTP isolation,
   private sessions and log permissions. The test container was restored to
-  `isolated-clean`; the local full suite remains pending only until
-  `staticcheck` is again available on PATH.
+  `isolated-clean`.
+
+- [x] **Final validation 2026-09-20:** `staticcheck 2026.2.1` is installed in
+  the standard Go tool directory and the complete `make test` entry point now
+  passes (`go vet`, `staticcheck`, and race-enabled unit tests). The current
+  package `0.0.0+git.886e627` passed live T10 PHP-FPM/Apache isolation and T17
+  legacy-vhost adoption in `pv-tls-debug-20260913`; the instance was restored
+  to `isolated-clean` after each run. A separate stateful E2 lifecycle created
+  and rotated a database credential without logging it, created/edited/removed
+  a cron job, added/removed an SSH key before enabling key access, and
+  created/inspected/dry-run-restored a backup before removing the database.
+  T16 then passed against a fresh official Pebble checkout (`13f2ac3`): actual
+  HTTP-01 issuance, forced renewal, deploy hook, and TLS disable all succeeded.
+  The failed setup attempts documented the intended guards: credential export
+  requires an existing subscription-owned directory, SSH key access requires a
+  key first, and database deletion requires `--yes`.
 - [x] **Official-release Docker server test:** added a disposable Debian 13
   systemd-capable container that installs `provctl` only from the signed
   GitHub Pages APT repository, then exercises bootstrap, doctor, subscription

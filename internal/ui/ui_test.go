@@ -824,7 +824,7 @@ func TestModel_PHPChangeStreamsApplyAndRefreshSteps(t *testing.T) {
 	}
 	updated, _ = m.Update(next())
 	m = updated.(appModel)
-	if m.progress != (progressState{}) || m.websites[0].PHPVersion != "8.3" {
+	if m.progress.active || m.progress.title != "" || len(m.progress.steps) != 0 || m.progress.ch != nil || m.progress.cancel != nil || m.progress.pendingMsg != nil || m.websites[0].PHPVersion != "8.3" {
 		t.Fatalf("final PHP refresh = progress:%#v websites:%#v", m.progress, m.websites)
 	}
 	if m.focus != focusWebsites {
