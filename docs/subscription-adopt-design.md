@@ -1,11 +1,10 @@
-# Subscription Adopt Design
+# Subscription adoption
 
-`subscription adopt` migrates one existing document root into one new
-subscription. It is a production mutation and must use one journaled plan;
-it must not compose the existing `subscription create` and `website create`
-commands as separate operations.
+`provctl subscription adopt` imports one existing project into a new managed
+subscription through a single journaled operation. It is available from the
+CLI and from the subscription picker (`i`) in the TUI.
 
-## Contract
+## Command contract
 
 ```text
 provctl subscription adopt <name> --domain <domain>
@@ -14,110 +13,46 @@ provctl subscription adopt <name> --domain <domain>
     [--redirect-code 301|302] [--copy] [--no-backup] [--dry-run]
 ```
 
-`php-fpm` and `static` are data-bearing: their source must exist, be a
-directory, and must not resolve inside the configured vhosts root. The target
-is exactly
-`<vhosts>/<name>/sites/<domain>/public`; it must not exist. The domain and
-subscription name use the ordinary domain validators. `--copy` is opt-in;
-the default is an atomic rename on the same filesystem. Cross-filesystem
-renames fail with an actionable message rather than silently copying data.
-`proxy` and `redirect` do not take a source; both require `--target`, and a
-redirect accepts only status 301 or 302. Proxy targets pass the normal
-loopback/allowlist validation before any system mutation.
+`php-fpm` and `static` require `--from`: it must be an existing directory
+outside the managed vhosts root. The default is an atomic move into
+`<vhosts>/<name>/sites/<domain>/public`; `--copy` is explicit. A cross-device
+move fails safely rather than silently copying. A backup is created by default.
 
-### Ownership and container-runtime contract
+`proxy` and `redirect` have no document root. They require `--target`; proxy
+targets use the ordinary loopback/allowlist validation, while redirects accept
+only 301 or 302. They never inspect or alter Docker, Compose, or project-owned
+runtime files.
 
-Every data-bearing adoption (`php-fpm` and `static`) must
-finish by recursively assigning the adopted document root to the newly
-allocated subscription UID and GID. This is a required, journaled plan step
-after the move or copy, not an operator follow-up: the deployed PHP-FPM pool
-and any managed process must be able to write only as that subscription user.
-The implementation uses explicit `chown --recursive --no-dereference --
-<uid>:<gid> <document-root>` arguments through the command seam; future
-website types must preserve that behavior and test both its preview and call.
+## Safety and ownership
 
-Proxy adoption is different: an Apache proxy has no intrinsic document root,
-and provctl must not guess or rewrite arbitrary Docker Compose files. A proxy
-adoption may record the upstream and Apache/TLS artifacts, while a container
-backed application needs an explicit runtime mapping from the new subscription
-UID/GID to its image's environment (for example `UID` and `GID`). The scorely
-Compose setup is the reference shape: PHP and Apache images receive those
-values through environment variables. The TUI and CLI intentionally leave the
-runtime unchanged and explicitly say so; an operator who uses such a stack
-must apply its documented UID/GID mapping separately.
-It must never silently modify a project-owned `.env` file or grant the
-subscription user privileged Docker-daemon access.
+Data-bearing adoption creates the subscription identity and recursively assigns
+the final document root to its allocated UID:GID using explicit,
+non-symlink-following command arguments. This is part of the plan, not an
+operator follow-up. The operation validates source/destination, name and domain
+conflicts, and generated Apache configuration before committing metadata.
 
-## Plan order
+For a container-backed proxy, adapting the application process to the new
+UID:GID remains the operator's responsibility. Configure its documented
+runtime environment; do not grant the subscription access to the Docker daemon
+or ask provctl to rewrite `.env` or Compose files.
 
-### Accepted TLS identity decision
+## TLS lineage
 
-Adoption preserves the existing Certbot lineage instead of issuing a new
-certificate. `Website.CertificateName` is the persistent website-to-lineage
-mapping: ordinary creation defaults to `provctl-site-<id>`, while adoption
-may supply the validated original name. This uses the existing column and
-unique constraint; a lineage cannot silently become owned by two websites.
-Live certificate files remain authoritative for SANs and expiry.
+An adoption may connect a validated existing Certbot lineage to the imported
+website. The website stores the association; live Certbot files remain the
+source of certificate material and expiry. A lineage predating provctl is
+marked externally owned: deleting its adopted website removes generated vhost
+artifacts and local metadata but does not revoke that certificate.
 
-Certificate metadata records explicit ownership. Certificates issued by
-provctl are `managed`; an adopted lineage is not, even when its historical
-name happens to begin with `provctl-`. Deleting an adopted website removes its
-generated vhost and local metadata but deliberately leaves the Certbot
-lineage intact. This prevents a migration rollback or later website deletion
-from revoking a certificate that existed before provctl controlled the site.
+Renewal reconfiguration is guarded by a saved pre-change configuration under
+`/var/lib/provctl/renewal-backups/`. If the irreversible verification stage
+fails, the journal records an inconsistent operation and the prior renewal
+configuration remains available for recovery.
 
-Repository persistence supports this mapping. Adoption wiring, certificate
-validation, TLS activation, certificate metadata, and renewal rollback are
-still required before this decision is fully implemented.
+## Verification
 
-### Execution
-
-1. Inspect source, destination, Unix identity, database/domain conflicts, and
-   matching Certbot renewal lineages. Present all of these in dry-run output.
-2. Create a recoverable backup of the source when backup is enabled (default).
-3. Create the Unix user and subscription-owned base directories.
-4. Create the website/log/PHP-FPM artifacts required for a PHP-FPM website,
-   but leave its document root empty.
-5. Move or copy the source into the exact document root and recursively assign
-   it to the subscription UID/GID.
-6. Run Apache/PHP-FPM validation and enable the vhost.
-7. Write the subscription and website rows only after system artifacts exist.
-8. Reconfigure every discovered certificate lineage to the shared ACME
-   webroot, then run `certbot renew --cert-name <lineage> --dry-run`.
-
-Renewal configuration uses Certbot 2.3+ `reconfigure --authenticator webroot
---webroot-path <shared-root> --cert-name <lineage>`. It tests the new options
-against staging before saving them and preserves the live certificate. Do not
-use `certonly --keep-until-expiring` here: it can issue a replacement when the
-certificate is nearing expiration. See the
-[Certbot renewal configuration guide](https://eff-certbot.readthedocs.io/en/stable/using.html#modifying-the-renewal-configuration-of-existing-certificates).
-
-After the system artifacts and SQLite rows are durable, the plan writes an
-explicit recovery boundary before modifying renewal configuration. If
-certificate renewal verification then fails, the operation is recorded as
-`inconsistent`: the adopted data and metadata remain available, while the
-captured pre-change renewal configuration is restored for manual recovery.
-Failures before that boundary roll back normally.
-
-## Required seams and tests
-
-Renewal snapshots are retained at
-`/var/lib/provctl/renewal-backups/<lineage>/<UTC timestamp>-<nonce>/`.
-`renewal.conf` holds the original bytes; `restore.txt` records the destination
-and original file mode. Backups use private directories and mode 0600 files.
-They remain after success or rollback for recovery after a process crash.
-For manual recovery, stop concurrent provisioning/Certbot work, review the
-recorded destination and original contents, restore with the recorded mode,
-then verify renewal. This is not automatic crash recovery or backup rotation.
-
-- `system.FileMover` for same-filesystem rename; a dedicated copy seam for
-  `--copy`, never a shell string.
-- a command seam for recursive ownership, using explicit `chown` arguments;
-  no user input reaches a shell.
-- a renewal inspector/reconfigurer seam, with tests for no certificate,
-  multiple SAN lineages, reconfiguration failure, and failed renewal dry-run.
-- fake-FS plan tests for destination escape, pre-existing target, rollback
-  after every system step, and SQLite being written last.
-- an Incus test against a copied legacy document root. Pebble is required for
-  the certificate branch; its clean snapshot is deliberately separate from
-  the normal E2 image.
+Use `--dry-run` first. The repeatable PHP and non-PHP Incus scenarios are T17,
+T17b, and T17c in the [testing cookbook](testing-cookbook.md). T17c has been
+run against a freshly built package for static, proxy, redirect, and PHP-FPM:
+it verified content transfer, ownership, rendered vhosts, an HTTP response,
+and `apache2ctl configtest`.

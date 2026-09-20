@@ -91,11 +91,13 @@ scenarios, and Docker caveat are in the
 
 ## Documentation
 
-- [Project specification](docs/project-specification.md) — architecture and behavior contract
-- [Roadmap](docs/roadmap.md) — implemented scope and validation record
-- [Testing cookbook](docs/testing-cookbook.md) — Incus, package, and TLS test procedures
+- [Roadmap](docs/roadmap.md) — current scope, validation status, and deferred work
+- [Testing cookbook](docs/testing-cookbook.md) — repeatable local, Incus, package, and Pebble checks
+- [TUI design](docs/tui-design.md) — interaction model and implementation rules
+- [Subscription adoption](docs/subscription-adopt-design.md) — migration contract and operational limits
+- [TLS lifecycle](docs/ssl-project-issuance-review.md) — current certificate model and remaining work
 - [Signing-key operations](docs/apt-signing-keys.md) — key backup and recovery
-- [TLS issuance review](docs/ssl-project-issuance-review.md) — certificate lifecycle decisions
+- [Project specification](docs/project-specification.md) — detailed v1 architecture reference
 
 ## Safety
 

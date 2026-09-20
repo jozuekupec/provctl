@@ -211,7 +211,7 @@ diff -u testdata/packaging/contents.expected dist/contents.actual
 ### T05 — install / remove / purge
 
 ```bash
-sudo piuparts -d trixie dist/provctl_1.0.0_amd64.deb
+sudo piuparts -d trixie dist/provctl_<version>_amd64.deb
 ```
 
 **Očekávané:**
@@ -235,28 +235,28 @@ Debian 13 `piuparts 1.6.0` nepodporuje historický přepínač
 Potřebuješ dvě verze. Postav starší z tagu nebo jen s jiným `VERSION`:
 
 ```bash
-VERSION=0.9.0 ./scripts/build-deb.sh
-VERSION=1.0.0 ./scripts/build-deb.sh
+VERSION=<previous-version> ./scripts/build-deb.sh
+VERSION=<candidate-version> ./scripts/build-deb.sh
 
-sudo apt install ./dist/provctl_0.9.0_amd64.deb
-sudo apt install ./dist/provctl_1.0.0_amd64.deb
+sudo apt install ./dist/provctl_<previous-version>_amd64.deb
+sudo apt install ./dist/provctl_<candidate-version>_amd64.deb
 ```
 
 Pro stejný upgrade v izolovaném `pv` bez E1 nástrojů na hostu:
 
 ```bash
 ./scripts/tests/t06-piuparts-upgrade.sh \
-  dist/provctl_0.9.0_amd64.deb dist/provctl_1.0.0_amd64.deb
+  dist/provctl_<previous-version>_amd64.deb dist/provctl_<candidate-version>_amd64.deb
 ```
 
 **[MUST] Kontrola conffile** (piuparts sám nezkontroluje obsah upraveného configu) — v E2:
 
 ```bash
-apt install -y ./provctl_0.9.0_amd64.deb
+apt install -y ./provctl_<previous-version>_amd64.deb
 echo '# MOJE POZNAMKA' >> /etc/provctl/config.toml
 sed -i 's|^vhosts.*|vhosts = "/data/web/vhosts"|' /etc/provctl/config.toml
 
-apt install -y ./provctl_1.0.0_amd64.deb
+apt install -y ./provctl_<candidate-version>_amd64.deb
 
 grep -q 'MOJE POZNAMKA' /etc/provctl/config.toml && echo "OK: config zachován"
 grep -q '/data/web/vhosts'  /etc/provctl/config.toml && echo "OK: hodnota zachována"
@@ -303,8 +303,8 @@ selhání integračního testu.
 chmod +x scripts/e2.sh
 ./scripts/e2.sh status
 ./scripts/e2.sh reset
-./scripts/e2.sh push dist/provctl_1.0.0_amd64.deb
-./scripts/e2.sh sh 'dpkg -i /root/provctl_1.0.0_amd64.deb'
+./scripts/e2.sh push dist/provctl_0.0.0+git.<sha>_amd64.deb
+./scripts/e2.sh sh 'dpkg -i /root/provctl_0.0.0+git.<sha>_amd64.deb'
 ```
 
 Vyžaduje to aktivní členství ve skupině `incus-admin` (po `usermod` se nově
@@ -315,10 +315,10 @@ mutujícím scénářem jej spusť znovu.
 ### Ruční TUI smoke test jedním příkazem
 
 `scripts/dev/run-tui-test.sh` je určený výhradně pro ruční kontrolu v reálném
-terminálu. Standardně obnoví izolovaný kontejner `pv-tls-debug-20260913` na
-fixture `tui-ssh-key-picker`, sestaví právě checkoutnutý balíček, nainstaluje
-jej do kontejneru a bez mezikroku otevře TUI. Vybraný kontejner se obnovuje,
-proto jej nikdy nenastavuj na pracovní `pv`.
+terminálu. Standardně obnoví `pv` na `clean`, sestaví právě checkoutnutý
+balíček, nainstaluje jej, provede potvrzený bootstrap a bez mezikroku otevře
+TUI. Po `q` nebo chybném ukončení znovu obnoví stejný snapshot; test proto
+nezanechá změny.
 
 ```bash
 ./scripts/dev/run-tui-test.sh
@@ -328,7 +328,7 @@ Volitelně lze předat již sestavený `.deb`, například pro reprodukci konkr�
 verze. `q` ukončí TUI a vrátí se do hostitelského shellu:
 
 ```bash
-./scripts/dev/run-tui-test.sh dist/provctl_0.0.0+git.bfc8d57_amd64.deb
+./scripts/dev/run-tui-test.sh dist/provctl_0.0.0+git.<sha>_amd64.deb
 ```
 
 ### Docker: ostrý test veřejného release
@@ -346,11 +346,11 @@ spouštěj jen v jednorázové VM nebo CI a potvrď jej explicitně:
 PROVCTL_ALLOW_PRIVILEGED=1 ./scripts/test-release-docker.sh
 ```
 
-Výchozí očekávaná veřejná verze je `0.1.2`. Po novém release ji explicitně
-změň, aby test neakceptoval nečekaný starší balíček:
+Výchozí očekávaná veřejná verze je aktuální stable `0.1.5`. Při novém release
+ji změň spolu s tagem, aby test neakceptoval nečekaný starší balíček:
 
 ```bash
-PROVCTL_EXPECTED_VERSION=0.1.3 ./scripts/test-release-docker.sh
+PROVCTL_EXPECTED_VERSION=<release-version> ./scripts/test-release-docker.sh
 ```
 
 Pokud ne, funguje stejně `lxd` (snap) nebo přejdi na E4 (VM). Docker se pro tohle **nedoporučuje** — bez systemd nemá `systemctl` co dělat a testoval bys jinou cestu kódem než produkční.
@@ -372,25 +372,15 @@ Reset před každým testem (sekundy):
 incus snapshot restore pv clean
 ```
 
-Helper skript `scripts/e2.sh`:
-
-```bash
-#!/bin/sh
-set -e
-CT=pv
-case "$1" in
-  reset) incus snapshot restore $CT clean ;;
-  push)  incus file push "$2" $CT/root/ ;;
-  sh)    shift; incus exec $CT -- sh -c "$*" ;;
-esac
-```
+Používej aktuální helper `scripts/e2.sh`; nevkládej jeho zkrácenou kopii do
+nových testů. `./scripts/e2.sh help` vypíše přesné podporované příkazy.
 
 ### T07 — doctor na čistém serveru
 
 ```bash
 ./scripts/e2.sh reset
-./scripts/e2.sh push dist/provctl_1.0.0_amd64.deb
-./scripts/e2.sh sh 'apt install -y /root/provctl_1.0.0_amd64.deb'
+./scripts/e2.sh push dist/provctl_0.0.0+git.<sha>_amd64.deb
+./scripts/e2.sh sh 'apt install -y /root/provctl_0.0.0+git.<sha>_amd64.deb'
 ./scripts/e2.sh sh 'provctl doctor; echo "exit=$?"'
 ```
 
@@ -680,7 +670,7 @@ zálohy.
 ./scripts/e2.sh reset
 # simulace tvého současného stavu
 ./scripts/e2.sh sh 'mkdir -p /var/www/stary.test && echo "<?php echo \"STARY\";" > /var/www/stary.test/index.php'
-./scripts/e2.sh sh 'apt install -y /root/provctl_1.0.0_amd64.deb && provctl bootstrap --install-missing --yes'
+./scripts/e2.sh sh 'apt install -y /root/provctl_0.0.0+git.<sha>_amd64.deb && provctl bootstrap --install-missing --yes'
 
 ./scripts/e2.sh sh 'provctl subscription adopt stary --from /var/www/stary.test --domain stary.test --dry-run'
 ./scripts/e2.sh sh 'provctl subscription adopt stary --from /var/www/stary.test --domain stary.test'
@@ -721,16 +711,16 @@ neobsahuje, proto je tento follow-up oddělený od standardního E2 průchodu.
 
 ### T17b — adopt s existujícím TLS lineage
 
-T17b vytvoří na izolované instanci funkční legacy vhost, vydá jeho certifikát
-přes Pebble a teprve pak provede adopci. Ověřuje přechod původního webrootu na
-centrální ACME webroot, TLS vhost, forced renewal a zachování cizího lineage po
-smazání provctl website. Nezasahuje do interaktivního `pv`, pokud použiješ
-debug instanci a její snapshot:
+T17b vytvoří v jednorázově zvoleném Incus kontejneru funkční legacy vhost,
+vydá jeho certifikát přes Pebble a teprve pak provede adopci. Ověřuje přechod
+původního webrootu na centrální ACME webroot, TLS vhost, forced renewal a
+zachování cizího lineage po smazání provctl website. Použij vlastní klon
+`pv` se snapshotem `clean`; nikdy neexistující historickou fixture:
 
 ```bash
 PATH=/home/linuxbrew/.linuxbrew/bin:$PATH \
-PROVCTL_E2_INSTANCE=pv-tls-debug-20260913 \
-PROVCTL_E2_SNAPSHOT=isolated-clean \
+PROVCTL_E2_INSTANCE=<disposable-pv-clone> \
+PROVCTL_E2_SNAPSHOT=clean \
 PROVCTL_E2_REGENERATE_NIC=true \
   ./scripts/tests/t17-adopt-tls.sh dist/provctl_*.deb /tmp/provctl-pebble
 ```
@@ -745,7 +735,7 @@ Pebble stejně jako T16 a není součástí `run-all.sh`.
 incus file push -r out/debian pv/srv/
 ./scripts/e2.sh sh 'echo "deb [trusted=yes] file:///srv/debian stable main" > /etc/apt/sources.list.d/provctl.list'
 ./scripts/e2.sh sh 'apt update && apt-cache policy provctl'
-./scripts/e2.sh sh 'apt install -y provctl && provctl --version'
+./scripts/e2.sh sh 'apt install -y provctl && dpkg-query -W provctl'
 ```
 
 **Očekávané:** `apt-cache policy` ukazuje správnou verzi z lokálního repa; instalace projde závislostmi.
@@ -756,7 +746,7 @@ Test povýšení verze:
 VERSION=1.1.0 ./scripts/build-deb.sh && ./scripts/build-apt-repo.sh out/debian
 incus file push -r out/debian pv/srv/
 ./scripts/e2.sh sh 'apt update && apt list --upgradable | grep provctl'
-./scripts/e2.sh sh 'apt upgrade -y && provctl --version'
+./scripts/e2.sh sh 'apt upgrade -y && dpkg-query -W provctl'
 ```
 
 **Ověř také řazení RC verzí:**
@@ -945,8 +935,8 @@ scripts/
 `run-all.sh` přijímá aktuální `.deb` a volitelně starší `.deb` pro T06:
 
 ```bash
-./scripts/tests/run-all.sh dist/provctl_1.0.0_amd64.deb \
-  dist/provctl_0.9.0_amd64.deb
+./scripts/tests/run-all.sh dist/provctl_0.0.0+git.<sha>_amd64.deb \
+  dist/provctl_<previous-version>_amd64.deb
 ```
 
 Spouští T04, T05, volitelné T06, T10 a T17 v tomto pořadí. Při prvním selhání

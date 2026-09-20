@@ -1,4 +1,11 @@
-# provctl — implementační zadání (v1, pro předání implementačnímu agentovi)
+# provctl — architecture and behavior specification
+
+> **Status (2026-09-20):** This is the detailed v1 architecture reference.
+> The implemented scope and outstanding work are maintained in the
+> [roadmap](roadmap.md); repeatable verification belongs in the
+> [testing cookbook](testing-cookbook.md). Where an older planning statement
+> conflicts with those documents or the running CLI, the roadmap and tested
+> implementation take precedence.
 
 **Status dokumentu:** závazné zadání pro implementaci v0.1.
 **Cílový čtenář:** implementační agent (Codex) + autor projektu.
@@ -1713,14 +1720,14 @@ dpkg-deb --info dist/provctl_*.deb          # kontrola control, závislostí, co
 **[MUST]** `piuparts` je nástroj přesně na tohle — instaluje balíček v čistém chrootu, znovu ho odinstaluje a purguje, a hlásí každý soubor, který po sobě balíček nechal:
 
 ```bash
-sudo piuparts -d trixie --warn-on-leftover-files dist/provctl_1.0.0_amd64.deb
+sudo piuparts -d trixie dist/provctl_<version>_amd64.deb
 ```
 
 **[MUST]** Test upgradu (potřebuje dvě verze):
 
 ```bash
 sudo piuparts -d trixie --warn-on-leftover-files \
-     dist/provctl_0.9.0_amd64.deb dist/provctl_1.0.0_amd64.deb
+     dist/provctl_<previous-version>_amd64.deb dist/provctl_<candidate-version>_amd64.deb
 ```
 
 Toto je jediný spolehlivý způsob, jak ověřit, že upgrade **nepřepsal `/etc/provctl/config.toml`** a že `purge` nesmazal nic ze zákaznických dat.
@@ -1735,8 +1742,8 @@ Chroot neumí systemd, Apache ani MariaDB. Skutečné ověření vyžaduje VM ne
 
 ```bash
 incus launch images:debian/13 provctl-test
-incus file push dist/provctl_1.0.0_amd64.deb provctl-test/root/
-incus exec provctl-test -- apt install -y /root/provctl_1.0.0_amd64.deb
+incus file push dist/provctl_<version>_amd64.deb provctl-test/root/
+incus exec provctl-test -- apt install -y /root/provctl_<version>_amd64.deb
 incus exec provctl-test -- provctl doctor
 incus exec provctl-test -- provctl bootstrap --install-missing --yes
 incus exec provctl-test -- provctl subscription create acme
