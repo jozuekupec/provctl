@@ -959,6 +959,14 @@ kontejner obnoven na `clean`.
   ./...` and `go test ./... -race -count=1` passed; `make test` remains blocked
   only because `staticcheck` is not currently installed on the host PATH.
 
+- [~] **Typed operation pipeline:** `plan.Executor` now publishes a typed,
+  context-scoped progress stream: the immutable step list followed by running,
+  done, failed and rolled-back transitions. The stream deliberately omits
+  command previews and errors to keep terminal progress safe. Its focused
+  executor test and the service suite pass with `-race`. The next slice wires
+  this stream into Bubble Tea and migrates PHP-FPM first, then the remaining
+  service-backed mutations.
+
 - [x] **TUI administration refinements:** Settings now uses the installed
   PHP-FPM version picker for `php.default_version`; selection stays pending
   until `Ctrl+S`, and the same popup marks the configured value. Cron's `n`

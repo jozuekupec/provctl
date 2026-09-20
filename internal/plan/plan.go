@@ -3,6 +3,34 @@ package plan
 
 import "context"
 
+type progressKey struct{}
+
+// ProgressEvent describes the executor's real plan and step transitions. It
+// deliberately exposes names and statuses only; previews may contain paths or
+// command details that do not belong in an interactive progress surface.
+type ProgressEvent struct {
+	Steps  []StepState
+	Index  int
+	Status StepStatus
+}
+
+// ProgressReporter receives executor events from the goroutine that runs the
+// plan. Consumers must return promptly; long-running UI work belongs outside
+// the reporter.
+type ProgressReporter func(ProgressEvent)
+
+// WithProgress attaches an optional observer to one plan execution.
+func WithProgress(ctx context.Context, reporter ProgressReporter) context.Context {
+	return context.WithValue(ctx, progressKey{}, reporter)
+}
+
+func reportProgress(ctx context.Context, event ProgressEvent) {
+	reporter, _ := ctx.Value(progressKey{}).(ProgressReporter)
+	if reporter != nil {
+		reporter(event)
+	}
+}
+
 type Step struct {
 	Name       string
 	Preview    string
@@ -25,6 +53,7 @@ type StepStatus string
 
 const (
 	StepPending    StepStatus = "pending"
+	StepRunning    StepStatus = "running"
 	StepDone       StepStatus = "done"
 	StepFailed     StepStatus = "failed"
 	StepRolledBack StepStatus = "rolled_back"

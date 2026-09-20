@@ -107,6 +107,51 @@ func TestExecutor_CommitBoundaryPreservesPriorStepsAfterLaterFailure(t *testing.
 	}
 }
 
+func TestExecutor_ReportsPlanAndStepTransitions(t *testing.T) {
+	journal, locker := &testJournal{}, &testLocker{}
+	var events []ProgressEvent
+	ctx := WithProgress(context.Background(), func(event ProgressEvent) {
+		events = append(events, event)
+	})
+	_, err := (Executor{Journal: journal, Locker: locker}).Run(ctx, Plan{Action: "test", Target: "target", Steps: []Step{
+		{Name: "first", Do: func(context.Context) error { return nil }},
+		{Name: "second", Do: func(context.Context) error { return errors.New("boom") }},
+	}})
+	if err == nil {
+		t.Fatal("Run() error = nil, want failure")
+	}
+	if got, want := events[0].Steps, []StepState{{Name: "first", Status: StepPending}, {Name: "second", Status: StepPending}}; !equalStepStates(got, want) {
+		t.Fatalf("plan event = %#v, want %#v", got, want)
+	}
+	if got, want := events[1:], []ProgressEvent{{Index: 0, Status: StepRunning}, {Index: 0, Status: StepDone}, {Index: 1, Status: StepRunning}, {Index: 1, Status: StepFailed}}; !equalProgressEvents(got, want) {
+		t.Fatalf("progress events = %#v, want %#v", got, want)
+	}
+}
+
+func equalStepStates(got, want []StepState) bool {
+	if len(got) != len(want) {
+		return false
+	}
+	for index := range got {
+		if got[index] != want[index] {
+			return false
+		}
+	}
+	return true
+}
+
+func equalProgressEvents(got, want []ProgressEvent) bool {
+	if len(got) != len(want) {
+		return false
+	}
+	for index := range got {
+		if got[index].Index != want[index].Index || got[index].Status != want[index].Status || len(got[index].Steps) != 0 {
+			return false
+		}
+	}
+	return true
+}
+
 func equalStrings(got, want []string) bool {
 	if len(got) != len(want) {
 		return false

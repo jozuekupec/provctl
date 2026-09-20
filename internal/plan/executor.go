@@ -67,6 +67,7 @@ func (executor Executor) Run(ctx context.Context, operation Plan) (operationID i
 	}
 	defer unlock()
 	snapshot := NewSnapshot(operation)
+	reportProgress(ctx, ProgressEvent{Steps: append([]StepState(nil), snapshot.Steps...), Index: -1})
 	id, err := executor.Journal.Start(ctx, snapshot)
 	if err != nil {
 		return 0, fmt.Errorf("start operation journal: %w", err)
@@ -77,10 +78,12 @@ func (executor Executor) Run(ctx context.Context, operation Plan) (operationID i
 		if step.Do == nil {
 			return id, executor.fail(ctx, id, operation, snapshot, completed, committed, index, errors.New("step has no action"))
 		}
+		reportProgress(ctx, ProgressEvent{Index: index, Status: StepRunning})
 		if err := step.Do(ctx); err != nil {
 			return id, executor.fail(ctx, id, operation, snapshot, completed, committed, index, err)
 		}
 		snapshot.Steps[index].Status = StepDone
+		reportProgress(ctx, ProgressEvent{Index: index, Status: StepDone})
 		completed = append(completed, index)
 		if err := executor.Journal.Update(ctx, id, OperationRunning, snapshot, ""); err != nil {
 			return id, executor.rollback(ctx, id, operation, snapshot, completed, committed, fmt.Errorf("record completed step: %w", err))
@@ -98,6 +101,7 @@ func (executor Executor) Run(ctx context.Context, operation Plan) (operationID i
 
 func (executor Executor) fail(ctx context.Context, id int64, operation Plan, snapshot Snapshot, completed []int, committed []string, failed int, cause error) error {
 	snapshot.Steps[failed].Status, snapshot.Steps[failed].Error = StepFailed, cause.Error()
+	reportProgress(ctx, ProgressEvent{Index: failed, Status: StepFailed})
 	_ = executor.Journal.Update(ctx, id, OperationRunning, snapshot, cause.Error())
 	return executor.rollback(ctx, id, operation, snapshot, completed, committed, cause)
 }
@@ -117,6 +121,7 @@ func (executor Executor) rollback(ctx context.Context, id int64, operation Plan,
 			continue
 		}
 		snapshot.Steps[index].Status = StepRolledBack
+		reportProgress(ctx, ProgressEvent{Index: index, Status: StepRolledBack})
 		_ = executor.Journal.Update(ctx, id, OperationRunning, snapshot, cause.Error())
 	}
 	status := OperationRolledBack
