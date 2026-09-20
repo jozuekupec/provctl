@@ -1010,7 +1010,10 @@ kontejner obnoven na `clean`.
   HTTP-01 issuance, forced renewal, deploy hook, and TLS disable all succeeded.
   The failed setup attempts documented the intended guards: credential export
   requires an existing subscription-owned directory, SSH key access requires a
-  key first, and database deletion requires `--yes`.
+  key first, and database deletion requires `--yes`. A fresh current-package
+  Incus fixture also opened the real alternate-screen TUI and rendered its
+  subscription list, including the newly created PHP-FPM subscription, before
+  it too was restored to `isolated-clean`.
 - [x] **Official-release Docker server test:** added a disposable Debian 13
   systemd-capable container that installs `provctl` only from the signed
   GitHub Pages APT repository, then exercises bootstrap, doctor, subscription
