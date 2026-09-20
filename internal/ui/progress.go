@@ -23,11 +23,13 @@ type progressStep struct {
 }
 
 type progressState struct {
-	title  string
-	steps  []progressStep
-	active bool
-	ch     chan tea.Msg
-	cancel context.CancelFunc
+	title           string
+	steps           []progressStep
+	active          bool
+	awaitingDismiss bool
+	pendingMsg      tea.Msg
+	ch              chan tea.Msg
+	cancel          context.CancelFunc
 }
 
 type progressStartMsg struct {
@@ -87,6 +89,20 @@ func steppedCmd(title string, labels []string, work func(context.Context, func(i
 
 func operationFailed(message tea.Msg) bool {
 	switch result := message.(type) {
+	case sshAccessChangedMsg:
+		return result.err != nil
+	case sshKeyAddedMsg:
+		return result.err != nil
+	case sshKeyRemovedMsg:
+		return result.err != nil
+	case cronJobCreatedMsg:
+		return result.err != nil
+	case cronJobUpdatedMsg:
+		return result.err != nil
+	case cronJobRemovedMsg:
+		return result.err != nil
+	case backupCreatedMsg:
+		return result.err != nil
 	case websiteChangedMsg:
 		return result.err != nil
 	case websiteTLSChangedMsg:
@@ -97,13 +113,11 @@ func operationFailed(message tea.Msg) bool {
 		return result.err != nil
 	case reconcileFinishedMsg:
 		return result.err != nil
-	case sshAccessChangedMsg:
-		return result.err != nil
-	case sshKeyAddedMsg:
-		return result.err != nil
 	case websitePHPChangedMsg:
 		return result.err != nil
 	case websiteDocumentRootChangedMsg:
+		return result.err != nil
+	case websiteLogDirectoryChangedMsg:
 		return result.err != nil
 	case websiteCreatedMsg:
 		return result.err != nil
@@ -113,8 +127,33 @@ func operationFailed(message tea.Msg) bool {
 		return result.err != nil
 	case websiteDeletedMsg:
 		return result.err != nil
+	case subscriptionDeletedMsg:
+		return result.err != nil
+	case databaseCreatedMsg:
+		return result.err != nil
+	case databasePasswordChangedMsg:
+		return result.err != nil
+	case databaseDeletedMsg:
+		return result.err != nil
 	}
 	return true
+}
+
+// isMutationResult separates a stepped command's terminal result from its
+// progress stream messages and unrelated read operations.
+func isMutationResult(message tea.Msg) bool {
+	switch message.(type) {
+	case sshAccessChangedMsg, sshKeyAddedMsg, sshKeyRemovedMsg,
+		cronJobCreatedMsg, cronJobUpdatedMsg, cronJobRemovedMsg, backupCreatedMsg,
+		websiteChangedMsg, websiteTLSChangedMsg, websiteDocumentRootChangedMsg,
+		websiteLogDirectoryChangedMsg, websiteCreatedMsg, websiteAliasChangedMsg,
+		websiteTargetChangedMsg, websiteDeletedMsg, subscriptionChangedMsg,
+		subscriptionDeletedMsg, subscriptionCreatedMsg, databaseCreatedMsg,
+		databasePasswordChangedMsg, databaseDeletedMsg, reconcileFinishedMsg,
+		websitePHPChangedMsg:
+		return true
+	}
+	return false
 }
 
 func (progress progressState) render() string {
@@ -138,7 +177,11 @@ func (progress progressState) render() string {
 // a persistent operation log and is not repurposed as a transient checklist.
 func (m appModel) progressPopup() string {
 	width := min(72, max(38, m.width-12))
-	lines := []string{m.progress.render(), "", dimStyle.Render("esc cancel · q quit")}
+	footer := "esc cancel · q quit"
+	if m.progress.awaitingDismiss {
+		footer = "enter/esc dismiss · q quit"
+	}
+	lines := []string{m.progress.render(), "", dimStyle.Render(footer)}
 	height := min(max(7, len(lines)+2), max(7, m.height-6))
 	return panel(m.progress.title, strings.Join(lines, "\n"), width, height, true)
 }

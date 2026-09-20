@@ -9,6 +9,9 @@ import (
 // handleKey routes a key by the current interaction mode. Keeping this apart
 // from Update makes the value-model message router easy to audit and test.
 func (m appModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if m.progress.active {
+		return m.handleProgressKey(msg)
+	}
 	if m.pathPicker.open {
 		return m.handlePathPickerKey(msg)
 	}
@@ -68,21 +71,6 @@ func (m appModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 	if !m.workspace {
 		return m.handlePickerKey(msg)
-	}
-	if m.progress.active {
-		switch msg.String() {
-		case "esc":
-			if m.progress.cancel != nil {
-				m.progress.cancel()
-			}
-			m.status = "cancelling change…"
-		case "q", "ctrl+c":
-			if m.progress.cancel != nil {
-				m.progress.cancel()
-			}
-			return m, tea.Quit
-		}
-		return m, nil
 	}
 	switch actionFor(m.shortcutContext(), msg.String()) {
 	case actionSettings:
@@ -147,6 +135,40 @@ func (m appModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.focus = focusRight(m.focus)
 	case actionPanelPrevious:
 		m.focus = focusLeft(m.focus)
+	}
+	return m, nil
+}
+
+// handleProgressKey keeps a failed checklist on screen until it has been read.
+// The deferred result re-enters Update so existing result handlers keep their
+// normal status, output, and refresh behavior.
+func (m appModel) handleProgressKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if m.progress.awaitingDismiss {
+		switch msg.String() {
+		case "q", "ctrl+c":
+			return m, tea.Quit
+		case "enter", "esc":
+			pending := m.progress.pendingMsg
+			m.progress = progressState{}
+			if pending == nil {
+				return m, nil
+			}
+			return m.Update(pending)
+		}
+		return m, nil
+	}
+
+	switch msg.String() {
+	case "esc":
+		if m.progress.cancel != nil {
+			m.progress.cancel()
+		}
+		m.status = "cancelling change…"
+	case "q", "ctrl+c":
+		if m.progress.cancel != nil {
+			m.progress.cancel()
+		}
+		return m, tea.Quit
 	}
 	return m, nil
 }

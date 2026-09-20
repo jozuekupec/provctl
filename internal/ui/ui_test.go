@@ -11,6 +11,7 @@ import (
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/google/go-cmp/cmp"
 
 	"provctl/internal/config"
 	"provctl/internal/domain"
@@ -496,6 +497,18 @@ func TestModel_RefreshCancelsPreviousRead(t *testing.T) {
 	}
 }
 
+func TestModel_InitialSubscriptionResponseCannotOverwriteRefresh(t *testing.T) {
+	m := New(Deps{LoadSubscriptions: func(context.Context) ([]domain.Subscription, error) { return nil, nil }})
+	m.items = []domain.Subscription{{ID: 2, Name: "fresh"}}
+	m, _ = m.startSubscriptions()
+
+	updated, _ := m.Update(subscriptionsLoadedMsg{generation: 0, items: []domain.Subscription{{ID: 1, Name: "stale"}}})
+	got := updated.(appModel)
+	if diff := cmp.Diff([]domain.Subscription{{ID: 2, Name: "fresh"}}, got.items); diff != "" {
+		t.Fatalf("stale initial response overwrote refresh (-want +got):\n%s", diff)
+	}
+}
+
 func TestModel_DetailUsesSelectedWebsite(t *testing.T) {
 	m := New(Deps{})
 	m.showWebsites = true
@@ -801,6 +814,30 @@ func TestModel_PHPChangeStreamsApplyAndRefreshSteps(t *testing.T) {
 	}
 	if m.focus != focusWebsites {
 		t.Fatalf("completed operation changed focus to %v", m.focus)
+	}
+}
+
+func TestModel_FailedProgressWaitsForDismissal(t *testing.T) {
+	m := New(Deps{})
+	m.workspace, m.focus = true, focusWebsites
+	m.progress = progressState{active: true, title: "Update website", steps: []progressStep{{label: "apply configuration", state: stepFailed}}}
+
+	updated, command := m.Update(websiteChangedMsg{domain: "app.example.test", err: fmt.Errorf("Apache validation failed")})
+	m = updated.(appModel)
+	if command != nil || !m.progress.active || !m.progress.awaitingDismiss || m.progress.pendingMsg == nil {
+		t.Fatalf("failed result did not remain visible: %#v", m.progress)
+	}
+	if !strings.Contains(m.progressPopup(), "enter/esc dismiss") {
+		t.Fatalf("failed progress footer = %q", m.progressPopup())
+	}
+
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = updated.(appModel)
+	if m.progress.active || m.progress.pendingMsg != nil {
+		t.Fatalf("dismissed progress = %#v", m.progress)
+	}
+	if !strings.Contains(m.status, "website change failed") || !strings.Contains(strings.Join(m.output.lines, "\n"), "Apache validation failed") {
+		t.Fatalf("deferred result was not applied: status=%q output=%#v", m.status, m.output)
 	}
 }
 

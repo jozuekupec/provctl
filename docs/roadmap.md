@@ -928,6 +928,37 @@ kontejner obnoven na `clean`.
 
 ## Follow-up scope after v0.1
 
+- [~] **CR 2026-09-20 — current TUI against refreshed branchctl and cookbook:**
+  `branchctl` and the personal Bubble Tea cookbook were fast-forwarded before
+  this review. The immediate correctness finding is that `New.Init()` starts
+  subscription loading with generation `0`, while `opSlot.stale(0)` always
+  returns false. A delayed initial reply can therefore overwrite a later
+  explicit refresh; initialize through the same `opSlot.start()` path and add
+  a regression test. The next focused TUI improvement is to move mutation
+  stages from UI-owned positional labels into a typed domain pipeline plan,
+  then keep a failed progress checklist open until Enter/Esc acknowledges it.
+  This preserves non-fatal skipped/failed stages that are currently hidden
+  when each final message immediately clears `m.progress.active`. Extracting
+  the repeated final-result handling from `ui.go` into one operation-result
+  applicator is a prerequisite. The existing binding table, popup classes,
+  path picker, generation guards for normal reads, minimum-terminal guard and
+  focused layout tests already match the current reference patterns; no broad
+  UI rewrite is warranted.
+
+- [x] **TUI read-race and failed-progress follow-up:** `opSlot` now compares
+  every generation, including the initial generation `0`, so an initial
+  subscription reply cannot overwrite a later refresh. A regression test
+  covers that ordering. A failed terminal result of every stepped mutation now
+  keeps its checklist modal open, with `Enter`/`Esc` explicitly dismissing it
+  before the existing result handler writes the error and any follow-up state.
+  The modal has priority over all underlying forms, its footer changes to
+  document the acknowledgement, and a focused test verifies both defer and
+  apply. The remaining review follow-up is to make mutation stage definitions
+  typed domain pipeline plans rather than UI-owned positional labels; defer
+  the larger result-handler extraction until that refactor can use it. `go vet
+  ./...` and `go test ./... -race -count=1` passed; `make test` remains blocked
+  only because `staticcheck` is not currently installed on the host PATH.
+
 - [x] **TUI administration refinements:** Settings now uses the installed
   PHP-FPM version picker for `php.default_version`; selection stays pending
   until `Ctrl+S`, and the same popup marks the configured value. Cron's `n`

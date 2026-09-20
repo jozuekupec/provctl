@@ -31,7 +31,7 @@ func (slot *opSlot) invalidate() {
 }
 
 func (slot *opSlot) stale(generation uint64) bool {
-	return generation != 0 && generation != slot.generation
+	return generation != slot.generation
 }
 
 func (slot *opSlot) finish(generation uint64) {

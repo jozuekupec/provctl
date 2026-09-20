@@ -11,6 +11,13 @@ import (
 )
 
 func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	if m.progress.active && isMutationResult(msg) && operationFailed(msg) {
+		m.progress.awaitingDismiss = true
+		m.progress.pendingMsg = msg
+		m.status = "change failed; review the checklist"
+		return m, nil
+	}
+
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width, m.height, m.ready = msg.Width, msg.Height, true
