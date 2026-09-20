@@ -1086,6 +1086,32 @@ func TestModel_CreateSubscriptionCallsDependency(t *testing.T) {
 	}
 }
 
+func TestModel_AdoptSubscriptionCallsDependencyWithOwnershipPreview(t *testing.T) {
+	var gotName string
+	var gotOptions service.SubscriptionAdoptOptions
+	m := New(Deps{
+		AdoptSubscription: func(_ context.Context, name string, options service.SubscriptionAdoptOptions) (int64, error) {
+			gotName, gotOptions = name, options
+			return 1, nil
+		},
+		LoadSubscriptions: func(context.Context) ([]domain.Subscription, error) { return nil, nil },
+	})
+	m = m.openSubscriptionAdoptForm()
+	m.subscriptionAdoptForm.name.SetValue("acme")
+	m.subscriptionAdoptForm.domain.SetValue("example.test")
+	m.subscriptionAdoptForm.source.SetValue("/legacy/example.test")
+	updated, _ := m.handleSubscriptionAdoptFormKey(tea.KeyMsg{Type: tea.KeyCtrlS})
+	m = updated.(appModel)
+	if m.confirm.action != "adopt-subscription" || m.confirm.word != "ADOPT" || !strings.Contains(strings.Join(m.confirm.lines, "\n"), "assigned to the new subscription UID:GID") {
+		t.Fatalf("adoption confirmation = %#v", m.confirm)
+	}
+	updated, command := m.runConfirmed()
+	m = runProgress(t, updated.(appModel), command)
+	if gotName != "acme" || gotOptions.Source != "/legacy/example.test" || gotOptions.Type != domain.WebsitePHPFPM || !gotOptions.Backup {
+		t.Fatalf("adoption call = %q %#v", gotName, gotOptions)
+	}
+}
+
 func TestSubscriptionCreateOptions_ParsesQuotas(t *testing.T) {
 	inputs := make([]textinput.Model, 5)
 	inputs[1].SetValue("2G")

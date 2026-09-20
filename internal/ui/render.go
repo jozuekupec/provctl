@@ -55,6 +55,9 @@ func (m appModel) View() string {
 	if m.subscriptionCreateForm.open {
 		return m.overlayCenter(m.subscriptionCreateFormPopup(), view)
 	}
+	if m.subscriptionAdoptForm.open {
+		return m.overlayCenter(m.subscriptionAdoptFormPopup(), view)
+	}
 	if m.databaseCreateForm.open {
 		return m.overlayCenter(m.databaseCreateFormPopup(), view)
 	}

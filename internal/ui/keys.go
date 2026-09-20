@@ -33,6 +33,9 @@ func (m appModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if m.subscriptionCreateForm.open {
 		return m.handleSubscriptionCreateFormKey(msg)
 	}
+	if m.subscriptionAdoptForm.open {
+		return m.handleSubscriptionAdoptFormKey(msg)
+	}
 	if m.databaseCreateForm.open {
 		return m.handleDatabaseCreateFormKey(msg)
 	}
@@ -240,6 +243,8 @@ func (m appModel) handlePickerKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m = m.openSSHAccessForm()
 	case actionCreate:
 		m = m.openSubscriptionCreateForm()
+	case actionAdopt:
+		m = m.openSubscriptionAdoptForm()
 	case actionOpen:
 		if len(m.visibleSubscriptions()) == 0 {
 			return m, nil

@@ -502,6 +502,42 @@ func TestSubscriptionService_PrepareAdoptRejectsSourceInsideVHosts(t *testing.T)
 	}
 }
 
+func TestSubscriptionService_PrepareAdoptStaticRetainsDataTransfer(t *testing.T) {
+	fs := &subscriptionFS{directories: map[string]bool{"/legacy/example.test": true}}
+	store := &subscriptionStore{values: map[string]domain.Subscription{}, domains: map[string]bool{}}
+	service := newSubscriptionService(fs, &subscriptionUsers{}, store, &subscriptionJournal{})
+	service.Commands, service.Apache = &fake.Commander{}, websiteApache{}
+	operation, err := service.PrepareAdopt(context.Background(), "acme", SubscriptionAdoptOptions{Source: "/legacy/example.test", Domain: "example.test", Type: domain.WebsiteStatic})
+	if err != nil {
+		t.Fatalf("PrepareAdopt() error = %v", err)
+	}
+	for _, step := range operation.Steps {
+		if step.Name == "install PHP-FPM pool" {
+			t.Fatal("static adoption unexpectedly installs a PHP-FPM pool")
+		}
+		if step.Name == "assign document root ownership" {
+			return
+		}
+	}
+	t.Fatal("static adoption is missing ownership reassignment")
+}
+
+func TestSubscriptionService_PrepareAdoptProxyNeedsNoDocumentRoot(t *testing.T) {
+	fs := &subscriptionFS{directories: map[string]bool{}}
+	store := &subscriptionStore{values: map[string]domain.Subscription{}, domains: map[string]bool{}}
+	service := newSubscriptionService(fs, &subscriptionUsers{}, store, &subscriptionJournal{})
+	service.Commands, service.Apache = &fake.Commander{}, websiteApache{}
+	operation, err := service.PrepareAdopt(context.Background(), "acme", SubscriptionAdoptOptions{Domain: "example.test", Type: domain.WebsiteProxy, Target: "http://127.0.0.1:8080"})
+	if err != nil {
+		t.Fatalf("PrepareAdopt() error = %v", err)
+	}
+	for _, step := range operation.Steps {
+		if strings.Contains(step.Name, "document root") || step.Name == "install PHP-FPM pool" {
+			t.Fatalf("proxy adoption unexpectedly mutates data path: %q", step.Name)
+		}
+	}
+}
+
 func TestSubscriptionService_AdoptMovesDataAndRecordsWebsite(t *testing.T) {
 	fs := &subscriptionFS{directories: map[string]bool{"/legacy/example.test": true}}
 	users := &subscriptionUsers{}

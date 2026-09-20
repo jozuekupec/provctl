@@ -38,7 +38,3 @@ func (m appModel) overlayCenter(foreground, background string) string {
 	y := max(0, (m.height-len(foregroundLines))/2)
 	return placeOverlay(x, y, foreground, background)
 }
-
-func (m appModel) popupWidth() int {
-	return min(72, max(32, m.width-12))
-}

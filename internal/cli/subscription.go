@@ -31,14 +31,16 @@ func newSubscriptionCommand() *cobra.Command {
 }
 
 func newSubscriptionAdoptCommand() *cobra.Command {
-	var configPath, source, domainName string
+	var configPath, source, domainName, target string
+	var kind string
+	var redirectCode int
 	var copyData, noBackup, dryRun bool
-	command := &cobra.Command{Use: "adopt <name>", Short: "adopt an existing document root as a PHP-FPM website", Args: cobra.ExactArgs(1), RunE: func(command *cobra.Command, args []string) error {
+	command := &cobra.Command{Use: "adopt <name>", Short: "adopt a legacy PHP-FPM, static, proxy, or redirect website", Args: cobra.ExactArgs(1), RunE: func(command *cobra.Command, args []string) error {
 		cfg, err := config.Load(configPath)
 		if err != nil {
 			return fmt.Errorf("load configuration: %w", err)
 		}
-		options := service.SubscriptionAdoptOptions{Source: source, Domain: domainName, Copy: copyData, Backup: !noBackup}
+		options := service.SubscriptionAdoptOptions{Source: source, Domain: domainName, Type: domain.WebsiteType(kind), Target: target, RedirectCode: redirectCode, Copy: copyData, Backup: !noBackup}
 		ctx := context.Background()
 		if dryRun {
 			runtime, err := service.NewReadOnlySubscriptionRuntime(ctx, cfg)
@@ -63,16 +65,18 @@ func newSubscriptionAdoptCommand() *cobra.Command {
 		if err != nil {
 			return err
 		}
-		_, err = fmt.Fprintf(command.OutOrStdout(), "Adopted document root for subscription %q (operation %d).\n", args[0], operationID)
+		_, err = fmt.Fprintf(command.OutOrStdout(), "Adopted website for subscription %q (operation %d).\n", args[0], operationID)
 		return err
 	}}
 	command.Flags().StringVar(&configPath, "config", meta.ConfigFile, "path to config.toml")
-	command.Flags().StringVar(&source, "from", "", "existing document root to adopt")
+	command.Flags().StringVar(&source, "from", "", "legacy document root (required for php-fpm and static)")
 	command.Flags().StringVar(&domainName, "domain", "", "primary domain for the adopted website")
+	command.Flags().StringVar(&kind, "type", string(domain.WebsitePHPFPM), "website type: php-fpm, static, proxy, or redirect")
+	command.Flags().StringVar(&target, "target", "", "proxy upstream or redirect target")
+	command.Flags().IntVar(&redirectCode, "redirect-code", 301, "redirect status code (301 or 302)")
 	command.Flags().BoolVar(&copyData, "copy", false, "copy data instead of the default atomic move")
 	command.Flags().BoolVar(&noBackup, "no-backup", false, "skip the default legacy document-root backup")
 	command.Flags().BoolVar(&dryRun, "dry-run", false, "show the operation plan without changing the system")
-	_ = command.MarkFlagRequired("from")
 	_ = command.MarkFlagRequired("domain")
 	return command
 }

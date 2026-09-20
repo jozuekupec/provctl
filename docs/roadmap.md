@@ -1062,3 +1062,15 @@ kontejner obnoven na `clean`.
   through Apache. The disposable release container and obsolete
   `pv-tls-debug-20260913` fixture (including 13 stale snapshots) were deleted;
   only active `pv` and its `clean`/`pre-tls-debug-20260913` snapshots remain.
+
+- [x] **Adoption types and TUI entry point:** `subscription adopt` now accepts
+  `php-fpm`, `static`, `proxy`, and `redirect`. Data-bearing types retain the
+  backup/move-or-copy flow and journal an explicit recursive
+  `chown --no-dereference` to the allocated subscription UID:GID; proxy and
+  redirect validate and install only managed hosting artifacts, never a
+  project-owned Compose file or Docker access. The subscription picker exposes
+  `i` for an adoption form with the shared source-path picker, typed `ADOPT`
+  confirmation, ownership/runtime consequences, and the real executor plan in
+  the progress popup. Focused service, CLI, and TUI tests cover static,
+  proxy, ownership preview, and executor completion. Follow-up: add an Incus
+  scenario for each non-PHP adoption type before the next public release.

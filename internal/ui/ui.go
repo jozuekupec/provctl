@@ -380,6 +380,17 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.output = m.output.append("subscription created: " + msg.name)
 		m, command := m.startSubscriptions()
 		return m, command
+	case subscriptionAdoptedMsg:
+		if msg.err != nil {
+			m.status = "website adoption failed: " + msg.err.Error()
+			m.output = m.output.append(m.status)
+			return m, nil
+		}
+		m.status = "website adopted for subscription " + msg.name + "; refreshing…"
+		m.output = m.output.append("website adopted for subscription: " + msg.name)
+		m.subscriptionFilter.input.SetValue("")
+		m, command := m.startSubscriptions()
+		return m, command
 	case databaseCreatedMsg:
 		if msg.err != nil {
 			m.status = "database creation failed: " + msg.err.Error()

@@ -64,6 +64,7 @@ const (
 	actionAdminTabPrev  shortcutAction = "admin-tab-previous"
 	actionAdminClose    shortcutAction = "admin-close"
 	actionRotateSecret  shortcutAction = "rotate-secret"
+	actionAdopt         shortcutAction = "adopt"
 )
 
 type binding struct {
@@ -95,6 +96,7 @@ var bindings = []binding{
 	{Action: actionPicker, Group: "Navigation", Keys: []string{"s", "esc"}, Label: "s / esc", Help: "return to subscription picker", Bar: "s subscriptions", Short: "s", Priority: 1, Contexts: contextsWorkspace},
 	{Action: actionOpen, Group: "Actions", Keys: []string{"enter"}, Label: "enter", Help: "open selected subscription", Bar: "enter open", Short: "enter", Priority: 2, Contexts: []shortcutContext{shortcutPicker}},
 	{Action: actionCreate, Group: "Actions", Keys: []string{"n"}, Label: "n", Help: "create subscription", Bar: "n create", Short: "n", Priority: 4, Contexts: []shortcutContext{shortcutPicker}},
+	{Action: actionAdopt, Group: "Actions", Keys: []string{"i"}, Label: "i", Help: "adopt a legacy website", Bar: "i adopt", Short: "i", Priority: 5, Contexts: []shortcutContext{shortcutPicker}},
 	{Action: actionArchive, Group: "Actions", Keys: []string{"a"}, Label: "a", Help: "archive selected subscription", Bar: "a archive", Short: "a", Priority: 6, Contexts: []shortcutContext{shortcutPicker}},
 	{Action: actionDelete, Group: "Actions", Keys: []string{"d"}, Label: "d", Help: "delete archived subscription", Bar: "d delete", Short: "d", Priority: 7, Contexts: []shortcutContext{shortcutPicker}},
 	{Action: actionSSHAccess, Group: "Actions", Keys: []string{"u"}, Label: "u", Help: "set subscription SSH access", Bar: "u SSH", Short: "u", Priority: 7, Contexts: []shortcutContext{shortcutPicker}},

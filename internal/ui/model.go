@@ -41,6 +41,7 @@ type Deps struct {
 	SetWebsiteTarget       func(context.Context, string, string, string, int) (int64, error)
 	DeleteWebsite          func(context.Context, string, string) (int64, error)
 	CreateSubscription     func(context.Context, string, service.SubscriptionCreateOptions) (int64, error)
+	AdoptSubscription      func(context.Context, string, service.SubscriptionAdoptOptions) (int64, error)
 	SetSubscriptionStatus  func(context.Context, string, string) (int64, error)
 	DeleteSubscription     func(context.Context, string, bool) (int64, error)
 	LoadPHPVersions        func(context.Context) ([]service.PHPFPMVersion, error)
@@ -121,6 +122,10 @@ type subscriptionUsageLoadedMsg struct {
 	items      map[int64]service.SubscriptionUsage
 	err        error
 	generation uint64
+}
+type subscriptionAdoptedMsg struct {
+	err  error
+	name string
 }
 type websiteChangedMsg struct {
 	err     error
@@ -265,6 +270,7 @@ type confirmState struct {
 	input   textinput.Model
 	err     string
 	jobID   int64
+	adopt   service.SubscriptionAdoptOptions
 }
 
 type helpState struct {
@@ -345,6 +351,19 @@ type subscriptionCreateFormState struct {
 	inputs []textinput.Model
 }
 
+type subscriptionAdoptFormState struct {
+	open         bool
+	field        int
+	typeIndex    int
+	redirectCode int
+	copy         bool
+	backup       bool
+	name         textinput.Model
+	domain       textinput.Model
+	source       textinput.Model
+	target       textinput.Model
+}
+
 type databaseCreateFormState struct {
 	open  bool
 	field int
@@ -384,6 +403,7 @@ const (
 	pathPickerDocumentRoot
 	pathPickerLogDirectory
 	pathPickerSSHKey
+	pathPickerAdoptSource
 )
 
 // pathPickerState belongs to the picker, keeping its filter and asynchronous
@@ -451,6 +471,7 @@ type appModel struct {
 	aliasForm              aliasFormState
 	targetForm             targetFormState
 	subscriptionCreateForm subscriptionCreateFormState
+	subscriptionAdoptForm  subscriptionAdoptFormState
 	databaseCreateForm     databaseCreateFormState
 	sshAccessForm          sshAccessFormState
 	sshKeyForm             sshKeyFormState

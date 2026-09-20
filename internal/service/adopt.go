@@ -191,10 +191,13 @@ func containsDomain(domains []string, name string) bool {
 }
 
 type SubscriptionAdoptOptions struct {
-	Source string
-	Domain string
-	Copy   bool
-	Backup bool
+	Source       string
+	Domain       string
+	Type         domain.WebsiteType
+	Target       string
+	RedirectCode int
+	Copy         bool
+	Backup       bool
 }
 
 type subscriptionAdoptStore interface {
@@ -209,7 +212,7 @@ type adoptionCertificateStore interface {
 	DeleteCertificateByWebsite(context.Context, int64) error
 }
 
-// Adopt imports an existing document root as one PHP-FPM website.
+// Adopt imports a legacy website into one new subscription.
 func (service SubscriptionService) Adopt(ctx context.Context, name string, options SubscriptionAdoptOptions) (int64, error) {
 	operation, err := service.PrepareAdopt(ctx, name, options)
 	if err != nil {
@@ -220,8 +223,8 @@ func (service SubscriptionService) Adopt(ctx context.Context, name string, optio
 
 // PrepareAdopt validates the legacy source and produces one journaled plan.
 func (service SubscriptionService) PrepareAdopt(ctx context.Context, name string, options SubscriptionAdoptOptions) (plan.Plan, error) {
-	if service.Apache == nil || service.PHPFPM == nil || service.Commands == nil {
-		return plan.Plan{}, errors.New("adopt requires Apache, PHP-FPM, and commander")
+	if service.Apache == nil || service.Commands == nil {
+		return plan.Plan{}, errors.New("adopt requires Apache and commander")
 	}
 	if err := domain.ValidateSubscriptionName(name); err != nil {
 		return plan.Plan{}, err
@@ -229,26 +232,54 @@ func (service SubscriptionService) PrepareAdopt(ctx context.Context, name string
 	if err := domain.ValidateDomain(options.Domain); err != nil {
 		return plan.Plan{}, err
 	}
-	if options.Source == "" {
-		return plan.Plan{}, errors.New("adopt source is required")
+	kind := options.Type
+	if kind == "" {
+		kind = domain.WebsitePHPFPM
 	}
-	source, err := service.FS.EvalSymlinks(filepath.Clean(options.Source))
-	if err != nil {
-		return plan.Plan{}, fmt.Errorf("resolve adopt source: %w", err)
+	if err := domain.ValidateWebsiteType(kind); err != nil {
+		return plan.Plan{}, err
 	}
-	info, err := service.FS.Stat(source)
-	if err != nil {
-		return plan.Plan{}, fmt.Errorf("inspect adopt source: %w", err)
+	options.Type = kind
+	dataBearing := kind == domain.WebsitePHPFPM || kind == domain.WebsiteStatic
+	if kind == domain.WebsitePHPFPM && service.PHPFPM == nil {
+		return plan.Plan{}, errors.New("PHP-FPM adopter requires a pool applier")
 	}
-	if !info.IsDir() {
-		return plan.Plan{}, fmt.Errorf("adopt source %q is not a directory", source)
+	if !dataBearing && options.Copy {
+		return plan.Plan{}, fmt.Errorf("--copy applies only to php-fpm or static adoption")
 	}
-	root, err := service.FS.EvalSymlinks(filepath.Clean(service.Config.Paths.VHosts))
-	if err != nil {
-		return plan.Plan{}, fmt.Errorf("resolve vhosts root: %w", err)
+	if dataBearing && options.Source == "" {
+		return plan.Plan{}, errors.New("adopt source is required for php-fpm or static websites")
 	}
-	if pathWithin(root, source) {
-		return plan.Plan{}, fmt.Errorf("adopt source %q is inside vhosts root", source)
+	if (kind == domain.WebsiteProxy || kind == domain.WebsiteRedirect) && options.Target == "" {
+		return plan.Plan{}, fmt.Errorf("adopt target is required for %s websites", kind)
+	}
+	if kind == domain.WebsiteRedirect && options.RedirectCode == 0 {
+		options.RedirectCode = 301
+	}
+	if kind == domain.WebsiteRedirect && options.RedirectCode != 301 && options.RedirectCode != 302 {
+		return plan.Plan{}, errors.New("redirect code must be 301 or 302")
+	}
+	var source string
+	if dataBearing {
+		var err error
+		source, err = service.FS.EvalSymlinks(filepath.Clean(options.Source))
+		if err != nil {
+			return plan.Plan{}, fmt.Errorf("resolve adopt source: %w", err)
+		}
+		info, err := service.FS.Stat(source)
+		if err != nil {
+			return plan.Plan{}, fmt.Errorf("inspect adopt source: %w", err)
+		}
+		if !info.IsDir() {
+			return plan.Plan{}, fmt.Errorf("adopt source %q is not a directory", source)
+		}
+		root, err := service.FS.EvalSymlinks(filepath.Clean(service.Config.Paths.VHosts))
+		if err != nil {
+			return plan.Plan{}, fmt.Errorf("resolve vhosts root: %w", err)
+		}
+		if pathWithin(root, source) {
+			return plan.Plan{}, fmt.Errorf("adopt source %q is inside vhosts root", source)
+		}
 	}
 	subscription, err := service.prepareSubscription(ctx, name, SubscriptionCreateOptions{})
 	if err != nil {
@@ -265,12 +296,25 @@ func (service SubscriptionService) PrepareAdopt(ctx context.Context, name string
 	if exists {
 		return plan.Plan{}, fmt.Errorf("domain %q is already assigned", options.Domain)
 	}
-	siteRoot := filepath.Join(subscription.Home, "sites", options.Domain)
-	documentRoot := filepath.Join(siteRoot, "public")
-	if _, err := service.FS.Stat(documentRoot); err == nil {
-		return plan.Plan{}, fmt.Errorf("adopt target %q already exists", documentRoot)
-	} else if !errors.Is(err, os.ErrNotExist) {
-		return plan.Plan{}, fmt.Errorf("inspect adopt target: %w", err)
+	siteRoot, documentRoot := "", ""
+	if dataBearing {
+		siteRoot = filepath.Join(subscription.Home, "sites", options.Domain)
+		documentRoot = filepath.Join(siteRoot, "public")
+		if _, err := service.FS.Stat(documentRoot); err == nil {
+			return plan.Plan{}, fmt.Errorf("adopt target %q already exists", documentRoot)
+		} else if !errors.Is(err, os.ErrNotExist) {
+			return plan.Plan{}, fmt.Errorf("inspect adopt target: %w", err)
+		}
+	}
+	// Validate routing inputs before looking at the live Apache configuration.
+	// RenderVHost is the shared policy boundary for proxy targets and redirects;
+	// using it here keeps --dry-run and execution failures equivalent.
+	candidate := domain.Website{Type: kind, PrimaryDomain: options.Domain, DocumentRoot: documentRoot, Target: options.Target, RedirectCode: options.RedirectCode, Enabled: true}
+	if kind == domain.WebsitePHPFPM {
+		candidate.PHPVersion = subscription.PHPVersion
+	}
+	if _, err := (WebsiteService{Config: service.Config}).RenderVHost(subscription.Name, candidate); err != nil {
+		return plan.Plan{}, fmt.Errorf("validate adopted website: %w", err)
 	}
 	renewalManager := service.Renewals
 	if renewalManager == nil {
@@ -355,6 +399,8 @@ func pathWithin(root, path string) bool {
 
 func (service SubscriptionService) adoptPlan(store subscriptionAdoptStore, renewalManager RenewalManager, subscription domain.Subscription, options SubscriptionAdoptOptions, source, siteRoot, documentRoot string, renewals []RenewalLineage) plan.Plan {
 	websiteService := WebsiteService{FS: service.FS, Apache: service.Apache, PHPFPM: service.PHPFPM, Version: PHPFPMVersion{Version: subscription.PHPVersion, Binary: filepath.Join("/usr/sbin", "php-fpm"+subscription.PHPVersion), Service: "php" + subscription.PHPVersion + "-fpm.service"}, Config: service.Config}
+	dataBearing := options.Type == domain.WebsitePHPFPM || options.Type == domain.WebsiteStatic
+	phpFPM := options.Type == domain.WebsitePHPFPM
 	logDir := filepath.Join(meta.LogDir, subscription.Name, options.Domain)
 	fpmLogDir := phpLogDir(subscription.Name, options.Domain)
 	fpmErrorLog := phpErrorLog(subscription.Name, options.Domain)
@@ -364,8 +410,10 @@ func (service SubscriptionService) adoptPlan(store subscriptionAdoptStore, renew
 	vhostPath := filepath.Join(service.Config.Apache.SitesAvailable, meta.FilePrefix+subscription.Name+"-"+options.Domain+".conf")
 	enabledPath := filepath.Join(service.Config.Apache.SitesEnabled, filepath.Base(vhostPath))
 	poolContents, _ := render.RenderPHPFPMPool(render.PHPFPMPool{Name: phpPoolName(subscription.Name, options.Domain), User: subscription.UnixUser, Home: subscription.Home, Socket: socket, MaxChildren: subscription.PHPMaxChildren, MemoryLimit: subscription.PHPMemoryLimit, UploadMax: subscription.PHPUploadMax, MaxExecTime: subscription.PHPMaxExecTime, PhpErrorLog: fpmErrorLog})
-	vhostContents, _ := render.RenderApachePHPFPMHTTP(render.ApacheHTTPVHost{Subscription: subscription.Name, PrimaryDomain: options.Domain, DocumentRoot: documentRoot, AcmeChallengeRoot: service.Config.Paths.ACMEChallenge, FPMSocket: socket, ProxyTimeout: service.Config.Apache.ProxyTimeout, LogDir: logDir})
-	website := domain.Website{SubscriptionID: subscription.ID, Type: domain.WebsitePHPFPM, PrimaryDomain: options.Domain, DocumentRoot: documentRoot, PHPVersion: subscription.PHPVersion, Enabled: true}
+	website := domain.Website{SubscriptionID: subscription.ID, Type: options.Type, PrimaryDomain: options.Domain, DocumentRoot: documentRoot, Target: options.Target, RedirectCode: options.RedirectCode, Enabled: true}
+	if phpFPM {
+		website.PHPVersion = subscription.PHPVersion
+	}
 	if len(renewals) == 1 {
 		website.CertificateName = renewals[0].Name
 		website.SSLEnabled = true
@@ -376,7 +424,7 @@ func (service SubscriptionService) adoptPlan(store subscriptionAdoptStore, renew
 		}
 	}
 	steps := make([]plan.Step, 0, 18+len(renewals)*2)
-	if options.Backup {
+	if dataBearing && options.Backup {
 		archive := filepath.Join(service.Config.Paths.Backups, "adopt", subscription.Name, filepath.Base(source)+"-"+time.Now().UTC().Format("20060102T150405.000000000Z")+".tar")
 		steps = append(steps, plan.Step{Name: "archive legacy document root", Preview: "create backup " + archive, Do: func(ctx context.Context) error {
 			if err := service.FS.MkdirAll(filepath.Dir(archive), 0o700); err != nil {
@@ -394,7 +442,7 @@ func (service SubscriptionService) adoptPlan(store subscriptionAdoptStore, renew
 	}, Undo: func(ctx context.Context) error { return service.Users.Delete(ctx, subscription.UnixUser, false) }})
 	logParent := filepath.Join(meta.LogDir, subscription.Name)
 	steps = append(steps, plan.Step{Name: "create subscription log directory", Preview: "create " + logParent, Do: service.createSubscriptionLogDirectory(logParent, subscription.UnixUID), Undo: func(context.Context) error { return service.FS.Remove(logParent) }})
-	for _, directory := range []struct {
+	baseDirectories := []struct {
 		name, path string
 		mode       os.FileMode
 	}{
@@ -404,53 +452,77 @@ func (service SubscriptionService) adoptPlan(store subscriptionAdoptStore, renew
 		{"create session directory", filepath.Join(subscription.Home, "tmp", "sessions"), 0o700},
 		{"create private directory", filepath.Join(subscription.Home, "private"), 0o700},
 		{"create SSH directory", filepath.Join(subscription.Home, ".ssh"), 0o700},
-		{"create website root", siteRoot, 0o751},
-		{"create application directory", filepath.Join(siteRoot, "app"), 0o750},
-		{"create storage directory", filepath.Join(siteRoot, "storage"), 0o750},
-	} {
+	}
+	if dataBearing {
+		baseDirectories = append(baseDirectories, struct {
+			name, path string
+			mode       os.FileMode
+		}{"create website root", siteRoot, 0o751})
+	}
+	if phpFPM {
+		baseDirectories = append(baseDirectories,
+			struct {
+				name, path string
+				mode       os.FileMode
+			}{"create application directory", filepath.Join(siteRoot, "app"), 0o750},
+			struct {
+				name, path string
+				mode       os.FileMode
+			}{"create storage directory", filepath.Join(siteRoot, "storage"), 0o750},
+		)
+	}
+	for _, directory := range baseDirectories {
 		directory := directory
 		steps = append(steps, plan.Step{Name: directory.name, Preview: "create " + directory.path, Do: service.createDirectory(directory.path, subscription.UnixUID, directory.mode), Undo: func(context.Context) error { return service.FS.Remove(directory.path) }})
 	}
-	for _, directory := range []struct {
+	logDirectories := []struct {
 		name, path string
 		uid        int
 		mode       os.FileMode
-	}{
-		{"create PHP-FPM log directory", fpmLogDir, 0, 0o750},
-		{"create website log directory", logDir, 0, 0o750},
-	} {
+	}{{"create website log directory", logDir, 0, 0o750}}
+	if phpFPM {
+		logDirectories = append(logDirectories, struct {
+			name, path string
+			uid        int
+			mode       os.FileMode
+		}{"create PHP-FPM log directory", fpmLogDir, 0, 0o750})
+	}
+	for _, directory := range logDirectories {
 		directory := directory
 		steps = append(steps, plan.Step{Name: directory.name, Preview: "create " + directory.path, Do: websiteService.createOwnedDirectory(directory.path, directory.uid, subscription.UnixUID, directory.mode), Undo: func(context.Context) error { return service.FS.Remove(directory.path) }})
 	}
-	steps = append(steps, plan.Step{Name: "create PHP-FPM error log", Preview: "create " + fpmErrorLog, Do: websiteService.createPHPErrorLog(fpmErrorLog, subscription.UnixUID), Undo: func(context.Context) error { return service.FS.Remove(fpmErrorLog) }})
+	if phpFPM {
+		steps = append(steps, plan.Step{Name: "create PHP-FPM error log", Preview: "create " + fpmErrorLog, Do: websiteService.createPHPErrorLog(fpmErrorLog, subscription.UnixUID), Undo: func(context.Context) error { return service.FS.Remove(fpmErrorLog) }})
+	}
 	for _, name := range []string{"access.log", "error.log"} {
 		path := filepath.Join(logDir, name)
 		steps = append(steps, plan.Step{Name: "create " + name, Preview: "create " + path, Do: websiteService.createLogFile(path, subscription.UnixUID), Undo: func(context.Context) error { return service.FS.Remove(path) }})
 	}
 	var undoPool func(context.Context) error
-	steps = append(steps, plan.Step{Name: "install PHP-FPM pool", Preview: "write " + poolPath, Do: func(ctx context.Context) error {
-		var err error
-		undoPool, err = service.PHPFPM.ApplyPool(ctx, websiteService.Version, poolPath, poolContents, socket)
-		return err
-	}, Undo: func(ctx context.Context) error {
-		if undoPool == nil {
-			return nil
-		}
-		return undoPool(ctx)
-	}})
-	steps = append(steps, plan.Step{Name: map[bool]string{true: "copy legacy document root", false: "move legacy document root"}[options.Copy], Preview: documentRoot, Do: service.transferDocumentRoot(source, documentRoot, options.Copy), Undo: service.undoTransfer(source, documentRoot, options.Copy)})
-	steps = append(steps, plan.Step{Name: "assign document root ownership", Preview: fmt.Sprintf("chown -R %d:%d %s", subscription.UnixUID, subscription.UnixUID, documentRoot), Do: func(ctx context.Context) error {
-		_, err := service.Commands.Run(ctx, "/usr/bin/chown", "--recursive", "--", fmt.Sprintf("%d:%d", subscription.UnixUID, subscription.UnixUID), documentRoot)
-		return err
-	}})
+	if phpFPM {
+		steps = append(steps, plan.Step{Name: "install PHP-FPM pool", Preview: "write " + poolPath, Do: func(ctx context.Context) error {
+			var err error
+			undoPool, err = service.PHPFPM.ApplyPool(ctx, websiteService.Version, poolPath, poolContents, socket)
+			return err
+		}, Undo: func(ctx context.Context) error {
+			if undoPool == nil {
+				return nil
+			}
+			return undoPool(ctx)
+		}})
+	}
+	if dataBearing {
+		steps = append(steps, plan.Step{Name: map[bool]string{true: "copy legacy document root", false: "move legacy document root"}[options.Copy], Preview: documentRoot, Do: service.transferDocumentRoot(source, documentRoot, options.Copy), Undo: service.undoTransfer(source, documentRoot, options.Copy)})
+		steps = append(steps, plan.Step{Name: "assign document root ownership", Preview: fmt.Sprintf("chown -R --no-dereference %d:%d %s", subscription.UnixUID, subscription.UnixUID, documentRoot), Do: func(ctx context.Context) error {
+			_, err := service.Commands.Run(ctx, "/usr/bin/chown", "--recursive", "--no-dereference", "--", fmt.Sprintf("%d:%d", subscription.UnixUID, subscription.UnixUID), documentRoot)
+			return err
+		}})
+	}
 	var undoApache func(context.Context) error
 	steps = append(steps, plan.Step{Name: "install and enable Apache vhost", Preview: "write " + vhostPath, Do: func(ctx context.Context) error {
-		var err error
-		if website.SSLEnabled {
-			vhostContents, err = websiteService.RenderVHost(subscription.Name, website)
-			if err != nil {
-				return err
-			}
+		vhostContents, err := websiteService.RenderVHost(subscription.Name, website)
+		if err != nil {
+			return err
 		}
 		undoApache, err = service.Apache.ApplyVHost(ctx, vhostPath, vhostContents, enabledPath)
 		return err

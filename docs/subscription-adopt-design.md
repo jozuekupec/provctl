@@ -8,25 +8,31 @@ commands as separate operations.
 ## Contract
 
 ```text
-provctl subscription adopt <name> --from <path> --domain <domain>
-    [--copy] [--no-backup] [--dry-run]
+provctl subscription adopt <name> --domain <domain>
+    [--type php-fpm|static|proxy|redirect]
+    [--from <path> | --target <url>]
+    [--redirect-code 301|302] [--copy] [--no-backup] [--dry-run]
 ```
 
-The source must exist, be a directory, and must not resolve inside the
-configured vhosts root. The target is exactly
+`php-fpm` and `static` are data-bearing: their source must exist, be a
+directory, and must not resolve inside the configured vhosts root. The target
+is exactly
 `<vhosts>/<name>/sites/<domain>/public`; it must not exist. The domain and
 subscription name use the ordinary domain validators. `--copy` is opt-in;
 the default is an atomic rename on the same filesystem. Cross-filesystem
 renames fail with an actionable message rather than silently copying data.
+`proxy` and `redirect` do not take a source; both require `--target`, and a
+redirect accepts only status 301 or 302. Proxy targets pass the normal
+loopback/allowlist validation before any system mutation.
 
 ### Ownership and container-runtime contract
 
-Every data-bearing adoption (`php-fpm` today; `static` when it is added) must
+Every data-bearing adoption (`php-fpm` and `static`) must
 finish by recursively assigning the adopted document root to the newly
 allocated subscription UID and GID. This is a required, journaled plan step
 after the move or copy, not an operator follow-up: the deployed PHP-FPM pool
 and any managed process must be able to write only as that subscription user.
-The existing PHP-FPM implementation uses explicit `chown --recursive --
+The implementation uses explicit `chown --recursive --no-dereference --
 <uid>:<gid> <document-root>` arguments through the command seam; future
 website types must preserve that behavior and test both its preview and call.
 
@@ -36,9 +42,9 @@ adoption may record the upstream and Apache/TLS artifacts, while a container
 backed application needs an explicit runtime mapping from the new subscription
 UID/GID to its image's environment (for example `UID` and `GID`). The scorely
 Compose setup is the reference shape: PHP and Apache images receive those
-values through environment variables. A future proxy-adopt form/CLI must show
-the allocated UID/GID and either require an explicit, declared compose-env
-mapping or leave the runtime unchanged with a clear manual-action warning.
+values through environment variables. The TUI and CLI intentionally leave the
+runtime unchanged and explicitly say so; an operator who uses such a stack
+must apply its documented UID/GID mapping separately.
 It must never silently modify a project-owned `.env` file or grant the
 subscription user privileged Docker-daemon access.
 

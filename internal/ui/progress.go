@@ -134,6 +134,8 @@ func operationFailed(message tea.Msg) bool {
 		return result.err != nil
 	case backupCreatedMsg:
 		return result.err != nil
+	case subscriptionAdoptedMsg:
+		return result.err != nil
 	case websiteChangedMsg:
 		return result.err != nil
 	case websiteTLSChangedMsg:
@@ -179,7 +181,7 @@ func isMutationResult(message tea.Msg) bool {
 		websiteChangedMsg, websiteTLSChangedMsg, websiteDocumentRootChangedMsg,
 		websiteLogDirectoryChangedMsg, websiteCreatedMsg, websiteAliasChangedMsg,
 		websiteTargetChangedMsg, websiteDeletedMsg, subscriptionChangedMsg,
-		subscriptionDeletedMsg, subscriptionCreatedMsg, databaseCreatedMsg,
+		subscriptionDeletedMsg, subscriptionCreatedMsg, subscriptionAdoptedMsg, databaseCreatedMsg,
 		databasePasswordChangedMsg, databaseDeletedMsg, reconcileFinishedMsg,
 		websitePHPChangedMsg:
 		return true

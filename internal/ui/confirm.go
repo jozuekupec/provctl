@@ -1,8 +1,6 @@
 package ui
 
 import (
-	"strings"
-
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -58,6 +56,8 @@ func (m appModel) runConfirmed() (tea.Model, tea.Cmd) {
 		return m, m.deleteSubscriptionCmd(confirm)
 	case "create-subscription":
 		return m, m.createSubscriptionCmd(confirm)
+	case "adopt-subscription":
+		return m, m.adoptSubscriptionCmd(confirm)
 	case "create-database":
 		return m, m.createDatabaseCmd(confirm)
 	case "rotate-database-password":
@@ -112,5 +112,5 @@ func (m appModel) confirmPopup() string {
 	} else {
 		lines = append(lines, "", confirmStyle.Render("Confirm: y = yes · any other key = cancel"))
 	}
-	return panel(m.confirm.title, strings.Join(lines, "\n"), m.popupWidth(), len(lines)+2, true)
+	return popupBox(m, popupOpts{Size: popupMedium, Fit: fitAuto, Title: m.confirm.title, Body: lines, Footer: []string{}})
 }

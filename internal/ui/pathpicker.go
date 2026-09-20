@@ -160,6 +160,8 @@ func (m appModel) acceptPath(path string) appModel {
 		m.logDirectoryForm.input.SetValue(absolute)
 	case pathPickerSSHKey:
 		m.sshKeyForm.input.SetValue(absolute)
+	case pathPickerAdoptSource:
+		m.subscriptionAdoptForm.source.SetValue(absolute)
 	default:
 		m.settings.values[m.pathPicker.field] = absolute
 	}
@@ -174,6 +176,10 @@ func (m appModel) acceptPath(path string) appModel {
 	}
 	if m.sshKeyForm.open {
 		m.sshKeyForm.input.Focus()
+		return m
+	}
+	if m.subscriptionAdoptForm.open {
+		m.subscriptionAdoptForm.source.Focus()
 		return m
 	}
 	return m.focusSettingInput()
@@ -273,6 +279,10 @@ func (m appModel) handlePathPickerKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		m.pathPicker = pathPickerState{}
+		if m.subscriptionAdoptForm.open {
+			m.subscriptionAdoptForm.source.Focus()
+			return m, nil
+		}
 		return m.focusSettingInput(), nil
 	}
 	return m, nil
