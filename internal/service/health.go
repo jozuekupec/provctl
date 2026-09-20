@@ -151,7 +151,10 @@ func (service HealthService) checkDatabase(ctx context.Context) Check {
 
 func (service HealthService) checkWebsite(ctx context.Context, subscription domain.Subscription, website domain.Website) []Check {
 	prefix := subscription.Name + "/" + website.PrimaryDomain
-	checks := []Check{service.checkVHost(prefix, subscription.Name, website), service.checkDocumentRoot(prefix, website)}
+	checks := []Check{service.checkVHost(prefix, subscription.Name, website)}
+	if website.Type == domain.WebsiteStatic || website.Type == domain.WebsitePHPFPM {
+		checks = append(checks, service.checkDocumentRoot(prefix, website))
+	}
 	if !website.Enabled {
 		return checks
 	}

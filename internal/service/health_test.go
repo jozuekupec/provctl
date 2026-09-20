@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -154,6 +155,42 @@ func TestHealthService_RunWarnsForCertificateExpiringSoon(t *testing.T) {
 	}
 	if checks[len(checks)-1].Status != CheckWarn {
 		t.Errorf("certificate check status = %s, want WARN", checks[len(checks)-1].Status)
+	}
+}
+
+func TestHealthService_RunSkipsDocumentRootForProxyAndRedirect(t *testing.T) {
+	temporary := t.TempDir()
+	enabled := filepath.Join(temporary, "enabled")
+	if err := os.MkdirAll(enabled, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	subscription := domain.Subscription{ID: 7, Name: "acme"}
+	websites := []domain.Website{
+		{PrimaryDomain: "proxy.example.test", Enabled: true, Type: domain.WebsiteProxy, Target: "http://127.0.0.1:8080"},
+		{PrimaryDomain: "redirect.example.test", Enabled: true, Type: domain.WebsiteRedirect, Target: "https://example.test", RedirectCode: 302},
+	}
+	for _, website := range websites {
+		path := filepath.Join(enabled, "provctl-acme-"+website.PrimaryDomain+".conf")
+		if err := os.WriteFile(path, nil, 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	service := HealthService{
+		FS: system.OSFS{}, Store: healthStore{subscriptions: []domain.Subscription{subscription}, websites: map[int64][]domain.Website{7: websites}},
+		Commands: &fake.Commander{}, Systemd: &fake.Systemd{IsActiveFunc: func(context.Context, string) (bool, error) { return true, nil }},
+		Network: healthNetwork{status: 200}, Certificates: healthCertificates{notAfter: time.Now().Add(30 * 24 * time.Hour)}, Database: healthDatabase{}, Config: config.Config{Apache: config.Apache{Service: "apache2", SitesEnabled: enabled}},
+	}
+	checks, err := service.Run(context.Background(), "acme", "")
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	if HasFailure(checks) {
+		t.Errorf("Run() returned failed checks: %#v", checks)
+	}
+	for _, check := range checks {
+		if strings.Contains(check.Name, "document root") {
+			t.Errorf("unexpected document-root check: %#v", check)
+		}
 	}
 }
 

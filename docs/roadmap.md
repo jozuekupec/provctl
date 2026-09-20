@@ -158,11 +158,13 @@ Legenda: `[x]` hotovo a ověřeno v uvedeném rozsahu; `[~]` rozpracováno;
 - [x] **M7 — provoz:** první read-only část `health` je dostupná jako
   `provctl health [<subscription> [<domain>]]` v textu i přes `--json`.
   Kontroluje aktivní Apache, `apachectl configtest`, read-only SQLite spojení,
-  enabled vhost, DocumentRoot, PHP-FPM pool a socket, DNS vůči IP serveru a
+  enabled vhost, DocumentRoot pouze pro static/PHP-FPM web, PHP-FPM pool a socket, DNS vůči IP serveru a
   HTTP/HTTPS odpověď a živou expiraci certifikátu (`WARN` pod 21 dní, `FAIL`
   pod 7 dní nebo po expiraci); síť a čtení certifikátu mají testovací seam a
   síť nepřebírá systémový proxy server. Úspěšná i chybová cesta jsou pokryty
-  offline testy a celý `make test` prošel. Měřenou diskovou kvótu lze nyní při
+  offline testy a celý `make test` prošel. Release revalidace opravila falešný
+  DocumentRoot `FAIL` pro proxy a redirect weby; cílený race test pokrývá oba
+  bez-root typy. Měřenou diskovou kvótu lze nyní při
   vytvoření subscription nastavit přes `--quota-disk 20G`; ukládá se do
   SQLite, `health` ji změří přes `du -sb` a hlásí `WARN` nad 90 % a `FAIL` po
   překročení. Kvóty počtu objektů lze volitelně nastavit přes
