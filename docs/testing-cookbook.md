@@ -690,6 +690,24 @@ zálohy.
 
 **Očekávané:** `--dry-run` vypíše plán a **nic nepřesune**; ostrý běh přesune data, nastaví práva, vytvoří uživatele a web funguje. Záloha před přesunem existuje.
 
+#### T17c — další typy adopce
+
+Vedle PHP-FPM ověř před vydáním i static, proxy a redirect. V čistém
+`pv` po bootstrapu musí následující příkazy skončit úspěšně; `apache2ctl
+configtest` je závěrečná kontrola společné konfigurace:
+
+```bash
+./scripts/e2.sh sh 'mkdir -p /srv/legacy-static && echo static >/srv/legacy-static/index.html'
+./scripts/e2.sh sh 'provctl subscription adopt static-adopt --type static --from /srv/legacy-static --domain static-adopt.test --no-backup'
+./scripts/e2.sh sh 'provctl subscription adopt proxy-adopt --type proxy --target http://127.0.0.1:8080 --domain proxy-adopt.test'
+./scripts/e2.sh sh 'provctl subscription adopt redirect-adopt --type redirect --target https://example.test/new --redirect-code 302 --domain redirect-adopt.test'
+./scripts/e2.sh sh 'test -f /var/www/vhosts/static-adopt/sites/static-adopt.test/public/index.html && apache2ctl configtest'
+```
+
+`static` musí přesunout data a nastavit je na UID:GID nové subscription.
+`proxy` a `redirect` nesmí vyžadovat ani vytvářet document root; kontrola
+jejich vhostů ověřuje `ProxyPass`, respektive zvolený `Redirect 301|302`.
+
 TLS větev vyžaduje samostatný Pebble obraz: před adopcí připrav platný legacy
 lineage pokrývající `stary.test` (a případné SAN aliasy), pak ověř `curl -k
 --resolve stary.test:443:127.0.0.1 https://stary.test/`, `provctl ssl status

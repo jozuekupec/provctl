@@ -1072,5 +1072,8 @@ kontejner obnoven na `clean`.
   `i` for an adoption form with the shared source-path picker, typed `ADOPT`
   confirmation, ownership/runtime consequences, and the real executor plan in
   the progress popup. Focused service, CLI, and TUI tests cover static,
-  proxy, ownership preview, and executor completion. Follow-up: add an Incus
-  scenario for each non-PHP adoption type before the next public release.
+  proxy, ownership preview, and executor completion. **Validated 2026-09-20:**
+  a freshly built `0.0.0+git.62cbc09` package was installed in clean Incus
+  `pv`; live static, proxy, redirect and PHP-FPM adoptions passed, including
+  data transfer, assigned UID:GID, rendered vhosts, PHP HTTP response and
+  `apache2ctl configtest`. Cookbook T17c records the repeatable non-PHP run.
