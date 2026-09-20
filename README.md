@@ -1,156 +1,105 @@
 # provctl
 
-`provctl` is a root-facing provisioning tool for Debian hosting servers. It manages subscriptions, websites, PHP-FPM, Apache, MariaDB, TLS certificates, backups, cron jobs, and SSH access from SQLite as the source of truth.
+`provctl` provisions and operates Debian web-hosting subscriptions from one
+auditable source of truth. It manages isolated Unix accounts, Apache vhosts,
+per-domain PHP-FPM, MariaDB databases, TLS certificates, cron jobs, SSH keys,
+and backups through both a CLI and terminal UI.
 
-The binding design is [the project specification](docs/project-specification.md). Test environments and acceptance scenarios are in [the testing cookbook](docs/testing-cookbook.md).
+It is a root-facing server tool, not a desktop application. Use it on a
+disposable test server first; never run mutating commands against a personal
+workstation.
 
-Maintainers: [APT signing-key setup, vault backup, and recovery](docs/apt-signing-keys.md).
+## Features
 
-## Safety model
+- Subscription lifecycle: create, suspend, archive, resume, and delete
+- PHP-FPM, static, proxy, and redirect websites with per-domain settings
+- Apache configuration generated from SQLite, with journaling and rollback
+- Certbot HTTP-01 TLS, databases, SSH access, cron jobs, quotas, and backups
+- A keyboard-first terminal UI: running `provctl` with no subcommand opens it
 
-System configuration is generated from the database; it is not the source of truth. Mutating operations are planned, journaled, locked, and rolled back on failure. Commands use explicit arguments through a restricted system abstraction—never a shell. Do not run unfinished mutating commands as root on a workstation.
+## Install
 
-## Current status
-
-The implementation status and outstanding work are tracked in
-[the roadmap](docs/roadmap.md). The command-line interface and read-mostly TUI
-are both available.
-
-## Terminal UI
-
-Running `provctl` without a subcommand starts the terminal UI:
-
-```bash
-sudo provctl
-```
-
-The UI reads the same `/etc/provctl/config.toml` and SQLite state as the CLI.
-On a fresh server, install the package and run `sudo provctl bootstrap` first;
-in an uninitialized development checkout, the missing configuration error is
-expected. Use explicit subcommands for non-interactive administration, for
-example `sudo provctl subscription list`.
-
-Press `,` in either TUI screen to open **Settings**. Its section tabs expose
-every supported key from `/etc/provctl/config.toml`; Shift+Left/Right changes
-section, Tab/Up/Down changes field, and Enter (or Ctrl+S) saves atomically
-without discarding comments or unknown administrator keys. Restart the TUI
-after saving non-TLS settings so its already-opened service runtimes reload
-them. Keep ACME staging enabled until certificate issuance has been verified;
-public Let's Encrypt issuance also needs public DNS and reachable HTTP port 80.
-For filesystem paths, Enter opens a directory or file picker; use Enter to
-open a directory, Space to select it, and confirm the selected absolute path.
-In the Domains panel, `E` opens the equivalent document-root editor for a
-selected static or PHP-FPM site; it uses the same picker and confirmation.
-
-Press `m` in the Domains panel to open **Manage subscription**. The connected
-tabs use Shift+Left/Right; `n` creates the resource on the active tab and
-`D` removes the selected database, SSH key, or cron job only after typing its
-name, fingerprint, or ID. Database password rotation is `p` and its generated
-secret appears once in a separate dialog, never in Output. The Backups tab
-lists archives and can create one; restore remains an explicit CLI operation
-because it can replace a subscription and generate new database passwords.
-Use `s` from the workspace, domain editor, or administration screen to return
-to the full-screen subscription picker. `?` always shows the shortcuts for the
-current surface.
-
-For scripted document-root changes, use `sudo provctl website docroot set
-<subscription> <domain> <absolute-path>`. The target must already exist and,
-after symlinks are resolved, remain inside the subscription home; the command
-does not move data.
-
-## Install from the APT repository
-
-The public repository is published at the following endpoint. Install on your
-Debian hosting server using:
+`provctl` supports Debian 13 and its packaged services. Verify the signing-key
+fingerprint before adding the public APT repository:
 
 ```bash
 curl -fsSLo /tmp/provctl.asc https://jozuekupec.github.io/provctl/debian/provctl.asc
 gpg --show-keys --with-fingerprint /tmp/provctl.asc
-```
+# Expected primary fingerprint: 578A5B0F5AABFB5851803D05FE92B73E4B3967C4
 
-Check the primary fingerprint against the maintainer-provided value:
-`578A5B0F5AABFB5851803D05FE92B73E4B3967C4`.
-
-```bash
 sudo install -d -m 0755 /etc/apt/keyrings
-sudo gpg --dearmor --output /etc/apt/keyrings/provctl.gpg /tmp/provctl.asc
-echo 'deb [signed-by=/etc/apt/keyrings/provctl.gpg] https://jozuekupec.github.io/provctl/debian stable main' | sudo tee /etc/apt/sources.list.d/provctl.list
+sudo gpg --dearmor -o /etc/apt/keyrings/provctl.gpg /tmp/provctl.asc
+echo 'deb [signed-by=/etc/apt/keyrings/provctl.gpg] https://jozuekupec.github.io/provctl/debian stable main' \
+  | sudo tee /etc/apt/sources.list.d/provctl.list >/dev/null
 sudo apt update
 sudo apt install provctl
+```
+
+For a release candidate, replace `stable` with `testing`. The repository needs
+only the public key; keep the private signing key outside the server.
+
+## First server
+
+Bootstrap creates the managed paths, Apache integration, audit log, ACME
+webroot, deploy hook, and required packages. Inspect the plan first, then run
+the confirmed command:
+
+```bash
+sudo provctl bootstrap --dry-run
+sudo provctl bootstrap --install-missing --yes
 sudo provctl doctor
-sudo provctl bootstrap
+sudo provctl
 ```
 
-Use `testing` instead of `stable` for release candidates. Public repository
-configuration never requires the private signing key or its passphrase.
+The last command opens the terminal UI. Press `?` for context-sensitive help,
+`s` to return to the subscription picker, and `,` to edit configuration. The
+UI exposes domain editing, PHP selection, TLS, document roots, log directories,
+databases, cron jobs, SSH keys, backups, and subscription lifecycle actions.
+Destructive actions always require a confirmation dialog.
 
-## Local development
-
-Go 1.22+ is required. These commands do not require root or Debian services:
+Use the CLI for automation:
 
 ```bash
-make test                 # vet, staticcheck, race-enabled unit tests
-make build                # produces dist/provctl
-dist/provctl --version
+sudo provctl subscription create acme --quota-disk 20G --quota-websites 5
+sudo provctl website create acme example.test --type php-fpm
+sudo provctl php set acme example.test --version 8.4
+sudo provctl ssl enable acme example.test
+sudo provctl health acme example.test --json
 ```
 
-`doctor` and `health` are read-only, but inspect the host's services and paths, so they may deliberately return a non-zero result on a development machine:
+Certificate issuance requires every requested hostname to resolve to the
+server and HTTP port 80 to be reachable. Before a first real issuance, set
+`[ssl].staging = true` in Settings (or `/etc/provctl/config.toml`) and verify
+that path against the Let's Encrypt staging CA.
+
+## Develop and test
+
+Go 1.22+ is required. Build artifacts always go to `dist/`:
 
 ```bash
-dist/provctl doctor --config packaging/config.toml.default --json
-dist/provctl health acme example.test --config /etc/provctl/config.toml --json
+make test                 # vet, staticcheck, and race-enabled tests
+make build                # dist/provctl
+make deb                  # dist/provctl_<version>_amd64.deb
 ```
 
-`subscription create` is a root-facing operation. Its dry run reads the existing database and account state, then prints the exact planned steps without changing the system:
+Integration tests must run in a Debian 13 Incus system container or VM, never
+on the development host. Incus is sufficient for real Apache, PHP-FPM,
+MariaDB, systemd, and filesystem tests; it does not need a privileged
+container or nested virtualization. The reproducible setup, snapshots, E2/E3
+scenarios, and Docker caveat are in the
+[testing cookbook](docs/testing-cookbook.md).
 
-```bash
-sudo dist/provctl subscription create acme --config /etc/provctl/config.toml --dry-run
-sudo dist/provctl subscription create acme --quota-disk 20G
-sudo dist/provctl subscription create acme --quota-websites 5 --quota-databases 3 --quota-backups 2
-```
+## Documentation
 
-The non-dry-run form requires the state directory and database created by the upcoming `bootstrap` command; do not create those system paths manually on a workstation.
+- [Project specification](docs/project-specification.md) — architecture and behavior contract
+- [Roadmap](docs/roadmap.md) — implemented scope and validation record
+- [Testing cookbook](docs/testing-cookbook.md) — Incus, package, and TLS test procedures
+- [Signing-key operations](docs/apt-signing-keys.md) — key backup and recovery
+- [TLS issuance review](docs/ssl-project-issuance-review.md) — certificate lifecycle decisions
 
-List recorded archives without changing the server:
+## Safety
 
-```bash
-sudo dist/provctl backup list acme
-```
-
-## Isolated server tests with Incus
-
-Run E2/E3 integration tests in a Debian 13 VM, then use an unprivileged Incus **system container**. Incus is sufficient; do not also install standalone LXC tooling. Its network and storage stay inside the VM.
-
-```bash
-sudo apt update
-sudo apt install -y incus
-sudo incus admin init --minimal
-sudo usermod -aG incus-admin "$USER"
-newgrp incus-admin
-
-incus launch images:debian/13 pv
-incus exec pv -- bash -lc '
-  apt update &&
-  apt install -y apache2 php-fpm mariadb-server certbot cron zstd
-'
-incus snapshot create pv clean
-
-incus exec pv -- systemctl is-system-running
-incus exec pv -- systemctl status apache2
-```
-
-If Docker's `FORWARD DROP` policy blocks the Incus bridge, install the narrowly scoped, persistent forwarding service from this repository:
-
-```bash
-sudo ./scripts/dev/install-incus-docker-forwarding.sh
-```
-
-It determines the current default uplink, enables IPv4 forwarding, and permits only Incus egress plus established replies. To remove it: `sudo systemctl disable --now incus-docker-forward.service` and remove `/etc/systemd/system/incus-docker-forward.service` and `/etc/sysctl.d/90-incus-forwarding.conf`.
-
-The container does not need privileged mode or nested virtualization. Reset it before each mutating scenario:
-
-```bash
-incus restore pv clean
-```
-
-Kernel, firewall, public DNS, and live Let's Encrypt checks require the later VM/VPS environments described in the cookbook.
+SQLite is the managed-state source of truth; system configuration is generated
+from it. Mutating operations are planned, journaled, locked, and rolled back
+where possible. `provctl` passes explicit command arguments and does not use a
+shell to execute user-controlled input.
