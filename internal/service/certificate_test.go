@@ -196,3 +196,36 @@ func TestSSLService_RenewalCheckArgsUsesPebbleRenewal(t *testing.T) {
 		t.Errorf("renewalCheckArgs() = %q, want %q", got, want)
 	}
 }
+
+func TestSSLEnableProgressSteps_UsesSafeIssuanceOrder(t *testing.T) {
+	got := sslEnableProgressSteps(true)
+	want := []string{
+		"validate public DNS",
+		"install HTTP ACME vhost",
+		"verify ACME HTTP endpoint",
+		"issue certificate with Certbot",
+		"install HTTPS vhost",
+		"record certificate metadata",
+		"verify certificate renewal",
+	}
+	if !equalStrings(got, want) {
+		t.Fatalf("steps = %#v, want %#v", got, want)
+	}
+	if got := sslEnableProgressSteps(false); len(got) != len(want)-1 {
+		t.Fatalf("steps without renewal = %#v", got)
+	}
+}
+
+func TestSSLAliasProgressSteps_UsesSafeReconcileOrder(t *testing.T) {
+	want := []string{
+		"install HTTP ACME vhost",
+		"validate public DNS",
+		"verify ACME HTTP endpoint",
+		"reconcile certificate names with Certbot",
+		"install HTTPS vhost",
+		"record aliases and certificate metadata",
+	}
+	if got := sslAliasProgressSteps(); !equalStrings(got, want) {
+		t.Fatalf("steps = %#v, want %#v", got, want)
+	}
+}

@@ -31,6 +31,21 @@ func reportProgress(ctx context.Context, event ProgressEvent) {
 	}
 }
 
+// ReportProgress publishes a transition for a service operation that has a
+// deliberate non-executor state machine, such as ACME certificate issuance.
+// It uses the same context-scoped observer as Executor.
+func ReportProgress(ctx context.Context, event ProgressEvent) { reportProgress(ctx, event) }
+
+// StartProgress publishes immutable, display-safe step names for a
+// non-executor operation.
+func StartProgress(ctx context.Context, names ...string) {
+	steps := make([]StepState, len(names))
+	for index, name := range names {
+		steps[index] = StepState{Name: name, Status: StepPending}
+	}
+	reportProgress(ctx, ProgressEvent{Steps: steps, Index: -1})
+}
+
 type Step struct {
 	Name       string
 	Preview    string

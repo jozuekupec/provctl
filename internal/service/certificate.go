@@ -16,6 +16,7 @@ import (
 	"provctl/internal/config"
 	"provctl/internal/domain"
 	"provctl/internal/meta"
+	"provctl/internal/plan"
 	"provctl/internal/repository/sqlite"
 	"provctl/internal/system"
 )
@@ -158,9 +159,12 @@ func (service SSLService) Enable(ctx context.Context, subscriptionName, primaryD
 	if !website.Enabled {
 		return fmt.Errorf("website %q is disabled", primaryDomain)
 	}
+	plan.StartProgress(ctx, sslEnableProgressSteps(renewalCheck)...)
+	plan.ReportProgress(ctx, plan.ProgressEvent{Index: 0, Status: plan.StepRunning})
 	if err := service.validateDNS(ctx, append([]string{website.PrimaryDomain}, website.Aliases...)); err != nil && !force {
 		return fmt.Errorf("DNS validation warning: %w; rerun with --force when this server is behind NAT", err)
 	}
+	plan.ReportProgress(ctx, plan.ProgressEvent{Index: 0, Status: plan.StepDone})
 	plain := website
 	plain.SSLEnabled = false
 	plain.ForceHTTPS = false
@@ -169,26 +173,32 @@ func (service SSLService) Enable(ctx context.Context, subscriptionName, primaryD
 		return err
 	}
 	path := service.vhostPath(subscriptionName, primaryDomain)
+	plan.ReportProgress(ctx, plan.ProgressEvent{Index: 1, Status: plan.StepRunning})
 	undoHTTP, err := service.Apache.Apply(ctx, path, contents)
 	if err != nil {
 		return err
 	}
+	plan.ReportProgress(ctx, plan.ProgressEvent{Index: 1, Status: plan.StepDone})
+	plan.ReportProgress(ctx, plan.ProgressEvent{Index: 2, Status: plan.StepRunning})
 	for _, name := range append([]string{website.PrimaryDomain}, website.Aliases...) {
 		if err := service.selfCheck(ctx, name); err != nil {
 			_ = undoHTTP(ctx)
 			return err
 		}
 	}
+	plan.ReportProgress(ctx, plan.ProgressEvent{Index: 2, Status: plan.StepDone})
 	lineage := website.CertificateName
 	if lineage == "" {
 		lineage = meta.FilePrefix + subscriptionName + "-" + primaryDomain
 	}
 	args := service.certbotArgs(lineage, append([]string{primaryDomain}, website.Aliases...), false)
+	plan.ReportProgress(ctx, plan.ProgressEvent{Index: 3, Status: plan.StepRunning})
 	result, err := service.Commands.Run(ctx, "/usr/bin/certbot", args...)
 	if err != nil {
 		_ = undoHTTP(ctx)
 		return commandError("issue certificate", result, err)
 	}
+	plan.ReportProgress(ctx, plan.ProgressEvent{Index: 3, Status: plan.StepDone})
 	certificatePath := filepath.Join(meta.LetsEncryptLiveDir, lineage, "fullchain.pem")
 	if _, err := service.FS.Stat(certificatePath); err != nil {
 		return fmt.Errorf("issued certificate %q: %w", certificatePath, err)
@@ -203,22 +213,43 @@ func (service SSLService) Enable(ctx context.Context, subscriptionName, primaryD
 	if err != nil {
 		return err
 	}
+	plan.ReportProgress(ctx, plan.ProgressEvent{Index: 4, Status: plan.StepRunning})
 	if _, err := service.Apache.Apply(ctx, path, contents); err != nil {
 		return err
 	}
+	plan.ReportProgress(ctx, plan.ProgressEvent{Index: 4, Status: plan.StepDone})
+	plan.ReportProgress(ctx, plan.ProgressEvent{Index: 5, Status: plan.StepRunning})
 	if err := service.Store.SetWebsiteSSL(ctx, website.ID, true, forceHTTPS); err != nil {
 		return err
 	}
 	if _, err := service.Store.CreateCertificate(ctx, domain.Certificate{SubscriptionID: subscription.ID, WebsiteID: website.ID, Lineage: lineage, PrimaryDomain: primaryDomain, SANs: append([]string{primaryDomain}, website.Aliases...), Managed: true, NotAfter: notAfter, LastCheckedAt: time.Now().UTC()}); err != nil && !strings.Contains(err.Error(), "UNIQUE") {
 		return err
 	}
+	plan.ReportProgress(ctx, plan.ProgressEvent{Index: 5, Status: plan.StepDone})
 	if renewalCheck {
+		plan.ReportProgress(ctx, plan.ProgressEvent{Index: 6, Status: plan.StepRunning})
 		result, err := service.Commands.Run(ctx, "/usr/bin/certbot", service.renewalCheckArgs(lineage)...)
 		if err != nil {
 			return fmt.Errorf("certificate issued, but renewal check warning: %w", commandError("verify certificate renewal", result, err))
 		}
+		plan.ReportProgress(ctx, plan.ProgressEvent{Index: 6, Status: plan.StepDone})
 	}
 	return nil
+}
+
+func sslEnableProgressSteps(renewalCheck bool) []string {
+	steps := []string{
+		"validate public DNS",
+		"install HTTP ACME vhost",
+		"verify ACME HTTP endpoint",
+		"issue certificate with Certbot",
+		"install HTTPS vhost",
+		"record certificate metadata",
+	}
+	if renewalCheck {
+		steps = append(steps, "verify certificate renewal")
+	}
+	return steps
 }
 
 // renewalCheckArgs uses Certbot's harmless dry-run for the production and
@@ -249,14 +280,22 @@ func (service SSLService) Disable(ctx context.Context, subscriptionName, primary
 	}
 	plain := website
 	plain.SSLEnabled, plain.ForceHTTPS = false, false
+	plan.StartProgress(ctx, "install HTTP vhost", "record TLS disabled")
 	contents, err := service.Websites.RenderVHost(subscriptionName, plain)
 	if err != nil {
 		return err
 	}
+	plan.ReportProgress(ctx, plan.ProgressEvent{Index: 0, Status: plan.StepRunning})
 	if _, err := service.Apache.Apply(ctx, service.vhostPath(subscriptionName, primaryDomain), contents); err != nil {
 		return err
 	}
-	return service.Store.SetWebsiteSSL(ctx, website.ID, false, false)
+	plan.ReportProgress(ctx, plan.ProgressEvent{Index: 0, Status: plan.StepDone})
+	plan.ReportProgress(ctx, plan.ProgressEvent{Index: 1, Status: plan.StepRunning})
+	err = service.Store.SetWebsiteSSL(ctx, website.ID, false, false)
+	if err == nil {
+		plan.ReportProgress(ctx, plan.ProgressEvent{Index: 1, Status: plan.StepDone})
+	}
+	return err
 }
 
 // ReconcileAliases replaces the complete SAN set of an enabled website
@@ -302,6 +341,7 @@ func (service SSLService) ReconcileAliases(ctx context.Context, subscriptionName
 	}
 	candidate := website
 	candidate.Aliases = aliases
+	plan.StartProgress(ctx, sslAliasProgressSteps()...)
 	plain := candidate
 	plain.SSLEnabled, plain.ForceHTTPS = false, false
 	contents, err := service.Websites.RenderVHost(subscriptionName, plain)
@@ -309,33 +349,41 @@ func (service SSLService) ReconcileAliases(ctx context.Context, subscriptionName
 		return err
 	}
 	path := service.vhostPath(subscriptionName, primaryDomain)
+	plan.ReportProgress(ctx, plan.ProgressEvent{Index: 0, Status: plan.StepRunning})
 	undoHTTP, err := service.Apache.Apply(ctx, path, contents)
 	if err != nil {
 		return err
 	}
+	plan.ReportProgress(ctx, plan.ProgressEvent{Index: 0, Status: plan.StepDone})
 	defer func() {
 		if returnErr != nil {
 			_ = undoHTTP(ctx)
 		}
 	}()
 	domains := append([]string{primaryDomain}, aliases...)
+	plan.ReportProgress(ctx, plan.ProgressEvent{Index: 1, Status: plan.StepRunning})
 	if err := service.validateDNS(ctx, domains); err != nil && !force {
 		return fmt.Errorf("DNS validation warning: %w; rerun with --force when this server is behind NAT", err)
 	}
+	plan.ReportProgress(ctx, plan.ProgressEvent{Index: 1, Status: plan.StepDone})
+	plan.ReportProgress(ctx, plan.ProgressEvent{Index: 2, Status: plan.StepRunning})
 	for _, name := range domains {
 		if err := service.selfCheck(ctx, name); err != nil {
 			return err
 		}
 	}
+	plan.ReportProgress(ctx, plan.ProgressEvent{Index: 2, Status: plan.StepDone})
 	lineage := website.CertificateName
 	if lineage == "" {
 		lineage = meta.FilePrefix + subscriptionName + "-" + primaryDomain
 	}
 	args := service.certbotArgs(lineage, domains, true)
+	plan.ReportProgress(ctx, plan.ProgressEvent{Index: 3, Status: plan.StepRunning})
 	result, err := service.Commands.Run(ctx, "/usr/bin/certbot", args...)
 	if err != nil {
 		return commandError("reconcile certificate names", result, err)
 	}
+	plan.ReportProgress(ctx, plan.ProgressEvent{Index: 3, Status: plan.StepDone})
 	notAfter, err := (CertificateService{FS: service.FS, Commands: service.Commands}).readNotAfter(ctx, filepath.Join(meta.LetsEncryptLiveDir, lineage, "fullchain.pem"))
 	if err != nil {
 		return err
@@ -344,9 +392,12 @@ func (service SSLService) ReconcileAliases(ctx context.Context, subscriptionName
 	if err != nil {
 		return err
 	}
+	plan.ReportProgress(ctx, plan.ProgressEvent{Index: 4, Status: plan.StepRunning})
 	if _, err := service.Apache.Apply(ctx, path, contents); err != nil {
 		return err
 	}
+	plan.ReportProgress(ctx, plan.ProgressEvent{Index: 4, Status: plan.StepDone})
+	plan.ReportProgress(ctx, plan.ProgressEvent{Index: 5, Status: plan.StepRunning})
 	if add {
 		err = service.Store.AddWebsiteAlias(ctx, website.ID, alias)
 	} else {
@@ -362,7 +413,21 @@ func (service SSLService) ReconcileAliases(ctx context.Context, subscriptionName
 	if !updated {
 		_, err = service.Store.CreateCertificate(ctx, domain.Certificate{SubscriptionID: subscription.ID, WebsiteID: website.ID, Lineage: lineage, PrimaryDomain: primaryDomain, SANs: domains, Managed: true, NotAfter: notAfter, LastCheckedAt: time.Now().UTC()})
 	}
+	if err == nil {
+		plan.ReportProgress(ctx, plan.ProgressEvent{Index: 5, Status: plan.StepDone})
+	}
 	return err
+}
+
+func sslAliasProgressSteps() []string {
+	return []string{
+		"install HTTP ACME vhost",
+		"validate public DNS",
+		"verify ACME HTTP endpoint",
+		"reconcile certificate names with Certbot",
+		"install HTTPS vhost",
+		"record aliases and certificate metadata",
+	}
 }
 
 func (service SSLService) certbotArgs(lineage string, domains []string, replaceNames bool) []string {

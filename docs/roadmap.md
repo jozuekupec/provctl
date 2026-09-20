@@ -970,9 +970,17 @@ kontejner obnoven na `clean`.
   therefore already shows pool, socket, vhost and SQLite steps from its real
   plan; all other mutations using `plan.Executor` inherit the same behavior
   without per-form wiring. Rollbacks render distinctly. A focused UI test
-  proves replacement and preservation of the refresh step. Remaining work is
-  to migrate mutations that do not yet use an executor (notably the TLS
-  certificate path) and remove their temporary UI-owned labels.
+  proves replacement and preservation of the refresh step. TLS certificate
+  issuance now uses the same stream without being forced through executor
+  rollback semantics: it reports the safe sequence DNS preflight → HTTP ACME
+  vhost → HTTP self-check → Certbot → HTTPS vhost → metadata → optional
+  renewal verification. Its focused UI test proves the concrete Certbot step
+  replaces the generic label and remains failed until dismissed. TLS disable
+  and TLS alias reconciliation now report their own safe sequences too, so
+  every TUI TLS mutation is covered. Their service tests assert the published
+  ordering. The remaining audit is to identify any other non-executor
+  mutations and replace their temporary labels where a typed service sequence
+  is warranted.
 
 - [x] **TUI administration refinements:** Settings now uses the installed
   PHP-FPM version picker for `php.default_version`; selection stays pending

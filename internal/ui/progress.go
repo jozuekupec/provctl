@@ -69,10 +69,21 @@ func steppedCmd(title string, labels []string, work func(context.Context, func(i
 			defer cancel()
 			planStepCount := 0
 			current := -1
+			activePlanStep := -1
 			ctx = plan.WithProgress(ctx, func(event plan.ProgressEvent) {
 				if len(event.Steps) > 0 {
 					planStepCount = len(event.Steps)
 					current = -1
+				}
+				if event.Index >= 0 {
+					switch event.Status {
+					case plan.StepRunning:
+						activePlanStep = event.Index
+					case plan.StepDone, plan.StepFailed, plan.StepRolledBack:
+						if activePlanStep == event.Index {
+							activePlanStep = -1
+						}
+					}
 				}
 				ch <- progressPlanMsg{event: event}
 			})
@@ -92,7 +103,9 @@ func steppedCmd(title string, labels []string, work func(context.Context, func(i
 			}
 			report(0)
 			result := work(ctx, report)
-			if current >= 0 {
+			if operationFailed(result) && activePlanStep >= 0 {
+				ch <- progressStepMsg{index: activePlanStep, state: stepFailed}
+			} else if current >= 0 {
 				state := stepDone
 				if operationFailed(result) {
 					state = stepFailed

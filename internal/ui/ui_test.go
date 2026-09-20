@@ -887,6 +887,39 @@ func TestModel_PlanProgressReplacesApplyPlaceholder(t *testing.T) {
 	}
 }
 
+func TestModel_TLSProgressUsesTypedServiceSteps(t *testing.T) {
+	m := New(Deps{SetWebsiteTLS: func(ctx context.Context, _, _ string, _ bool) error {
+		plan.StartProgress(ctx, "validate public DNS", "issue certificate with Certbot")
+		plan.ReportProgress(ctx, plan.ProgressEvent{Index: 0, Status: plan.StepRunning})
+		plan.ReportProgress(ctx, plan.ProgressEvent{Index: 0, Status: plan.StepDone})
+		plan.ReportProgress(ctx, plan.ProgressEvent{Index: 1, Status: plan.StepRunning})
+		return fmt.Errorf("Certbot rejected challenge")
+	}})
+	m.items = []domain.Subscription{{ID: 1, Name: "acme"}}
+	m.websites = []domain.Website{{ID: 1, PrimaryDomain: "app.example.test", Enabled: true}}
+	m.workspace, m.showWebsites, m.focus = true, true, focusWebsites
+
+	command := m.changeWebsiteTLSCmd(confirmState{enabled: true})
+	seenSteps := false
+	for range 12 {
+		message := command()
+		updated, next := m.Update(message)
+		m, command = updated.(appModel), next
+		if strings.Contains(m.progress.render(), "issue certificate with Certbot") {
+			seenSteps = true
+			if strings.Contains(m.progress.render(), "apply TLS configuration") {
+				t.Fatalf("generic TLS label remained: %q", m.progress.render())
+			}
+		}
+		if m.progress.awaitingDismiss {
+			break
+		}
+	}
+	if !seenSteps || !m.progress.awaitingDismiss || m.progress.steps[1].state != stepFailed {
+		t.Fatalf("TLS progress = %#v", m.progress)
+	}
+}
+
 func TestModel_HelpOpensFiltersAndCloses(t *testing.T) {
 	m := New(Deps{})
 	m.ready, m.width, m.height = true, 100, 28
