@@ -928,19 +928,18 @@ kontejner obnoven na `clean`.
 
 ## Follow-up scope after v0.1
 
-- [~] **CR 2026-09-20 — current TUI against refreshed branchctl and cookbook:**
+- [x] **CR 2026-09-20 — current TUI against refreshed branchctl and cookbook:**
   `branchctl` and the personal Bubble Tea cookbook were fast-forwarded before
   this review. The immediate correctness finding is that `New.Init()` starts
   subscription loading with generation `0`, while `opSlot.stale(0)` always
   returns false. A delayed initial reply can therefore overwrite a later
   explicit refresh; initialize through the same `opSlot.start()` path and add
-  a regression test. The next focused TUI improvement is to move mutation
-  stages from UI-owned positional labels into a typed domain pipeline plan,
-  then keep a failed progress checklist open until Enter/Esc acknowledges it.
-  This preserves non-fatal skipped/failed stages that are currently hidden
-  when each final message immediately clears `m.progress.active`. Extracting
-  the repeated final-result handling from `ui.go` into one operation-result
-  applicator is a prerequisite. The existing binding table, popup classes,
+  a regression test. The resulting work is complete: the strict generation
+  guard prevents the stale reply, services publish typed plan stages, and a
+  failed progress checklist remains until Enter/Esc acknowledges it. Terminal
+  mutation results now pass through one pre-routing applicator that clears the
+  complete progress state after acknowledgement, rather than each result case
+  independently clearing only `active`. The existing binding table, popup classes,
   path picker, generation guards for normal reads, minimum-terminal guard and
   focused layout tests already match the current reference patterns; no broad
   UI rewrite is warranted.
@@ -959,7 +958,7 @@ kontejner obnoven na `clean`.
   ./...` and `go test ./... -race -count=1` passed; `make test` remains blocked
   only because `staticcheck` is not currently installed on the host PATH.
 
-- [~] **Typed operation pipeline:** `plan.Executor` now publishes a typed,
+- [x] **Typed operation pipeline:** `plan.Executor` now publishes a typed,
   context-scoped progress stream: the immutable step list followed by running,
   done, failed and rolled-back transitions. The stream deliberately omits
   command previews and errors to keep terminal progress safe. Its focused
@@ -978,9 +977,8 @@ kontejner obnoven na `clean`.
   replaces the generic label and remains failed until dismissed. TLS disable
   and TLS alias reconciliation now report their own safe sequences too, so
   every TUI TLS mutation is covered. Their service tests assert the published
-  ordering. The remaining audit is to identify any other non-executor
-  mutations and replace their temporary labels where a typed service sequence
-  is warranted.
+  ordering. The audit found that all other TUI mutations use `plan.Executor`;
+  no untyped multi-stage service path remains.
 
 - [x] **TUI administration refinements:** Settings now uses the installed
   PHP-FPM version picker for `php.default_version`; selection stays pending

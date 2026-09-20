@@ -17,6 +17,11 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.status = "change failed; review the checklist"
 		return m, nil
 	}
+	if isMutationResult(msg) {
+		// Terminal mutation results always close a completed progress operation.
+		// Failures are intercepted above until the user acknowledges the checklist.
+		m.progress = progressState{}
+	}
 
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
@@ -176,7 +181,6 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.detailView, m.focus = detailBackups, focusDetail
 		}
 	case sshAccessChangedMsg:
-		m.progress.active = false
 		if msg.err != nil {
 			m.status = "SSH access change failed: " + msg.err.Error()
 			m.output = m.output.append(m.status)
@@ -193,7 +197,6 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	case sshKeyAddedMsg:
-		m.progress.active = false
 		if msg.err != nil {
 			m.status = "SSH key add failed: " + msg.err.Error()
 			m.output = m.output.append(m.status)
@@ -207,7 +210,6 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.output = m.output.append("SSH key added from " + msg.path)
 		return m, nil
 	case sshKeyRemovedMsg:
-		m.progress.active = false
 		if msg.err != nil {
 			m.status = "SSH key removal failed: " + msg.err.Error()
 			m.output = m.output.append(m.status)
@@ -219,7 +221,6 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.output = m.output.append("SSH key removed: " + msg.fingerprint)
 		return m, nil
 	case cronJobCreatedMsg:
-		m.progress.active = false
 		if msg.err != nil {
 			m.status = "cron job creation failed: " + msg.err.Error()
 			m.output = m.output.append(m.status)
@@ -229,7 +230,6 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.output = m.output.append("cron job created")
 		return m, nil
 	case cronJobRemovedMsg:
-		m.progress.active = false
 		if msg.err != nil {
 			m.status = "cron job removal failed: " + msg.err.Error()
 			m.output = m.output.append(m.status)
@@ -239,7 +239,6 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.output = m.output.append(fmt.Sprintf("cron job removed: %d", msg.id))
 		return m, nil
 	case cronJobUpdatedMsg:
-		m.progress.active = false
 		if msg.err != nil {
 			m.status = "cron job update failed: " + msg.err.Error()
 			m.output = m.output.append(m.status)
@@ -249,7 +248,6 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.output = m.output.append(fmt.Sprintf("cron job updated: %d", msg.id))
 		return m, nil
 	case backupCreatedMsg:
-		m.progress.active = false
 		if msg.err != nil {
 			m.status = "backup creation failed: " + msg.err.Error()
 			m.output = m.output.append(m.status)
@@ -259,7 +257,6 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.output = m.output.append(fmt.Sprintf("backup created: %d", msg.id))
 		return m, nil
 	case websiteChangedMsg:
-		m.progress.active = false
 		if msg.err != nil {
 			m.status = "website change failed: " + msg.err.Error()
 			m.output = m.output.append(m.status)
@@ -271,7 +268,6 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m, command := m.startWebsites()
 		return m, command
 	case websiteTLSChangedMsg:
-		m.progress.active = false
 		if msg.err != nil {
 			m.status = "TLS change failed: " + msg.err.Error()
 			m.output = m.output.append(m.status)
@@ -282,7 +278,6 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m, command := m.startWebsites()
 		return m, command
 	case websiteDocumentRootChangedMsg:
-		m.progress.active = false
 		if msg.err != nil {
 			m.status = "document root change failed: " + msg.err.Error()
 			m.output = m.output.append(m.status)
@@ -296,7 +291,6 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	case websiteLogDirectoryChangedMsg:
-		m.progress.active = false
 		if msg.err != nil {
 			m.status = "log directory change failed: " + msg.err.Error()
 			m.output = m.output.append(m.status)
@@ -308,7 +302,6 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.output = m.output.append("log directory " + msg.domain + " → " + msg.path)
 		return m, nil
 	case websiteCreatedMsg:
-		m.progress.active = false
 		if msg.err != nil {
 			m.status = "domain creation failed: " + msg.err.Error()
 			m.output = m.output.append(m.status)
@@ -322,7 +315,6 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	case websiteAliasChangedMsg:
-		m.progress.active = false
 		if msg.err != nil {
 			m.status = "alias change failed: " + msg.err.Error()
 			m.output = m.output.append(m.status)
@@ -336,7 +328,6 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	case websiteTargetChangedMsg:
-		m.progress.active = false
 		if msg.err != nil {
 			m.status = "target change failed: " + msg.err.Error()
 			return m, nil
@@ -347,7 +338,6 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	case websiteDeletedMsg:
-		m.progress.active = false
 		if msg.err != nil {
 			m.status = "domain deletion failed: " + msg.err.Error()
 			m.output = m.output.append(m.status)
@@ -359,7 +349,6 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.websiteCursor = clamp(m.websiteCursor, len(m.visibleWebsites()))
 		return m, nil
 	case subscriptionChangedMsg:
-		m.progress.active = false
 		if msg.err != nil {
 			m.status = "subscription change failed: " + msg.err.Error()
 			m.output = m.output.append(m.status)
@@ -370,7 +359,6 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m, command := m.startSubscriptions()
 		return m, command
 	case subscriptionDeletedMsg:
-		m.progress.active = false
 		if msg.err != nil {
 			m.status = "subscription deletion failed: " + msg.err.Error()
 			m.output = m.output.append(m.status)
@@ -383,7 +371,6 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m, command := m.startSubscriptions()
 		return m, command
 	case subscriptionCreatedMsg:
-		m.progress.active = false
 		if msg.err != nil {
 			m.status = "subscription creation failed: " + msg.err.Error()
 			m.output = m.output.append(m.status)
@@ -394,7 +381,6 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m, command := m.startSubscriptions()
 		return m, command
 	case databaseCreatedMsg:
-		m.progress.active = false
 		if msg.err != nil {
 			m.status = "database creation failed: " + msg.err.Error()
 			m.output = m.output.append(m.status)
@@ -405,7 +391,6 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.secret = secretState{open: true, title: "Database password", secret: msg.password}
 		return m, nil
 	case databasePasswordChangedMsg:
-		m.progress.active = false
 		if msg.err != nil {
 			m.status = "database password rotation failed: " + msg.err.Error()
 			m.output = m.output.append(m.status)
@@ -416,7 +401,6 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.secret = secretState{open: true, title: "Database password", secret: msg.password}
 		return m, nil
 	case databaseDeletedMsg:
-		m.progress.active = false
 		if msg.err != nil {
 			m.status = "database deletion failed: " + msg.err.Error()
 			m.output = m.output.append(m.status)
@@ -428,7 +412,6 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.output = m.output.append("database deleted: " + msg.name)
 		return m, nil
 	case reconcileFinishedMsg:
-		m.progress.active = false
 		if msg.err != nil {
 			m.status = "reconcile failed: " + msg.err.Error()
 			m.output = m.output.append(m.status)
@@ -474,7 +457,6 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	case websitePHPChangedMsg:
-		m.progress.active = false
 		if msg.err != nil {
 			m.status = "PHP version change failed: " + msg.err.Error()
 			m.output = m.output.append(m.status)
