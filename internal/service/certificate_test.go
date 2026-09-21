@@ -176,7 +176,7 @@ func TestSSLService_CertbotArgsUsesCompleteSANSet(t *testing.T) {
 	service := SSLService{Config: config.Config{Paths: config.Paths{ACMEChallenge: "/acme"}, SSL: config.SSL{Email: "ops@example.test", Staging: true, Server: "https://acme.example.test/directory"}}}
 	args := service.certbotArgs("provctl-site-7", []string{"example.test", "www.example.test"}, true)
 	joined := strings.Join(args, " ")
-	for _, want := range []string{"-d example.test", "-d www.example.test", "--cert-name provctl-site-7", "--expand", "--server https://acme.example.test/directory"} {
+	for _, want := range []string{"-d example.test", "-d www.example.test", "--cert-name provctl-site-7", "--force-renewal", "--server https://acme.example.test/directory"} {
 		if !strings.Contains(joined, want) {
 			t.Errorf("certbot arguments %q do not contain %q", joined, want)
 		}

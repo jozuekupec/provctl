@@ -71,3 +71,29 @@ func TestRepository_ListAndFindSubscriptions(t *testing.T) {
 		t.Errorf("QuotaBackups = %d, want %d", got, want)
 	}
 }
+
+func TestRepository_UpdateSubscriptionQuotas(t *testing.T) {
+	repository, err := Open(context.Background(), filepath.Join(t.TempDir(), "provctl.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer repository.Close()
+	subscription := domain.Subscription{Name: "acme", UnixUser: "acme", UnixUID: 5000, Home: "/vhosts/acme", PHPMaxChildren: 10, PHPMemoryLimit: "256M", PHPUploadMax: "64M", PHPMaxExecTime: 60, SSHAccess: "none"}
+	if err := repository.CreateSubscription(context.Background(), subscription); err != nil {
+		t.Fatal(err)
+	}
+	stored, err := repository.SubscriptionByName(context.Background(), "acme")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := repository.UpdateSubscriptionQuotas(context.Background(), stored.ID, 2*1024*1024*1024, 4, 3, 2); err != nil {
+		t.Fatal(err)
+	}
+	updated, err := repository.SubscriptionByName(context.Background(), "acme")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if updated.QuotaDiskBytes != 2*1024*1024*1024 || updated.QuotaWebsites != 4 || updated.QuotaDatabases != 3 || updated.QuotaBackups != 2 {
+		t.Fatalf("updated quotas = %#v", updated)
+	}
+}

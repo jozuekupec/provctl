@@ -56,6 +56,8 @@ func (m appModel) runConfirmed() (tea.Model, tea.Cmd) {
 		return m, m.deleteSubscriptionCmd(confirm)
 	case "create-subscription":
 		return m, m.createSubscriptionCmd(confirm)
+	case "update-subscription-quotas":
+		return m, m.updateSubscriptionQuotasCmd(confirm)
 	case "adopt-subscription":
 		return m, m.adoptSubscriptionCmd(confirm)
 	case "create-database":

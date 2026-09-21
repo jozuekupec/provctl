@@ -437,7 +437,9 @@ func (service SSLService) certbotArgs(lineage string, domains []string, replaceN
 	}
 	args = append(args, "--non-interactive", "--agree-tos", "-m", service.Config.SSL.Email, "--cert-name", lineage)
 	if replaceNames {
-		args = append(args, "--expand")
+		// Certbot's --expand refuses a shorter SAN set. Reissuing the complete
+		// requested set makes alias addition and removal use the same safe path.
+		args = append(args, "--force-renewal")
 	}
 	// Certbot treats --staging and an explicit --server as mutually exclusive.
 	// A configured server is an intentional override, typically local Pebble.

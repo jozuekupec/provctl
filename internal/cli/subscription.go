@@ -20,6 +20,7 @@ import (
 func newSubscriptionCommand() *cobra.Command {
 	command := &cobra.Command{Use: "subscription", Short: "manage hosting subscriptions"}
 	command.AddCommand(newSubscriptionCreateCommand())
+	command.AddCommand(newSubscriptionQuotaCommand())
 	command.AddCommand(newSubscriptionAdoptCommand())
 	command.AddCommand(newSubscriptionListCommand())
 	command.AddCommand(newSubscriptionShowCommand())
@@ -275,6 +276,49 @@ func newSubscriptionCreateCommand() *cobra.Command {
 	command.Flags().IntVar(&quotaBackups, "quota-backups", 0, "maximum backups (0 means unlimited)")
 	command.Flags().BoolVar(&dryRun, "dry-run", false, "show the operation plan without changing the system")
 	return command
+}
+
+func newSubscriptionQuotaCommand() *cobra.Command {
+	var configPath, quotaDisk string
+	var quotaWebsites, quotaDatabases, quotaBackups int
+	quota := &cobra.Command{Use: "quota", Short: "manage subscription quotas"}
+	set := &cobra.Command{Use: "set <name>", Short: "replace subscription quota limits", Args: cobra.ExactArgs(1), RunE: func(command *cobra.Command, args []string) error {
+		cfg, err := config.Load(configPath)
+		if err != nil {
+			return fmt.Errorf("load configuration: %w", err)
+		}
+		diskBytes, err := parseByteSize(quotaDisk)
+		if err != nil {
+			return fmt.Errorf("parse --quota-disk: %w", err)
+		}
+		if quotaWebsites < 0 || quotaDatabases < 0 || quotaBackups < 0 {
+			return fmt.Errorf("object quotas must not be negative")
+		}
+		runtime, err := service.NewProductionSubscriptionRuntime(context.Background(), cfg)
+		if err != nil {
+			return fmt.Errorf("open subscription state: %w", err)
+		}
+		defer runtime.Close()
+		ctx, cancel := context.WithTimeout(context.Background(), time.Duration(cfg.Limits.LockTimeoutSeconds)*time.Second)
+		defer cancel()
+		operationID, err := runtime.Service.UpdateQuotas(ctx, args[0], service.SubscriptionCreateOptions{QuotaDiskBytes: diskBytes, QuotaWebsites: quotaWebsites, QuotaDatabases: quotaDatabases, QuotaBackups: quotaBackups})
+		if err != nil {
+			return err
+		}
+		_, err = fmt.Fprintf(command.OutOrStdout(), "Updated quotas for subscription %q (operation %d).\n", args[0], operationID)
+		return err
+	}}
+	set.Flags().StringVar(&configPath, "config", meta.ConfigFile, "path to config.toml")
+	set.Flags().StringVar(&quotaDisk, "quota-disk", "", "measured disk quota (0 means unlimited)")
+	set.Flags().IntVar(&quotaWebsites, "quota-websites", 0, "maximum websites (0 means unlimited)")
+	set.Flags().IntVar(&quotaDatabases, "quota-databases", 0, "maximum databases (0 means unlimited)")
+	set.Flags().IntVar(&quotaBackups, "quota-backups", 0, "maximum backups (0 means unlimited)")
+	_ = set.MarkFlagRequired("quota-disk")
+	_ = set.MarkFlagRequired("quota-websites")
+	_ = set.MarkFlagRequired("quota-databases")
+	_ = set.MarkFlagRequired("quota-backups")
+	quota.AddCommand(set)
+	return quota
 }
 
 var byteSize = regexp.MustCompile(`^([1-9][0-9]*)([KMGT]?)$`)

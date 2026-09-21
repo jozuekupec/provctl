@@ -6,6 +6,7 @@ import (
 	"crypto/rand"
 	"crypto/x509"
 	"encoding/pem"
+	"errors"
 	"math/big"
 	"os"
 	"path/filepath"
@@ -95,6 +96,34 @@ func TestCertbotRenewals_SnapshotRestoresContentsAndMode(t *testing.T) {
 	info, err := os.Stat(path)
 	if err != nil || info.Mode().Perm() != 0o600 {
 		t.Fatalf("restored mode: %v, %v", info, err)
+	}
+}
+
+func TestCertbotRenewals_SnapshotPrunesExpiredRecoveryMaterial(t *testing.T) {
+	directory := t.TempDir()
+	path := filepath.Join(directory, "legacy.conf")
+	if err := os.WriteFile(path, []byte("authenticator = apache\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	backupRoot := filepath.Join(directory, "backups")
+	old := filepath.Join(backupRoot, "legacy", "old")
+	if err := os.MkdirAll(old, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	oldTime := time.Now().AddDate(0, 0, -2)
+	if err := os.Chtimes(old, oldTime, oldTime); err != nil {
+		t.Fatal(err)
+	}
+	manager := CertbotRenewals{FS: system.OSFS{}, Directory: directory, BackupDirectory: backupRoot, RetentionDays: 1}
+	if _, err := manager.Snapshot(context.Background(), "legacy"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(old); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("expired backup remains: %v", err)
+	}
+	entries, err := os.ReadDir(filepath.Join(backupRoot, "legacy"))
+	if err != nil || len(entries) != 1 {
+		t.Fatalf("retained snapshots = %v, %v", entries, err)
 	}
 }
 

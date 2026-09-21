@@ -50,7 +50,12 @@ type CertbotRenewals struct {
 	// it with public staging when --dry-run is used, so local Pebble verification
 	// must perform a real forced renewal instead.
 	Server string
+	// RetentionDays limits persistent recovery snapshots per lineage. Zero uses
+	// the conservative default; pruning never makes a live operation fail.
+	RetentionDays int
 }
+
+const defaultRenewalBackupRetentionDays = 30
 
 func (manager CertbotRenewals) Find(_ context.Context, domainName string) ([]RenewalLineage, error) {
 	entries, err := manager.FS.ReadDir(manager.directory())
@@ -171,7 +176,42 @@ func (manager CertbotRenewals) Snapshot(_ context.Context, lineage string) (func
 	if err := manager.FS.WriteFileAtomic(filepath.Join(backupDirectory, "restore.txt"), metadata, 0o600); err != nil {
 		return nil, fmt.Errorf("persist renewal restore instructions: %w", err)
 	}
+	// A failed cleanup only retains additional recovery material; it must never
+	// turn a successfully persisted snapshot into an unsafe failed operation.
+	_ = manager.pruneSnapshots(lineage, time.Now().UTC())
 	return func(context.Context) error { return manager.FS.WriteFileAtomic(path, contents, info.Mode().Perm()) }, nil
+}
+
+func (manager CertbotRenewals) pruneSnapshots(lineage string, now time.Time) error {
+	backupRoot := manager.BackupDirectory
+	if backupRoot == "" {
+		backupRoot = meta.RenewalBackupDir
+	}
+	entries, err := manager.FS.ReadDir(filepath.Join(backupRoot, lineage))
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return nil
+		}
+		return err
+	}
+	days := manager.RetentionDays
+	if days <= 0 {
+		days = defaultRenewalBackupRetentionDays
+	}
+	cutoff := now.AddDate(0, 0, -days)
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+		info, err := entry.Info()
+		if err != nil || !info.ModTime().Before(cutoff) {
+			continue
+		}
+		if err := manager.FS.RemoveAll(filepath.Join(backupRoot, lineage, entry.Name())); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (manager CertbotRenewals) directory() string {

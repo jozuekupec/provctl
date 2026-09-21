@@ -176,12 +176,15 @@ func NewRootCommand() *cobra.Command {
 		createSubscription := func(ctx context.Context, name string, options service.SubscriptionCreateOptions) (int64, error) {
 			return subscriptionWriteRuntime.Service.CreateWithOptions(ctx, name, options)
 		}
+		updateSubscriptionQuotas := func(ctx context.Context, name string, options service.SubscriptionCreateOptions) (int64, error) {
+			return subscriptionWriteRuntime.Service.UpdateQuotas(ctx, name, options)
+		}
 		createDatabase := func(ctx context.Context, subscription, name, credentials string) (string, int64, error) {
 			return databaseWriteRuntime.Service.CreateWithCredentials(ctx, subscription, name, credentials)
 		}
 		_, err = ui.Program(ui.Deps{LoadSubscriptions: runtime.Service.List, LoadSubscriptionUsage: runtime.Service.ListUsage, LoadWebsites: websiteRuntime.Service.List, LoadDatabases: databaseRuntime.Service.ListForSubscription, CreateDatabase: createDatabase, ChangeDatabasePassword: databaseWriteRuntime.Service.ChangePassword, DeleteDatabase: databaseWriteRuntime.Service.Delete, LoadSSHKeys: sshRuntime.Service.List, LoadCronJobs: cronRuntime.Service.List, AddCronJob: cronWriteRuntime.Service.Add, UpdateCronJob: cronWriteRuntime.Service.Update, RemoveCronJob: cronWriteRuntime.Service.Remove, LoadBackups: backupRuntime.Service.ListForSubscription, CreateBackup: backupWriteRuntime.Service.Create, SetSSHAccess: sshWriteRuntime.Service.SetAccess, AddSSHKeyFromFile: sshWriteRuntime.Service.AddFromFile, RemoveSSHKey: sshWriteRuntime.Service.Remove, ReadWebsiteLogs: websiteRuntime.Service.ReadLogs, SetWebsiteEnabled: websiteWriteRuntime.Service.SetEnabled, SetWebsiteTLS: setWebsiteTLS, SetWebsiteDocumentRoot: websiteWriteRuntime.Service.SetDocumentRoot, SetWebsiteLogDirectory: websiteWriteRuntime.Service.SetLogDirectory, SetWebsiteTarget: websiteWriteRuntime.Service.SetTarget, DeleteWebsite: websiteWriteRuntime.Service.Delete, CreateWebsite: createWebsiteFromUI, SetWebsiteAlias: setWebsiteAlias, CreateSubscription: createSubscription, AdoptSubscription: subscriptionWriteRuntime.Service.Adopt, SetSubscriptionStatus: subscriptionWriteRuntime.Service.SetStatus, DeleteSubscription: subscriptionWriteRuntime.Service.Delete, LoadPHPVersions: phpReadRuntime.Service.ListVersions, SetWebsitePHP: phpWriteRuntime.Service.Set, RunHealth: healthRuntime.Service.Run, Reconcile: reconcileRuntime.Service.Reconcile, SaveConfig: func(_ context.Context, updated config.Config) error {
 			return config.Update(meta.ConfigFile, updated)
-		}, BrowsePath: func(_ context.Context, path string, mode fsbrowse.Mode) (string, []fsbrowse.Entry, error) {
+		}, UpdateSubscriptionQuotas: updateSubscriptionQuotas, BrowsePath: func(_ context.Context, path string, mode fsbrowse.Mode) (string, []fsbrowse.Entry, error) {
 			return fsbrowse.Browse(path, mode)
 		}, Config: cfg}).Run()
 		return err

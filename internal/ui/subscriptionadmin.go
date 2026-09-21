@@ -75,7 +75,11 @@ func (m appModel) handleSubscriptionAdminKey(msg tea.KeyMsg) (tea.Model, tea.Cmd
 			}
 		}
 	case actionEdit:
-		if m.subscriptionAdmin.tab == 3 {
+		if m.subscriptionAdmin.tab == 0 {
+			if subscription, ok := m.selectedSubscription(); ok {
+				return m.openSubscriptionQuotaForm(subscription), nil
+			}
+		} else if m.subscriptionAdmin.tab == 3 {
 			if job, ok := m.selectedCronJob(); ok {
 				return m.openCronEditForm(job), nil
 			}

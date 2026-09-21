@@ -87,6 +87,23 @@ func (repository *Repository) CreateSubscription(ctx context.Context, subscripti
 	return nil
 }
 
+// UpdateSubscriptionQuotas replaces all quota values. Zero means unlimited.
+func (repository *Repository) UpdateSubscriptionQuotas(ctx context.Context, id int64, diskBytes int64, websites, databases, backups int) error {
+	now := time.Now().UTC().Format(time.RFC3339)
+	result, err := repository.DB.ExecContext(ctx, `UPDATE subscriptions SET quota_disk_bytes = ?, quota_websites = ?, quota_databases = ?, quota_backups = ?, updated_at = ? WHERE id = ?`, nullableInt64(diskBytes), nullableQuotaInt(websites), nullableQuotaInt(databases), nullableQuotaInt(backups), now, id)
+	if err != nil {
+		return fmt.Errorf("update subscription quotas: %w", err)
+	}
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("count subscription quota update: %w", err)
+	}
+	if rows != 1 {
+		return fmt.Errorf("subscription ID %d not found", id)
+	}
+	return nil
+}
+
 func nullableInt64(value int64) any {
 	if value == 0 {
 		return nil

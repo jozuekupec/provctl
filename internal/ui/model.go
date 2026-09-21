@@ -14,43 +14,44 @@ import (
 )
 
 type Deps struct {
-	LoadSubscriptions      func(context.Context) ([]domain.Subscription, error)
-	LoadSubscriptionUsage  func(context.Context) (map[int64]service.SubscriptionUsage, error)
-	LoadWebsites           func(context.Context, int64) ([]domain.Website, error)
-	LoadDatabases          func(context.Context, string) ([]domain.Database, error)
-	CreateDatabase         func(context.Context, string, string, string) (string, int64, error)
-	ChangeDatabasePassword func(context.Context, string, string) (string, int64, error)
-	DeleteDatabase         func(context.Context, string, string) (int64, error)
-	LoadSSHKeys            func(context.Context, string) ([]domain.SSHKey, error)
-	LoadCronJobs           func(context.Context, string) ([]domain.CronJob, error)
-	AddCronJob             func(context.Context, string, string, string, string) (int64, error)
-	UpdateCronJob          func(context.Context, string, int64, string, string, string) (int64, error)
-	RemoveCronJob          func(context.Context, string, int64) (int64, error)
-	LoadBackups            func(context.Context, string) ([]domain.Backup, error)
-	CreateBackup           func(context.Context, string) (int64, error)
-	SetSSHAccess           func(context.Context, string, string) (string, int64, error)
-	AddSSHKeyFromFile      func(context.Context, string, string) (int64, error)
-	RemoveSSHKey           func(context.Context, string, string) (int64, error)
-	ReadWebsiteLogs        func(context.Context, string, string, bool, int) (string, error)
-	SetWebsiteEnabled      func(context.Context, string, string, bool) (int64, error)
-	SetWebsiteTLS          func(context.Context, string, string, bool) error
-	SetWebsiteDocumentRoot func(context.Context, string, string, string) (int64, error)
-	SetWebsiteLogDirectory func(context.Context, string, string, string) (int64, error)
-	CreateWebsite          func(context.Context, string, string, domain.WebsiteType, string, int) (int64, error)
-	SetWebsiteAlias        func(context.Context, string, string, string, bool) (int64, error)
-	SetWebsiteTarget       func(context.Context, string, string, string, int) (int64, error)
-	DeleteWebsite          func(context.Context, string, string) (int64, error)
-	CreateSubscription     func(context.Context, string, service.SubscriptionCreateOptions) (int64, error)
-	AdoptSubscription      func(context.Context, string, service.SubscriptionAdoptOptions) (int64, error)
-	SetSubscriptionStatus  func(context.Context, string, string) (int64, error)
-	DeleteSubscription     func(context.Context, string, bool) (int64, error)
-	LoadPHPVersions        func(context.Context) ([]service.PHPFPMVersion, error)
-	SetWebsitePHP          func(context.Context, string, string, service.PHPSetOptions) (int64, error)
-	RunHealth              func(context.Context, string, string) ([]service.Check, error)
-	Reconcile              func(context.Context, string) (int64, error)
-	SaveConfig             func(context.Context, config.Config) error
-	BrowsePath             func(context.Context, string, fsbrowse.Mode) (string, []fsbrowse.Entry, error)
-	Config                 config.Config
+	LoadSubscriptions        func(context.Context) ([]domain.Subscription, error)
+	LoadSubscriptionUsage    func(context.Context) (map[int64]service.SubscriptionUsage, error)
+	LoadWebsites             func(context.Context, int64) ([]domain.Website, error)
+	LoadDatabases            func(context.Context, string) ([]domain.Database, error)
+	CreateDatabase           func(context.Context, string, string, string) (string, int64, error)
+	ChangeDatabasePassword   func(context.Context, string, string) (string, int64, error)
+	DeleteDatabase           func(context.Context, string, string) (int64, error)
+	LoadSSHKeys              func(context.Context, string) ([]domain.SSHKey, error)
+	LoadCronJobs             func(context.Context, string) ([]domain.CronJob, error)
+	AddCronJob               func(context.Context, string, string, string, string) (int64, error)
+	UpdateCronJob            func(context.Context, string, int64, string, string, string) (int64, error)
+	RemoveCronJob            func(context.Context, string, int64) (int64, error)
+	LoadBackups              func(context.Context, string) ([]domain.Backup, error)
+	CreateBackup             func(context.Context, string) (int64, error)
+	SetSSHAccess             func(context.Context, string, string) (string, int64, error)
+	AddSSHKeyFromFile        func(context.Context, string, string) (int64, error)
+	RemoveSSHKey             func(context.Context, string, string) (int64, error)
+	ReadWebsiteLogs          func(context.Context, string, string, bool, int) (string, error)
+	SetWebsiteEnabled        func(context.Context, string, string, bool) (int64, error)
+	SetWebsiteTLS            func(context.Context, string, string, bool) error
+	SetWebsiteDocumentRoot   func(context.Context, string, string, string) (int64, error)
+	SetWebsiteLogDirectory   func(context.Context, string, string, string) (int64, error)
+	CreateWebsite            func(context.Context, string, string, domain.WebsiteType, string, int) (int64, error)
+	SetWebsiteAlias          func(context.Context, string, string, string, bool) (int64, error)
+	SetWebsiteTarget         func(context.Context, string, string, string, int) (int64, error)
+	DeleteWebsite            func(context.Context, string, string) (int64, error)
+	CreateSubscription       func(context.Context, string, service.SubscriptionCreateOptions) (int64, error)
+	UpdateSubscriptionQuotas func(context.Context, string, service.SubscriptionCreateOptions) (int64, error)
+	AdoptSubscription        func(context.Context, string, service.SubscriptionAdoptOptions) (int64, error)
+	SetSubscriptionStatus    func(context.Context, string, string) (int64, error)
+	DeleteSubscription       func(context.Context, string, bool) (int64, error)
+	LoadPHPVersions          func(context.Context) ([]service.PHPFPMVersion, error)
+	SetWebsitePHP            func(context.Context, string, string, service.PHPSetOptions) (int64, error)
+	RunHealth                func(context.Context, string, string) ([]service.Check, error)
+	Reconcile                func(context.Context, string) (int64, error)
+	SaveConfig               func(context.Context, config.Config) error
+	BrowsePath               func(context.Context, string, fsbrowse.Mode) (string, []fsbrowse.Entry, error)
+	Config                   config.Config
 }
 type websitesLoadedMsg struct {
 	items      []domain.Website
@@ -346,9 +347,10 @@ type targetFormState struct {
 }
 
 type subscriptionCreateFormState struct {
-	open   bool
-	field  int
-	inputs []textinput.Model
+	open    bool
+	editing bool
+	field   int
+	inputs  []textinput.Model
 }
 
 type subscriptionAdoptFormState struct {

@@ -49,6 +49,15 @@ bootstraps, opens the TUI, and restores `pv:clean` after exit.
   data ownership transfer, external runtime boundary, optional backups, TUI
   entry form, and Certbot-lineage handling. See [adoption](subscription-adopt-design.md).
 
+- [x] **Post-v0.1 TLS and quotas:** TLS alias reconciliation issues the exact
+  complete SAN set, including safe removal, and T16 Pebble covers add/remove,
+  certificate contents, renewal, and Apache rendering. Renewal recovery
+  snapshots are retained for 30 days per lineage; cleanup failure retains extra
+  evidence, and automatic post-crash restoration is intentionally prohibited
+  because operation completion cannot be inferred safely. Subscription quotas
+  are editable through `subscription quota set` and the administration
+  Overview tab (`e`), with a journaled SQLite update and rollback.
+
 ## Recent validation
 
 - `make test` passes: `go vet`, `staticcheck`, and race-enabled unit tests.
@@ -64,12 +73,6 @@ bootstraps, opens the TUI, and restores `pv:clean` after exit.
 
 - [ ] Cut the next public release from current `main` and repeat the signed
   GitHub Pages APT installation smoke test.
-- [ ] Expand the Pebble regression for alias/SAN add and removal, including
-  renewal after each direction.
-- [ ] Define retention and automatic crash-recovery policy for saved Certbot
-  renewal configurations.
-- [ ] Decide whether existing subscription quotas need an edit operation; the
-  current UI and CLI intentionally set them at creation time.
 
 ## Change rule
 

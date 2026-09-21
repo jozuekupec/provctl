@@ -74,6 +74,31 @@ type SubscriptionCreateOptions struct {
 	QuotaBackups   int
 }
 
+// UpdateQuotas replaces all quota limits for an existing subscription.
+// Zero keeps the established meaning of an unlimited limit.
+func (service SubscriptionService) UpdateQuotas(ctx context.Context, name string, options SubscriptionCreateOptions) (int64, error) {
+	if options.QuotaDiskBytes < 0 || options.QuotaWebsites < 0 || options.QuotaDatabases < 0 || options.QuotaBackups < 0 {
+		return 0, errors.New("quotas must not be negative")
+	}
+	subscription, err := service.Show(ctx, name)
+	if err != nil {
+		return 0, err
+	}
+	store, ok := service.Store.(interface {
+		UpdateSubscriptionQuotas(context.Context, int64, int64, int, int, int) error
+	})
+	if !ok {
+		return 0, errors.New("subscription quota updates are not supported by this store")
+	}
+	previous := SubscriptionCreateOptions{QuotaDiskBytes: subscription.QuotaDiskBytes, QuotaWebsites: subscription.QuotaWebsites, QuotaDatabases: subscription.QuotaDatabases, QuotaBackups: subscription.QuotaBackups}
+	operation := plan.Plan{Action: "subscription.quota.set", Target: name, Steps: []plan.Step{{Name: "record subscription quotas", Preview: "update subscription quotas in SQLite", Do: func(ctx context.Context) error {
+		return store.UpdateSubscriptionQuotas(ctx, subscription.ID, options.QuotaDiskBytes, options.QuotaWebsites, options.QuotaDatabases, options.QuotaBackups)
+	}, Undo: func(ctx context.Context) error {
+		return store.UpdateSubscriptionQuotas(ctx, subscription.ID, previous.QuotaDiskBytes, previous.QuotaWebsites, previous.QuotaDatabases, previous.QuotaBackups)
+	}}}}
+	return service.Executor.Run(ctx, operation)
+}
+
 // SubscriptionUsage is a read-only, derived overview for subscription lists.
 // It is intentionally separate from Subscription because neither website
 // counts nor disk usage are persisted subscription configuration.

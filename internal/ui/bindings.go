@@ -132,6 +132,7 @@ var bindings = []binding{
 	{Action: actionAdminTabNext, Group: "Navigation", Keys: []string{"shift+right"}, Label: "Shift+→", Help: "next administration tab", Contexts: contextsAdmin},
 	{Action: actionAdminClose, Group: "Navigation", Keys: []string{"esc"}, Label: "esc", Help: "return to workspace", Bar: "esc workspace", Short: "esc", Priority: 3, Contexts: contextsAdmin},
 	{Action: actionPicker, Group: "Navigation", Keys: []string{"s"}, Label: "s", Help: "return to subscription picker", Bar: "s subscriptions", Short: "s", Priority: 1, Contexts: contextsAdmin},
+	{Action: actionEdit, Group: "Actions", Keys: []string{"e"}, Label: "e", Help: "edit subscription quotas", Bar: "e quotas", Short: "quotas", Priority: 4, Contexts: []shortcutContext{shortcutAdminOverview}},
 	{Action: actionCreate, Group: "Actions", Keys: []string{"n"}, Label: "n", Help: "create database", Bar: "n create", Short: "create", Priority: 4, Contexts: []shortcutContext{shortcutAdminDatabases}},
 	{Action: actionRotateSecret, Group: "Actions", Keys: []string{"p"}, Label: "p", Help: "rotate selected database password", Bar: "p password", Short: "password", Priority: 5, Contexts: []shortcutContext{shortcutAdminDatabases}},
 	{Action: actionDelete, Group: "Actions", Keys: []string{"D"}, Label: "D", Help: "delete selected database", Bar: "D delete", Short: "delete", Priority: 6, Contexts: []shortcutContext{shortcutAdminDatabases}},
