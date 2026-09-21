@@ -8,11 +8,11 @@ Legend: `[x]` completed and validated, `[ ]` deferred or not yet scheduled.
 
 ## Current release state
 
-`v0.1.5` is the latest public release, published through the signed GitHub
-Pages APT repository and validated from that repository in a fresh Debian 13
-Incus system container. Main also contains post-release multi-type adoption
-work. The next release must rebuild, publish, and repeat the public APT smoke
-test from the current commit.
+`v0.1.6` is the latest public release. GitHub Actions built amd64 and arm64
+packages, published the GitHub Release, and updated the signed GitHub Pages
+APT repository. A fresh Debian 13 Incus container verified the public key,
+installed exactly `0.1.6` from `stable`, ran bootstrap and doctor, and updated
+an existing subscription's quotas.
 
 The working integration target is the disposable Debian 13 Incus container
 `pv`. Restore it with `./scripts/e2.sh reset` before a scenario and after a
@@ -61,8 +61,8 @@ bootstraps, opens the TUI, and restores `pv:clean` after exit.
 ## Recent validation
 
 - `make test` passes: `go vet`, `staticcheck`, and race-enabled unit tests.
-- Public `v0.1.5` was installed from GitHub Pages in fresh Debian 13; bootstrap,
-  doctor, quota-limited hosting and Apache serving were checked.
+- Public `v0.1.6` was installed from GitHub Pages in fresh Debian 13; bootstrap,
+  doctor, quota creation and a persisted quota update were checked.
 - Pebble E3 verified HTTP-01 issuance, forced renewal, deploy hook, and TLS
   disable without using public ACME limits.
 - A current-package `pv` run validated `static`, `proxy`, `redirect`, and
@@ -71,8 +71,6 @@ bootstraps, opens the TUI, and restores `pv:clean` after exit.
 
 ## Deferred follow-up
 
-- [ ] Cut the next public release from current `main` and repeat the signed
-  GitHub Pages APT installation smoke test.
 
 ## Change rule
 
