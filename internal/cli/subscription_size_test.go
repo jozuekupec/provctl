@@ -8,7 +8,7 @@ func TestParseByteSize(t *testing.T) {
 		want  int64
 		valid bool
 	}{
-		{"", 0, true}, {"20G", 20 * 1024 * 1024 * 1024, true}, {"2m", 2 * 1024 * 1024, true}, {"1T", 1024 * 1024 * 1024 * 1024, true}, {"0", 0, false}, {"20GB", 0, false}, {"-1G", 0, false},
+		{"", 0, true}, {"0", 0, true}, {"20G", 20 * 1024 * 1024 * 1024, true}, {"2m", 2 * 1024 * 1024, true}, {"1T", 1024 * 1024 * 1024 * 1024, true}, {"20GB", 0, false}, {"-1G", 0, false},
 	}
 	for _, test := range tests {
 		t.Run(test.input, func(t *testing.T) {

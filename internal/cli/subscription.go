@@ -324,7 +324,7 @@ func newSubscriptionQuotaCommand() *cobra.Command {
 var byteSize = regexp.MustCompile(`^([1-9][0-9]*)([KMGT]?)$`)
 
 func parseByteSize(value string) (int64, error) {
-	if value == "" {
+	if value == "" || value == "0" {
 		return 0, nil
 	}
 	match := byteSize.FindStringSubmatch(strings.ToUpper(value))
