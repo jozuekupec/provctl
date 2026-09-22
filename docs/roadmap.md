@@ -61,8 +61,9 @@ bootstraps, opens the TUI, and restores `pv:clean` after exit.
 ## Recent validation
 
 - `make test` passes: `go vet`, `staticcheck`, and race-enabled unit tests.
-- Public `v0.1.6` was installed from GitHub Pages in fresh Debian 13; bootstrap,
-  doctor, quota creation and a persisted quota update were checked.
+- Public `v0.1.7` was installed from GitHub Pages in fresh Debian 13; signing
+  fingerprint, bootstrap, doctor, quota creation, and changing disk quota to
+  the documented unlimited `0` value were checked.
 - Pebble E3 verified HTTP-01 issuance, forced renewal, deploy hook, and TLS
   disable without using public ACME limits.
 - A current-package `pv` run validated `static`, `proxy`, `redirect`, and
