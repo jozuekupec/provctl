@@ -346,7 +346,7 @@ spouštěj jen v jednorázové VM nebo CI a potvrď jej explicitně:
 PROVCTL_ALLOW_PRIVILEGED=1 ./scripts/test-release-docker.sh
 ```
 
-Výchozí očekávaná veřejná verze je aktuální stable `0.1.5`. Při novém release
+Výchozí očekávaná veřejná verze je aktuální stable `0.1.7`. Při novém release
 ji změň spolu s tagem, aby test neakceptoval nečekaný starší balíček:
 
 ```bash

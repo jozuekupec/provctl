@@ -8,11 +8,11 @@ Legend: `[x]` completed and validated, `[ ]` deferred or not yet scheduled.
 
 ## Current release state
 
-`v0.1.6` is the latest public release. GitHub Actions built amd64 and arm64
+`v0.1.7` is the latest public release. GitHub Actions built amd64 and arm64
 packages, published the GitHub Release, and updated the signed GitHub Pages
 APT repository. A fresh Debian 13 Incus container verified the public key,
-installed exactly `0.1.6` from `stable`, ran bootstrap and doctor, and updated
-an existing subscription's quotas.
+installed exactly `0.1.7` from `stable`, ran bootstrap and doctor, and updated
+an existing subscription's quotas, including the `0` unlimited disk value.
 
 The working integration target is the disposable Debian 13 Incus container
 `pv`. Restore it with `./scripts/e2.sh reset` before a scenario and after a
